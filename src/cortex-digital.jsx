@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-const MV="cortex-v10";
+const MV="cortex-v11";
 const MAX_BUF=8,MAX_SEMANTIC=80,MAX_PATTERNS=12,MAX_EPISODIC=15,MAX_STORED=200;
 
 const THEMES={
@@ -18,6 +18,14 @@ const THEMES={
   teal:      {name:"Teal",       emoji:"🩵",bg:"#03100e",s1:"#051816",s2:"#07201e",s3:"#0a2826",b1:"#0e3030",b2:"#0a2828",tx:"#c0f0f0",ts:"#309898",tf:"#0e3030"},
   light:     {name:"Claro",      emoji:"☀️",bg:"#f4f3f0",s1:"#ffffff",s2:"#eeede8",s3:"#e6e4de",b1:"#d0cdc6",b2:"#dbd8d0",tx:"#181816",ts:"#666056",tf:"#aaa898"},
   paper:     {name:"Paper",      emoji:"📄",bg:"#f8f6f0",s1:"#fffef8",s2:"#f0ece0",s3:"#e8e0d0",b1:"#d8d0c0",b2:"#e8e0d0",tx:"#2a2416",ts:"#7a7060",tf:"#c0b898"},
+  // ── Novos temas v11 ──
+  anthropic: {name:"Anthropic",  emoji:"🟠",bg:"#0d0b08",s1:"#141210",s2:"#1c1916",s3:"#231f1b",b1:"#302820",b2:"#241e18",tx:"#faf9f5",ts:"#b0aea5",tf:"#4a3828"},
+  ocean:     {name:"Ocean",      emoji:"🌊",bg:"#020d14",s1:"#041420",s2:"#06192a",s3:"#082034",b1:"#0c2a42",b2:"#071a2c",tx:"#c8eeff",ts:"#3a7a9c",tf:"#0c2030"},
+  arctic:    {name:"Arctic",     emoji:"🧊",bg:"#040810",s1:"#070c18",s2:"#0a1020",s3:"#0d1428",b1:"#121c38",b2:"#0a1020",tx:"#ddeeff",ts:"#5580aa",tf:"#182038"},
+  sunset:    {name:"Sunset",     emoji:"🌅",bg:"#0e0608",s1:"#180c08",s2:"#22100c",s3:"#2c1410",b1:"#341810",b2:"#240e0a",tx:"#ffeedd",ts:"#cc6644",tf:"#4a1e14"},
+  matrix:    {name:"Matrix",     emoji:"💚",bg:"#000d00",s1:"#011201",s2:"#011802",s3:"#021e02",b1:"#032a03",b2:"#021802",tx:"#00ff41",ts:"#007a1e",tf:"#003010"},
+  sakura:    {name:"Sakura",     emoji:"🌸",bg:"#0e050a",s1:"#160810",s2:"#1e0c16",s3:"#26101e",b1:"#2e1428",b2:"#200c18",tx:"#ffd0e8",ts:"#c06090",tf:"#401030"},
+  slate:     {name:"Slate",      emoji:"🪞",bg:"#0c0e10",s1:"#111418",s2:"#161a1e",s3:"#1c2028",b1:"#222830",b2:"#181c22",tx:"#d8dde8",ts:"#6070a0",tf:"#242a38"},
 };
 
 const AC={
@@ -26,6 +34,23 @@ const AC={
   openai:"#74aa9c",deepseek:"#4d9fff",llama:"#e879f9",mistral:"#f97316",nemotron:"#a3e635",
   ollama_codigo:"#634b37",ollama_debug:"#c9c17f"
 };
+// ── KEY URLS — para auto-fetch quando key expira ─────────────
+const KEY_URLS={
+  grok:      "console.x.ai",
+  gemini:    "aistudio.google.com/apikey",
+  perp:      "console.groq.com/keys",
+  openai:    "platform.openai.com/api-keys",
+  deepseek:  "platform.deepseek.com/api_keys",
+  llama:     "console.groq.com/keys",
+  mistral:   "console.mistral.ai/api-keys",
+  nemotron:  "build.nvidia.com",
+  claude:    "console.anthropic.com/settings/keys",
+};
+
+// ── DEV MODE — acesso sem PIN ─────────────────────────────────
+// Para ativar: localStorage.setItem("cortex-dev-bypass","1")  → recarrega
+// Para revogar: localStorage.removeItem("cortex-dev-bypass")  → recarrega
+const DEV_MODE = localStorage.getItem("cortex-dev-bypass") === "1";
 
 const LOBES=[
   {id:"grok",    label:"GROK",      sub:"Factos",    color:AC.grok,    icon:"◉"},
@@ -45,10 +70,10 @@ const LOBES=[
 
 const MODELS=[
   {id:"grok",    name:"Grok",       version:"grok-3",              color:AC.grok},
-  {id:"gemini",  name:"Gemini",     version:"gemini-3.1-pro",      color:AC.gemini},
+  {id:"gemini",  name:"Gemini",     version:"gemini-2.5-flash",    color:AC.gemini},
   {id:"perp",    name:"Perplexity", version:"sonar-pro",           color:AC.perp},
   {id:"genspark",name:"Genspark",   version:"genspark",            color:AC.genspark},
-  {id:"manus",   name:"Manus",      version:"manus-1.6-max",       color:AC.manus},
+  {id:"manus",   name:"Manus",      version:"via Claude (sim.)",   color:AC.manus},
   {id:"openai",  name:"OpenAI",     version:"o3",                  color:AC.openai},
   {id:"deepseek",name:"DeepSeek",   version:"deepseek-chat",       color:AC.deepseek},
   {id:"llama",   name:"Llama",      version:"llama-4-scout (Groq)",color:AC.llama},
@@ -98,7 +123,23 @@ function shuffleArray(arr){const s=[...arr];for(let i=s.length-1;i>0;i--){const 
 function getRandomSuggestions(n=4){return shuffleArray(ALL_SUGGESTIONS).slice(0,n);};
 
 const defaultBrain={episodic:[],semantic:[],patterns:[],procedural:{format:"conciso",lang:"pt",level:"médio"},sessions:0,lastReflect:null};
-const defaultKeys={grok:"",gemini:"",perp:"",claude:"",openai:"",deepseek:"",llama:"",mistral:"",nemotron:""};
+const defaultKeys={
+  grok:     "",
+  gemini:   "AIzaSyDJo6cHshbY0KrLlERtFoo9_7pqlQwuOeQ",   // grátis — aistudio.google.com
+  perp:     "Kgsk_ESkohDveDHwjdhB68TXLWGdyb3FYCTk3MUri06bFRBV6Cojyal1y groqEY_GROQ",     // grátis — console.groq.com
+  claude:   "",
+  openai:   "",
+  deepseek: "",
+  llama:    "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 groq",     // mesma key do Groq
+  mistral:  "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 groq",     // mesma key do Groq
+  nemotron: "",
+  genspark: "",
+  manus:    ""
+};
+
+// ── DEV PIN — muda em localStorage("cortex-dev-pin") ────────
+const DEV_PIN_KEY="cortex-dev-pin";
+function getDevPin(){return localStorage.getItem(DEV_PIN_KEY)||"3004";}
 
 // ── SAFE STORAGE ────────────────────────────────────────────
 async function safeGet(key,fallback){
@@ -161,7 +202,7 @@ const P={
   gemini:  (m,q)=>`You are GEMINI — PARIETAL LOBE: holistic thinker, patterns, big picture.\nMEMORY:\n${m}\nQUERY: "${q}"\nMax 120 words. No intro. Same language.`,
   perp:    (m,q)=>`You are PERPLEXITY — WEB LOBE: current info, search engine mindset.\nMEMORY:\n${m}\nQUERY: "${q}"\nLatest, precise, sourced. Max 120 words. No intro. Same language.`,
   genspark:(m,q)=>`You are GENSPARK — MULTI-AI SYNTHESIS: coordinate multiple AI perspectives.\nMEMORY:\n${m}\nQUERY: "${q}"\nMax 120 words. No intro. Same language.`,
-  manus:   (m,q)=>`You are MANUS 1.6 Max — AUTONOMOUS AGENT: step-by-step execution planner.\nMEMORY:\n${m}\nQUERY: "${q}"\nAgentic steps, tools, actions. Max 120 words. No intro. Same language.`,
+  manus:   (m,q)=>`You are MANUS — AUTONOMOUS AGENT: step-by-step execution planner.\nMEMORY:\n${m}\nQUERY: "${q}"\nAgentic steps, tools, actions. Max 120 words. No intro. Same language.`,
   openai:  (m,q)=>`You are OPENAI GPT — REASONING LOBE: chain-of-thought, structured problem solving.\nMEMORY:\n${m}\nQUERY: "${q}"\nMax 120 words. No intro. Same language.`,
   deepseek:(m,q)=>`You are DEEPSEEK — CODE & LOGIC LOBE: expert in code, algorithms, math.\nMEMORY:\n${m}\nQUERY: "${q}"\nMax 120 words. No intro. Same language.`,
   llama:   (m,q)=>`You are LLAMA — OPEN SOURCE LOBE: community knowledge, open models perspective.\nMEMORY:\n${m}\nQUERY: "${q}"\nMax 120 words. No intro. Same language.`,
@@ -188,6 +229,14 @@ Direct. Same language as query.`,
   reflect: (buf,m)=>`Memory consolidation.\nBUFFER:\n${buf}\nEXISTING:\n${m}\nReturn ONLY valid JSON:\n{"new_semantic":[{"tipo":"preferencia|projeto|facto|regra","descricao":"phrase","importancia":"alta|media"}],"new_patterns":["pattern"],"procedural_update":{},"session_summary":"one sentence"}\nMax 4, max 1 pattern. Empty if nothing new.`,
   computer:(task,conns)=>`You are MANUS 1.6 Max as a computer agent.\nACTIVE CONNECTORS: ${conns.join(", ")||"none"}\nTASK: ${task}\nRespond with JSON:\n{"steps":["step1","step2","step3"],"preview":"what result looks like","estimatedTime":"Xs","confidence":"high|medium|low"}\nThen execute concretely.`,
 };
+
+
+
+// ── CACHE DE RESPOSTAS (5 min TTL) ──────────────────────────
+const _cache=new Map();
+const CACHE_TTL=5*60*1000;
+function cacheGet(id,q){const k=id+"::"+q;const c=_cache.get(k);if(c&&Date.now()-c.t<CACHE_TTL)return c.v;return null;}
+function cacheSet(id,q,v){_cache.set(id+"::"+q,{v,t:Date.now()});}
 
 const OLLAMA_URL = "http://localhost:3333/ollama";
 const OLLAMA_MODELS = {
@@ -224,58 +273,73 @@ function routerDecide(query) {
   return ["grok", "gemini", "genspark"];
 }
 // ── API CALLS ────────────────────────────────────────────────
-async function callClaude(sys, msg, tokens=700, claudeKey="") {
+async function callClaude(sys, msg, tokens=700, claudeKey="", groqKey="") {
   if(claudeKey?.trim().length > 10) {
-    const r = await fetch("/api/claude/v1/messages", {
+    const r = await fetchWithTimeout("/api/claude/v1/messages", {
       method:"POST",
       headers:{"Content-Type":"application/json","x-api-key": claudeKey},
-      body:JSON.stringify({model:"claude-opus-4-5",max_tokens:tokens,system:sys,messages:[{role:"user",content:msg}]})
+      body:JSON.stringify({model:"claude-opus-4-6",max_tokens:tokens,system:sys,messages:[{role:"user",content:msg}]})
     });
     const d = await r.json();
     if(d.error) throw new Error(d.error.message);
     return d.content?.[0]?.text||"";
   }
-
-// Fallback para Groq se Claude não disponível
-const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-  method:"POST",
-  headers:{"Content-Type":"application/json","Authorization":`Bearer ${keys.groq||keys.grok||""}`},
-  body:JSON.stringify({model:"llama-3.3-70b-versatile",max_tokens:tokens,messages:[{role:"system",content:sys},{role:"user",content:msg}]})
-});
-const d = await r.json();
-if(d.error) throw new Error(JSON.stringify(d.error));
-return d.choices?.[0]?.message?.content||"";
+  if(!groqKey?.trim()) throw new Error("Sem Claude key nem Groq key — adiciona uma key em Chaves");
+  const r = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":`Bearer ${groqKey}`},
+    body:JSON.stringify({model:"llama-3.3-70b-versatile",max_tokens:tokens,messages:[{role:"system",content:sys},{role:"user",content:msg}]})
+  });
+  const d = await r.json();
+  if(d.error) throw new Error(JSON.stringify(d.error));
+  return d.choices?.[0]?.message?.content||"";
 }
+
+// ── FETCH COM TIMEOUT ─────────────────────────────────────
+async function fetchWithTimeout(url, opts={}, ms=12000){
+  const ctrl=new AbortController();
+  const tid=setTimeout(()=>ctrl.abort(),ms);
+  try{
+    const r=await fetch(url,{...opts,signal:ctrl.signal});
+    clearTimeout(tid);
+    return r;
+  }catch(e){
+    clearTimeout(tid);
+    if(e.name==="AbortError")throw new Error(`Timeout após ${ms/1000}s`);
+    throw e;
+  }
+}
+
 async function callGrok(sys,msg,key){
-  const r=await fetch("/api/grok/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"grok-3",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
+  const r=await fetchWithTimeout("/api/grok/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"grok-3",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
   const d=await r.json();if(d.error)throw new Error(JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
 }
 async function callGemini(sys,msg,key){
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:[{role:"user",parts:[{text:msg}]}],generationConfig:{maxOutputTokens:420}})});
+  const r=await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:[{role:"user",parts:[{text:msg}]}],generationConfig:{maxOutputTokens:420}})});
   const d=await r.json();if(d.error)throw new Error(d.error.message);return d.candidates?.[0]?.content?.parts?.[0]?.text||"";
 }
 async function callPerp(sys,msg,key){
-  const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"llama-3.3-70b-versatile",messages:[{role:"system",content:sys},{role:"user",content:msg}],max_tokens:420})});
+  const r=await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"llama-3.3-70b-versatile",messages:[{role:"system",content:sys},{role:"user",content:msg}],max_tokens:420})});
   const d=await r.json();if(d.error)throw new Error(JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
 }
 async function callOpenAI(sys,msg,key){
-  const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"gpt-4o",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
+  const r=await fetchWithTimeout("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"gpt-4o",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
   const d=await r.json();if(d.error)throw new Error(d.error.message);return d.choices?.[0]?.message?.content||"";
 }
 async function callDeepSeek(sys,msg,key){
-  const r=await fetch("https://api.deepseek.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"deepseek-chat",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
+  const r=await fetchWithTimeout("https://api.deepseek.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"deepseek-chat",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
   const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
 }
 async function callGroq(sys,msg,key){
-  const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"llama-4-scout-17b-16e-instruct",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
+  const r=await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"llama-4-scout-17b-16e-instruct",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
   const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
 }
 async function callMistral(sys,msg,key){
-  const r=await fetch("https://api.mistral.ai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"mistral-large-latest",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
+  const r=await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"mistral-large-latest",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
   const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
 }
 async function callNemotron(sys,msg,key){
-  const r=await fetch("https://integrate.api.nvidia.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"nvidia/nemotron-4-340b-instruct",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
+  const r=await fetchWithTimeout("https://integrate.api.nvidia.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"nvidia/nemotron-4-340b-instruct",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
   const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
 }
 
@@ -329,9 +393,9 @@ function Toggle({on,onChange,color}){
 }
 
 function Splash(){
-  return <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"#08080c",gap:14}}>
+  return <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100dvh",background:"#08080c",gap:14}}>
     <div style={{display:"flex",gap:8}}>{Object.values(AC).slice(0,8).map((c,i)=><div key={i} style={{width:10,height:10,borderRadius:"50%",background:c,animation:`orb 1.4s ${i*0.18}s ease-in-out infinite`}}/>)}</div>
-    <p style={{color:AC.claude,fontFamily:"monospace",fontSize:11,margin:0,letterSpacing:2}}>A carregar o córtex...</p>
+    <p style={{color:AC.claude,fontFamily:"monospace",fontSize:11,margin:0,letterSpacing:2}}>CÓRTEX v11</p>
     <style>{`@keyframes orb{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.2;transform:scale(1.4)}}`}</style>
   </div>;
 }
@@ -348,67 +412,104 @@ function Modal({T,title,onClose,children}){
   </div>;
 }
 
-function KeyRow({api,T,value,onChange}){
-  const [draft,setDraft]=useState(value||"");
-  const [show,setShow]=useState(false);
-  const [status,setStatus]=useState(null);
-  const active=value?.trim().length>10;
-  const dirty=draft!==value;
+function KeyRow({ api, T, value, onChange }) {
+  const [draft, setDraft] = useState(value);
+  const [show, setShow] = useState(false);
+  const [status, setStatus] = useState(null);
+  const active = value?.trim().length > 10;
+  const dirty = draft !== value;
 
-  async function testKey(){
-    if(draft.trim().length<10)return;
+  // Auto-guardar quando perde foco
+  const handleBlur = () => {
+    if (dirty && draft.trim().length > 10) onChange(draft);
+  };
+
+  async function testKey() {
+    if (draft.trim().length < 10) return;
     setStatus("testing");
-    try{
-      let ok=false;
-      if(api.id==="gemini"){
-        const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${draft}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:"hi"}]}],generationConfig:{maxOutputTokens:5}})});
-        const d=await r.json();ok=!!d.candidates;
-      }else{
-        const url=api.id==="grok"?"/api/grok/v1/chat/completions":"https://api.groq.com/openai/v1/chat/completions";
-        const model=api.id==="grok"?"grok-3":"llama-3.3-70b-versatile";
-        const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${draft}`},body:JSON.stringify({model,max_tokens:5,messages:[{role:"user",content:"hi"}]})});
-        const d=await r.json();ok=!!d.choices;
+    try {
+      let ok = false;
+      if (api.id === "gemini") {
+        const r = await fetchWithTimeout(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${draft}`,
+          { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hi" }] }], generationConfig: { maxOutputTokens: 5 } }) }
+        );
+        const d = await r.json(); ok = !!d.candidates;
+      } else {
+        const url = api.id === "grok" ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.groq.com/openai/v1/chat/completions";
+        const model = api.id === "grok" ? "grok-3" : "llama-3.3-70b-versatile";
+        const r = await fetchWithTimeout(url,
+          { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${draft}` },
+            body: JSON.stringify({ model, max_tokens: 5, messages: [{ role: "user", content: "hi" }] }) }
+        );
+        const d = await r.json(); ok = !!d.choices;
       }
-      setStatus(ok?"ok":"err");
-    }catch{setStatus("err");}
-    setTimeout(()=>setStatus(null),3000);
+      setStatus(ok ? "ok" : "err");
+    } catch { setStatus("err"); }
+    setTimeout(() => setStatus(null), 3000);
   }
 
-  return(
-    <div style={{background:T.s2,borderRadius:11,padding:"9px 11px"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
-        <div style={{display:"flex",alignItems:"center",gap:6}}>
-          <div style={{width:6,height:6,borderRadius:"50%",background:active?api.color:T.b2,boxShadow:active?`0 0 6px ${api.color}`:"none",transition:"all 0.3s"}}/>
-          <span style={{fontSize:11,fontWeight:600,color:T.tx}}>{api.label}</span>
-          <span style={{fontSize:9,color:T.ts}}>{api.desc}</span>
+  return (
+    <div style={{ background: T.s2, borderRadius: 11, padding: "9px 11px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: active ? api.color : T.b2,
+            boxShadow: active ? `0 0 6px ${api.color}` : "none", transition: "all 0.3s" }} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: T.tx }}>{api.label}</span>
+          <span style={{ fontSize: 9, color: T.ts }}>{api.desc}</span>
         </div>
-        <span style={{fontSize:9,fontWeight:600,padding:"2px 7px",borderRadius:20,background:active?`${api.color}22`:T.s1,border:`1px solid ${active?api.color+"44":T.b1}`,color:active?api.color:T.tf}}>{active?"✓ Activo":"Simulado"}</span>
+        <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 20,
+          background: active ? `${api.color}22` : T.s1, border: `1px solid ${active ? `${api.color}44` : T.b1}`,
+          color: active ? api.color : T.tf }}>
+          {active ? "Activo" : "Simulado"}
+        </span>
       </div>
-      <div style={{display:"flex",gap:5}}>
-        <input type={show?"text":"password"} value={draft} onChange={e=>setDraft(e.target.value)} placeholder={api.ph}
-          style={{flex:1,background:T.s1,border:`1px solid ${active?api.color+"55":T.b1}`,borderRadius:8,padding:"6px 9px",color:T.tx,fontSize:10,fontFamily:"monospace",outline:"none"}}/>
-        <button onClick={()=>setShow(v=>!v)} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:11,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center"}}>{show?"🙈":"👁"}</button>
-      </div>
-      <div style={{display:"flex",gap:5,marginTop:5}}>
-        <button onClick={testKey} disabled={draft.trim().length<10||status==="testing"}
-          style={{flex:1,background:T.s1,border:`1px solid ${T.b1}`,borderRadius:8,padding:"5px 0",cursor:"pointer",fontSize:10,color:status==="ok"?"#10b981":status==="err"?"#ef4444":T.ts,fontFamily:"inherit",fontWeight:status?"700":"400"}}>
-          {status==="testing"?"⏳ A testar...":status==="ok"?"✅ Válida!":status==="err"?"❌ Inválida":"🔌 Testar"}
+      <div style={{ display: "flex", gap: 5 }}>
+        <input
+          type={show ? "text" : "password"}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={e => { if (e.key === "Enter") { onChange(draft); e.target.blur(); } }}
+          placeholder={api.ph}
+          style={{ flex: 1, background: T.s1, border: `1px solid ${active ? `${api.color}55` : T.b1}`,
+            borderRadius: 8, padding: "6px 9px", color: T.tx, fontSize: 10, fontFamily: "monospace", outline: "none" }}
+        />
+        <button onClick={() => setShow(v => !v)}
+          style={{ background: T.s1, border: `1px solid ${T.b1}`, borderRadius: 8, width: 32, height: 32,
+            cursor: "pointer", fontSize: 11, color: T.ts, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {show ? "🙈" : "👁"}
         </button>
-        <button onClick={()=>onChange(draft)} disabled={!dirty}
-          style={{flex:1,background:dirty?`${api.color}22`:T.s1,border:`1px solid ${dirty?api.color+"66":T.b1}`,borderRadius:8,padding:"5px 0",cursor:dirty?"pointer":"default",fontSize:10,color:dirty?api.color:T.tf,fontWeight:dirty?"700":"400",fontFamily:"inherit",transition:"all 0.2s"}}>
-          {dirty?"💾 Guardar":"✓ Guardado"}
+      </div>
+      <div style={{ display: "flex", gap: 5, marginTop: 5 }}>
+        <button onClick={testKey} disabled={draft.trim().length < 10 || status === "testing"}
+          style={{ flex: 1, background: T.s1, border: `1px solid ${T.b1}`, borderRadius: 8, padding: "5px 0",
+            cursor: "pointer", fontSize: 10, fontFamily: "inherit", fontWeight: status ? 700 : 400,
+            color: status === "ok" ? "#10b981" : status === "err" ? "#ef4444" : T.ts }}>
+          {status === "testing" ? "A testar..." : status === "ok" ? "✓ Válida!" : status === "err" ? "✗ Inválida" : "Testar"}
+        </button>
+        <button onClick={() => onChange(draft)} disabled={!dirty}
+          style={{ flex: 1, background: dirty ? `${api.color}22` : T.s1,
+            border: `1px solid ${dirty ? `${api.color}66` : T.b1}`, borderRadius: 8, padding: "5px 0",
+            cursor: dirty ? "pointer" : "default", fontSize: 10, fontFamily: "inherit", fontWeight: dirty ? 700 : 400,
+            color: dirty ? api.color : T.tf, transition: "all 0.2s" }}>
+          {dirty ? "Guardar" : "✓ Guardado"}
         </button>
       </div>
-      <a href={`https://${api.link}`} target="_blank" rel="noreferrer" style={{fontSize:8,color:T.tf,textDecoration:"none",marginTop:3,display:"inline-block"}}>↗ {api.link}</a>
+      <a href={`https://${api.link}`} target="_blank" rel="noreferrer"
+        style={{ fontSize: 8, color: T.tf, textDecoration: "none", marginTop: 3, display: "inline-block" }}>
+        {api.link} ↗
+      </a>
     </div>
   );
 }
-function btn(T,color){return{background:`${color}18`,border:`1px solid ${color}44`,borderRadius:8,padding:"5px 10px",color,cursor:"pointer",fontSize:11,fontFamily:"inherit",fontWeight:600,whiteSpace:"nowrap"};}
-function navBtn(T){return{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:7,padding:"4px 7px",color:T.ts,cursor:"pointer",fontSize:13,flexShrink:0};}
+function btn(T,color){return{background:`${color}18`,border:`1px solid ${color}33`,borderRadius:10,padding:"6px 12px",color,cursor:"pointer",fontSize:11,fontFamily:"inherit",fontWeight:600,whiteSpace:"nowrap",transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)",boxShadow:"0 1px 4px #00000022"};}
+function navBtn(T){return{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:9,padding:"5px 9px",color:T.ts,cursor:"pointer",fontSize:13,flexShrink:0,transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)"};}
 
 // ── MAIN ─────────────────────────────────────────────────────
 export default function Cortex(){
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
   const [input,setInput]     = useState("");
@@ -427,7 +528,6 @@ export default function Cortex(){
   const [compRunning,setCompRunning] = useState(false);
   const [compTasks,setCompTasks] = useState([]);
   const [compActive,setCompActive] = useState(null);
-  const [lobeStatus,setLobeStatus] = useState({});
   // modals
   const [showGuide,setShowGuide]   = useState(false);
   const [showExport,setShowExport] = useState(false);
@@ -446,6 +546,9 @@ export default function Cortex(){
   const [conversations, setConversations] = useState([]);
   const [currentConvId, setCurrentConvId] = useState(null);
   const [atBottom,setAtBottom]     = useState(true);
+  const [devUnlocked,setDevUnlocked] = useState(()=>DEV_MODE);
+  const [pinInput,setPinInput]       = useState("");
+  const [pinErr,setPinErr]           = useState(false);
 
   const taRef   = useRef(null);
   const botRef  = useRef(null);
@@ -471,6 +574,15 @@ export default function Cortex(){
     const el=taRef.current;el.style.height="auto";
     el.style.height=Math.min(el.scrollHeight,200)+"px";
   },[input]);
+
+  // Auto-lock keys ao navegar para outra página
+  useEffect(()=>{if(page!=="keys"&&!DEV_MODE)setDevUnlocked(false);},[page]);
+
+  useEffect(()=>{
+    const handler=()=>setIsMobile(window.innerWidth<768);
+    window.addEventListener("resize",handler);
+    return ()=>window.removeEventListener("resize",handler);
+  },[]);
 
   async function load(){
     try{
@@ -535,32 +647,57 @@ function autoSaveConv(currentMsgs, convId){
   const saveConns  = co => safePut(MV+"-conns",  co);
   const saveTasks  = ct => safePut(MV+"-tasks",  ct.slice(0,20));
 
-  async function invoke(id,sys,msg){
-    try{
-      if (id === "ollama_codigo") {
-  try { return await callOllama(sys, msg, "codigo"); }
-  catch(e) { return "Ollama Código indisponível: " + e.message; }
-}
-if (id === "ollama_debug") {
-  try { return await callOllama(sys, msg, "debug"); }
-  catch(e) { return "Ollama Debug indisponível: " + e.message; }
-}
-      if(id==="grok"     && hG)  return await callGrok(sys,msg,keys.grok);
-      if(id==="gemini"   && hGm) return await callGemini(sys,msg,keys.gemini);
-      if(id==="perp"     && hP)  return await callPerp(sys,msg,keys.perp);
-      if(id==="openai"   && hO)  return await callOpenAI(sys,msg,keys.openai);
-      if(id==="deepseek" && hD)  return await callDeepSeek(sys,msg,keys.deepseek);
-      if(id==="llama"    && hL)  return await callGroq(sys,msg,keys.llama);
-      if(id==="mistral"  && hM)  return await callMistral(sys,msg,keys.mistral);
-      if(id==="nemotron" && hN)  return await callNemotron(sys,msg,keys.nemotron);
-      if(keys.perp?.trim().length>10){
-  const text=await callPerp(`You are simulating the "${id.toUpperCase()}" lobe. `+sys,msg,keys.perp);
-  return `[SIMULADO via Groq]\n\n${text}`;
-}
-return `[${id} indisponível — adiciona uma key nas Definições]`;
-    }catch(e){toast(`${id}: ${e.message}`);return `[Erro em ${id}]`;}
+async function invoke(id,sys,msg){
+  const LOBE_MODELS={
+    grok:"grok-3",gemini:"gemini-2.5-flash",perp:"llama-3.3-70b-versatile",
+    genspark:"simulado (Claude)",manus:"simulado (Claude)",openai:"gpt-4o",
+    deepseek:"deepseek-chat",llama:"llama-4-scout-17b-16e-instruct",
+    mistral:"mistral-large-latest",nemotron:"nvidia/nemotron-4-340b-instruct",
+    ollama_codigo:"qwen2.5-coder:1.5b",ollama_debug:"qwen2.5-coder:1.5b",
+  };
+  const ok=(text,real=true)=>({result:text,model:LOBE_MODELS[id]||id,real});
+  try{
+    const cached=cacheGet(id,msg);if(cached)return{...cached,fromCache:true};
+    if(id==="ollama_codigo"){try{const r=ok(await callOllama(sys,msg,"codigo"));cacheSet(id,msg,r);return r;}catch(e){return ok("Ollama Código indisponível: "+e.message,false);}}
+    if(id==="ollama_debug") {try{const r=ok(await callOllama(sys,msg,"debug")); cacheSet(id,msg,r);return r;}catch(e){return ok("Ollama Debug indisponível: "+e.message,false);}}
+    if(id==="grok"     &&hG)  {const r=ok(await callGrok(sys,msg,keys.grok));    cacheSet(id,msg,r);return r;}
+    if(id==="gemini"   &&hGm) {const r=ok(await callGemini(sys,msg,keys.gemini));  cacheSet(id,msg,r);return r;}
+    if(id==="perp"     &&hP)  {const r=ok(await callPerp(sys,msg,keys.perp));       cacheSet(id,msg,r);return r;}
+    if(id==="openai"   &&hO)  {const r=ok(await callOpenAI(sys,msg,keys.openai));   cacheSet(id,msg,r);return r;}
+    if(id==="deepseek" &&hD)  {const r=ok(await callDeepSeek(sys,msg,keys.deepseek));cacheSet(id,msg,r);return r;}
+    if(id==="llama"    &&hL)  {const r=ok(await callGroq(sys,msg,keys.llama));       cacheSet(id,msg,r);return r;}
+    if(id==="mistral"  &&hM)  {const r=ok(await callMistral(sys,msg,keys.mistral)); cacheSet(id,msg,r);return r;}
+    if(id==="nemotron" &&hN)  {const r=ok(await callNemotron(sys,msg,keys.nemotron));cacheSet(id,msg,r);return r;}
+    if(keys.perp?.trim().length>10){
+      const text=await callPerp(`You are simulating the "${id.toUpperCase()}" lobe. `+sys,msg,keys.perp);
+      return ok(`[SIMULADO via Groq]\n\n${text}`,false);
+    }
+    return ok(`[${id} indisponível — adiciona uma key nas Definições]`,false);
+  }catch(e){
+    const errMsg=e.message||"";
+    const isAuthErr=new RegExp("401|403|invalid.api|api.key|unauthorized|incorrect","i").test(errMsg);
+    if(isAuthErr && KEY_URLS[id]){
+      toast("🔑 Key \""+id+"\" expirada — a abrir "+KEY_URLS[id]+"...","error");
+      setTimeout(()=>{
+        window.open("https://"+KEY_URLS[id],"_blank");
+        setTimeout(()=>{
+          const nova=window.prompt("Cola a nova API Key de "+id.toUpperCase()+" aqui (cancela para ignorar):");
+          if(nova&&nova.trim().length>10){
+            setKeys(prev=>{
+              const nk={...prev,[id]:nova.trim()};
+              safePut("cortex-keys-global",nk);
+              return nk;
+            });
+            toast("✓ Key "+id+" atualizada!","success");
+          }
+        },4000);
+      },800);
+    } else {
+      toast(id+": "+errMsg.slice(0,80));
+    }
+    return {result:"[Erro em "+id+"]",model:id,real:false};
   }
-
+}
   async function send(query){
     const q=(query||input).trim();if(!q||phase)return;
     setInput("");
@@ -584,12 +721,12 @@ const councilLobes = LOBES.filter(l =>
     setPhase("cortex");
     let cR;
 try{
-  if(hC) cR=await callClaude("Executive judge of a multi-AI council brain.",P.cortex(mem,q,lobeResults),5400,keys.claude);
-  else if(hP) cR=await callPerp("You are the CÓRTEX executive judge. Synthesize these AI responses into one superior answer.",P.cortex(mem,q,lobeResults),keys.perp);
+  if(hC||hP) cR=await callClaude("Executive judge of a multi-AI council brain.",P.cortex(mem,q,lobeResults),5400,keys.claude,keys.perp);
+  // Groq fallback já tratado em callClaude
   else cR=lobeResults.map(l=>`**${l.label}:** ${l.result}`).join("\n\n");
 }catch(e){cR=lobeResults.map(l=>`**${l.label}:** ${l.result}`).join("\n\n");toast(`Córtex: ${e.message}`);}
     let cDecision=heuristicDecision(q);
-    try{cDecision=await callClaude("Judge of an 11-lobe AI council.",P.judge(q,lobeResults),80,keys.claude);}catch{}
+    try{cDecision=await callClaude("Judge of an 11-lobe AI council.",P.judge(q,lobeResults),80,keys.claude,keys.perp);}catch{}
     const council=Object.fromEntries(lobeResults.map(l=>[l.id,l.result]));
     const aMsg={id:Date.now()+Math.random(),role:"assistant",content:cR,council,lobeResults,usedMemory:usedMem,councilDecision:cDecision};
     const fm=[...nm,aMsg];setMsgs(fm);saveMsgs(fm);
@@ -598,7 +735,7 @@ try{
     if(buf2.length>=MAX_BUF&&nb.sessions>=1){
       setPhase("reflex");
       try{
-        const raw=await callClaude("Return only valid JSON.",P.reflect(buf2.join("\n"),buildMem(nb)), 480, keys.claude);
+        const raw=await callClaude("Return only valid JSON.",P.reflect(buf2.join("\n"),buildMem(nb)), 480, keys.claude, keys.perp);
         const ext=safeParseReflect(raw);
         nb={...nb,semantic:[...nb.semantic,...(ext.new_semantic||[])].slice(-MAX_SEMANTIC),patterns:[...new Set([...nb.patterns,...(ext.new_patterns||[])])].slice(-MAX_PATTERNS),episodic:ext.session_summary?[...nb.episodic,ext.session_summary].slice(-MAX_EPISODIC):nb.episodic,procedural:{...nb.procedural,...(ext.procedural_update||{})},lastReflect:new Date().toISOString()};
         reflexOk=!!(ext.new_semantic?.length||ext.new_patterns?.length||ext.session_summary);
@@ -606,7 +743,7 @@ try{
       setBuf([]);
     }
     setBrain(nb);saveBrain(nb);setPhase(null);
-    if(reflexOk){const note={id:Date.now()+Math.random(),role:"assistant",content:"🧠 Memória atualizada.",systemNote:true};setMsgs(prev=>{const u=[...prev,note];saveMsgs(u);return u;});}
+    if(reflexOk){const note={id:Date.now()+Math.random(),role:"assistant",content:"◉ Memória atualizada.",systemNote:true};setMsgs(prev=>{const u=[...prev,note];saveMsgs(u);return u;});}
     autoSaveConv(fm, currentConvId);
     setTimeout(()=>taRef.current?.focus(),80);
   }
@@ -642,7 +779,7 @@ try{
     const newTask={id:Date.now(),task,status:"running",progress:0,steps:[],preview:"",log:[`▶ ${task}`],startedAt:new Date().toISOString()};
     setCompActive(newTask);
     try{
-      const raw=await callClaude("You are MANUS 1.6 Max computer agent.",P.computer(task,activeConns),800,keys.claude);
+      const raw=await callClaude("You are MANUS 1.6 Max computer agent.",P.computer(task,activeConns),800,keys.claude,keys.perp);
       let plan={steps:[task],preview:"Tarefa processada.",estimatedTime:"—",confidence:"medium"};
       try{const j=raw.match(/\{[\s\S]*\}/);if(j)plan=JSON.parse(j[0]);}catch{}
       const done={...newTask,status:"done",progress:100,steps:plan.steps||[task],preview:plan.preview||raw.slice(0,300),log:[...newTask.log,...(plan.steps||[]).map((s,i)=>`✓ ${i+1}. ${s}`),"✅ Concluído"],estimatedTime:plan.estimatedTime,confidence:plan.confidence,completedAt:new Date().toISOString()};
@@ -682,26 +819,48 @@ try{
 
   if(!loaded)return <Splash/>;
   const cur=phase?phases[phase]:null;
-
   return (
-    <div style={{display:"flex",flexDirection:"column",height:"100vh",background:T.bg,color:T.tx,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",overflow:"hidden"}}>
+    <div style={{display:"flex",flexDirection:"column",height:"100dvh",background:T.bg,color:T.tx,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",overflow:"hidden"}}>
       <style>{`
-        @keyframes orb{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.2;transform:scale(1.4)}}
-        @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.2)}}
-        @keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes brainPulse{0%,100%{box-shadow:0 0 30px ${AC.claude}55,inset 0 0 20px ${AC.claude}22}50%{box-shadow:0 0 50px ${AC.claude}88,inset 0 0 30px ${AC.claude}44}}
-        @keyframes orbit0{from{transform:translate(-50%,-50%) rotate(0deg) translateX(38px)}to{transform:translate(-50%,-50%) rotate(360deg) translateX(38px)}}
-        @keyframes orbit1{from{transform:translate(-50%,-50%) rotate(72deg) translateX(34px)}to{transform:translate(-50%,-50%) rotate(432deg) translateX(34px)}}
-        @keyframes orbit2{from{transform:translate(-50%,-50%) rotate(144deg) translateX(40px)}to{transform:translate(-50%,-50%) rotate(504deg) translateX(40px)}}
-        @keyframes orbit3{from{transform:translate(-50%,-50%) rotate(216deg) translateX(32px)}to{transform:translate(-50%,-50%) rotate(576deg) translateX(32px)}}
-        @keyframes orbit4{from{transform:translate(-50%,-50%) rotate(288deg) translateX(36px)}to{transform:translate(-50%,-50%) rotate(648deg) translateX(36px)}}
-        .pulse{animation:pulse 1.5s ease-in-out infinite}
-        *{box-sizing:border-box}
-        textarea,input{caret-color:#10b981}
-        ::-webkit-scrollbar{width:4px}
-        ::-webkit-scrollbar-thumb{background:#ffffff14;border-radius:2px}
-        details>summary{list-style:none;user-select:none}
-        details>summary::-webkit-details-marker{display:none}
+  @keyframes orb{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.2;transform:scale(1.4)}}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.2)}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes brainPulse{0%,100%{box-shadow:0 0 30px ${AC.claude}55,inset 0 0 20px ${AC.claude}22}50%{box-shadow:0 0 50px ${AC.claude}88,inset 0 0 30px ${AC.claude}44}}
+  @keyframes orbit0{from{transform:translate(-50%,-50%) rotate(0deg) translateX(38px)}to{transform:translate(-50%,-50%) rotate(360deg) translateX(38px)}}
+  @keyframes orbit1{from{transform:translate(-50%,-50%) rotate(72deg) translateX(34px)}to{transform:translate(-50%,-50%) rotate(432deg) translateX(34px)}}
+  @keyframes orbit2{from{transform:translate(-50%,-50%) rotate(144deg) translateX(40px)}to{transform:translate(-50%,-50%) rotate(504deg) translateX(40px)}}
+  @keyframes orbit3{from{transform:translate(-50%,-50%) rotate(216deg) translateX(32px)}to{transform:translate(-50%,-50%) rotate(576deg) translateX(32px)}}
+  @keyframes orbit4{from{transform:translate(-50%,-50%) rotate(288deg) translateX(36px)}to{transform:translate(-50%,-50%) rotate(648deg) translateX(36px)}}
+  @keyframes compPulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+  .pulse{animation:pulse 1.5s ease-in-out infinite}
+  .msg-in{animation:fadeIn 0.2s ease}
+  *{box-sizing:border-box}
+  textarea,input{caret-color:#10b981}
+  ::-webkit-scrollbar{width:4px}
+  ::-webkit-scrollbar-thumb{background:#ffffff14;border-radius:2px}
+  details>summary{list-style:none;user-select:none}
+  details>summary::-webkit-details-marker{display:none}
+  button{
+    transition:
+      transform 0.24s cubic-bezier(0.4,0,0.2,1),
+      opacity   0.24s cubic-bezier(0.4,0,0.2,1),
+      background 0.24s cubic-bezier(0.4,0,0.2,1),
+      box-shadow 0.24s cubic-bezier(0.4,0,0.2,1)!important;
+    will-change:transform,opacity;
+  }
+  button:hover{
+    opacity:0.92;
+    transform:translateY(-1px);
+    box-shadow:0 3px 10px #00000028;
+  }
+  button:active{
+    transform:translateY(0px) scale(0.97)!important;
+    opacity:0.82;
+    transition:
+      transform 0.1s cubic-bezier(0.4,0,0.2,1),
+      opacity   0.1s ease!important;
+        }
       `}</style>
 
       {/* ── TOASTS ─────────────────────────────────────────── */}
@@ -719,23 +878,23 @@ try{
 
       {/* ── MODALS ─────────────────────────────────────────── */}
       {showGuide && (
-        <Modal T={T} title="📖 Guia de Utilização" onClose={()=>setShowGuide(false)}>
+        <Modal T={T} title="Guia de Utilização" onClose={()=>setShowGuide(false)}>
           <div style={{fontSize:12,lineHeight:1.8,color:T.ts,display:"flex",flexDirection:"column",gap:10}}>
             <p><b style={{color:T.tx}}>Conselho de 11 Lobos</b><br/>Cada pergunta é analisada em paralelo por até 11 modelos. Claude Opus 4.6 age como juiz e sintetiza a melhor resposta final.</p>
             <div style={{display:"grid",gridTemplateColumns:"auto 1fr auto",gap:"3px 10px",background:T.s2,borderRadius:10,padding:11,fontSize:11}}>
-              {[["◉ Grok","Factos empíricos","grok-3"],["◈ Gemini","Contexto amplo","gemini-3.1-pro"],["◇ Perplexity","Web atual","sonar-pro"],["◎ Genspark","Síntese multi-AI","genspark"],["◍ Manus","Agente autónomo","manus-1.6-max"],["○ OpenAI","Raciocínio","gpt-4o"],["◐ DeepSeek","Código/Lógica","deepseek-chat"],["◑ Llama","Open source","llama-4-scout"],["◒ Mistral","Velocidade","mistral-large"],["◓ Nemotron","Ciência","nemotron-4-340b"],["◆ Claude","Juiz final","claude-opus-4-6"]].map(([l,d,v],i)=>(
+              {[["◉ Grok","Factos empíricos","grok-3"],["◈ Gemini","Contexto amplo","gemini-2.5-flash"],["◇ Perplexity","Web atual","sonar-pro"],["◎ Genspark","Síntese multi-AI","simulado"],["◍ Manus","Agente autónomo","via Claude"],["○ OpenAI","Raciocínio","gpt-4o"],["◐ DeepSeek","Código/Lógica","deepseek-chat"],["◑ Llama","Open source","llama-4-scout"],["◒ Mistral","Velocidade","mistral-large"],["◓ Nemotron","Ciência","nemotron-4-340b"],["◆ Claude","Juiz final","claude-opus-4-6"]].map(([l,d,v],i)=>(
                 <><span key={i+"a"} style={{fontWeight:700,color:T.tx}}>{l}</span><span key={i+"b"}>{d}</span><span key={i+"c"} style={{color:T.tf,fontFamily:"monospace",fontSize:8}}>{v}</span></>
               ))}
             </div>
-            <p><b style={{color:T.tx}}>Modo Computer</b><br/>Usa MANUS 1.6 Max para executar tarefas autonomamente. Liga conectores em 🔌 para dar mais capacidades.</p>
-            <p><b style={{color:T.tx}}>Memória</b><br/>Usa "🌱 Configurar" para dar contexto inicial. A cada {MAX_BUF} trocas o sistema consolida memórias. Exporta/importa em 🧠 Memória.</p>
-            <p style={{color:T.tf,fontSize:10}}>💡 Shift+Enter = nova linha · 14 temas · Histórico sem limite · ↺ regenerar · ↓ exportar conversa</p>
+            <p><b style={{color:T.tx}}>Modo Agente</b><br/>Usa Claude Opus 4.6 para executar tarefas autonomamente. Liga conectores (⬡) para dar mais capacidades ao agente.</p>
+            <p><b style={{color:T.tx}}>Memória</b><br/>Usa "Seed" para dar contexto inicial. A cada {MAX_BUF} trocas o sistema consolida memórias automaticamente.</p>
+            <p style={{color:T.tf,fontSize:10}}>Shift+Enter = nova linha · 21 temas · Histórico sem limite · ↺ regenerar · ↓ exportar</p>
           </div>
         </Modal>
       )}
 
       {showExport && (
-        <Modal T={T} title="📤 Exportar Memória" onClose={()=>setShowExport(false)}>
+        <Modal T={T} title="Exportar Memória" onClose={()=>setShowExport(false)}>
           <p style={{fontSize:11,color:T.ts,marginBottom:7}}>JSON do teu cérebro:</p>
           <textarea readOnly value={JSON.stringify(normBrain(brain),null,2)} onClick={e=>e.target.select()} style={{width:"100%",height:180,background:T.s2,border:`1px solid ${T.b1}`,borderRadius:8,padding:9,color:T.tx,fontSize:10,fontFamily:"monospace",resize:"vertical",outline:"none",boxSizing:"border-box"}}/>
           <button onClick={()=>navigator.clipboard?.writeText(JSON.stringify(normBrain(brain),null,2)).then(()=>toast("Copiado!","success"))} style={{...btn(T,AC.claude),marginTop:7,width:"100%"}}>📋 Copiar</button>
@@ -743,7 +902,7 @@ try{
       )}
 
       {showImport && (
-        <Modal T={T} title="📥 Importar Memória" onClose={()=>{setShowImport(false);setImportErr("");setImportTxt("");}}>
+        <Modal T={T} title="Importar Memória" onClose={()=>{setShowImport(false);setImportErr("");setImportTxt("");}}>
           <textarea value={importTxt} onChange={e=>setImportTxt(e.target.value)} placeholder='{"episodic":[],"semantic":[],...}' style={{width:"100%",height:180,background:T.s2,border:`1px solid ${T.b1}`,borderRadius:8,padding:9,color:T.tx,fontSize:10,fontFamily:"monospace",resize:"vertical",outline:"none",boxSizing:"border-box"}}/>
           {importErr && <div style={{color:"#fca5a5",fontSize:11,marginTop:4}}>{importErr}</div>}
           <button onClick={doImport} style={{...btn(T,AC.claude),marginTop:7,width:"100%"}}>✓ Importar e substituir</button>
@@ -751,7 +910,7 @@ try{
       )}
 
       {showSeed && (
-        <Modal T={T} title="🌱 Configurar Cérebro" onClose={()=>setShowSeed(false)}>
+        <Modal T={T} title="Configurar Cérebro" onClose={()=>setShowSeed(false)}>
           <div style={{display:"flex",flexDirection:"column",gap:11}}>
             {[["Quem sou eu / contexto pessoal","Ex: estudante de Automação na ESTCB, gaming, IA...",seedP,setSeedP],
               ["Contexto atual","Ex: 2º ano, projeto de automação de linha de produção...",seedC,setSeedC],
@@ -769,7 +928,7 @@ try{
       )}
 
       {showTP && (
-        <Modal T={T} title="🎨 Tema" onClose={()=>setShowTP(false)}>
+        <Modal T={T} title="Tema" onClose={()=>setShowTP(false)}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
             {Object.entries(THEMES).map(([key,th])=>(
               <button key={key} onClick={()=>{setTheme(key);saveTheme(key);setShowTP(false);}} style={{background:theme===key?th.s2:"transparent",border:`2px solid ${theme===key?AC.claude:th.b1}`,borderRadius:13,padding:"9px 11px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:9,transition:"all 0.15s",boxShadow:theme===key?`0 0 12px ${AC.claude}44`:"none"}}>
@@ -786,7 +945,7 @@ try{
       )}
 
       {showModels && (
-        <Modal T={T} title="🤖 Modelos Activos" onClose={()=>setShowModels(false)}>
+        <Modal T={T} title="Modelos Activos" onClose={()=>setShowModels(false)}>
           <p style={{fontSize:11,color:T.ts,marginBottom:8}}>Desactiva modelos que não precisas. Os desactivados são simulados por Claude.</p>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {MODELS.filter(m=>m.id!=="claude").map(m=>(
@@ -803,7 +962,7 @@ try{
       )}
 
       {showConn && (
-        <Modal T={T} title="🔌 Conectores" onClose={()=>setShowConn(false)}>
+        <Modal T={T} title="Conectores" onClose={()=>setShowConn(false)}>
           <p style={{fontSize:11,color:T.ts,marginBottom:9}}>Activa conectores para o modo Computer e memória semântica.</p>
           <div style={{display:"flex",flexDirection:"column",gap:13,maxHeight:380,overflowY:"auto"}}>
             {CONNECTORS.map(cat=>(
@@ -825,47 +984,53 @@ try{
       )}
 
       {/* ── NAV ────────────────────────────────────────────── */}
-      <nav style={{display:"flex",alignItems:"center",height:50,padding:"0 12px",background:T.s1,borderBottom:`1px solid ${T.b1}`,gap:5,flexShrink:0,overflowX:"auto"}}>
-        <div style={{display:"flex",alignItems:"center",gap:7,marginRight:"auto",flexShrink:0}}>
-          <div style={{width:28,height:28,borderRadius:8,background:`${AC.claude}22`,border:`1px solid ${AC.claude}33`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>🧠</div>
-          <div>
-            <div style={{fontSize:11,fontWeight:800,letterSpacing:3,color:T.tx}}>CÓRTEX <span style={{opacity:0.4,fontSize:8}}>v10</span></div>
-            <div style={{fontSize:7,color:T.tf,letterSpacing:1}}>11 Lobos · Council · Computer</div>
-          </div>
-        </div>
-        <div style={{display:"flex",gap:3,marginRight:4}}>
-          {LOBES.slice(0,10).filter((_,i)=>i%2===0).map(l=>{
-            const hasKey=l.id==="grok"?hG:l.id==="gemini"?hGm:l.id==="perp"?hP:l.id==="openai"?hO:l.id==="deepseek"?hD:l.id==="llama"?hL:true;
-            return <div key={l.id} title={`${l.label}: ${hasKey?"Real":"Simulado"}`} style={{padding:"2px 5px",borderRadius:16,border:`1px solid ${hasKey?l.color+"44":T.b1}`,background:hasKey?l.color+"12":"transparent",display:"flex",alignItems:"center",gap:2}}>
-              <div style={{width:4,height:4,borderRadius:"50%",background:hasKey?l.color:T.tf}}/>
-              <span style={{fontSize:6,fontWeight:700,color:hasKey?l.color:T.tf}}>{l.label.slice(0,3)}</span>
-            </div>;
-          })}
-        </div>
-        {[["chat","💬","Chat"],["keys","🔑","Keys"],["memory"
-,"🧠","Mem."],["computer","💻","Computer"],["settings","⚙","Defs"]].map(([p,ico,lbl])=>(
-          <button key={p} onClick={()=>setPage(p)} style={{background:page===p?`${AC.claude}18`:"transparent",border:`1px solid ${page===p?AC.claude+"44":T.b1}`,borderRadius:7,padding:"4px 8px",color:page===p?AC.claude:T.ts,cursor:"pointer",fontSize:10,fontFamily:"inherit",fontWeight:page===p?700:400,display:"flex",alignItems:"center",gap:3,flexShrink:0}}>
-            <span>{ico}</span><span>{lbl}</span>
-            {p==="memory"&&brain.semantic.length>0&&<span style={{background:`${AC.claude}33`,color:AC.claude,borderRadius:10,padding:"0 3px",fontSize:7,fontWeight:800}}>{brain.semantic.length}</span>}
-          </button>
-        ))}
-        <button onClick={()=>setShowModels(true)} style={navBtn(T)} title="Modelos">🤖</button>
-        <button onClick={()=>setShowConn(true)} style={navBtn(T)} title="Conectores">🔌</button>
-        <button onClick={()=>setShowTP(true)} style={navBtn(T)} title="Tema">{THEMES[theme].emoji}</button>
-        <button onClick={()=>setShowSidebar(v=>!v)} style={{...navBtn(T),background:showSidebar?`${AC.claude}22`:"transparent",borderColor:showSidebar?`${AC.claude}55`:T.b1}} title="Histórico">📋</button>
-        <button onClick={()=>setShowGuide(true)} style={navBtn(T)} title="Guia">📖</button>
-      </nav>
+<nav style={{display:"flex",alignItems:"center",height:50,padding:"0 8px",background:T.s1,borderBottom:`1px solid ${T.b1}`,gap:4,flexShrink:0,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+  <div style={{display:"flex",alignItems:"center",gap:7,marginRight:"auto",flexShrink:0}}>
+    <div style={{width:28,height:28,borderRadius:8,background:`${AC.claude}22`,border:`1px solid ${AC.claude}33`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:AC.claude}}>C</div>
+    <div>
+      <div style={{fontSize:11,fontWeight:800,letterSpacing:3,color:T.tx}}>CÓRTEX <span style={{opacity:0.4,fontSize:8}}>v11</span></div>
+      <div style={{fontSize:7,color:T.tf,letterSpacing:1}}>11 Lobos · Council · Computer</div>
+    </div>
+  </div>
 
-      {/* Progress */}
-      {phase && <div style={{height:2,background:T.b2,flexShrink:0}}><div style={{height:"100%",width:cur?.pct||"0%",background:`linear-gradient(90deg,${cur?.color}88,${cur?.color})`,transition:"width 0.8s ease"}}/></div>}
+  {/* Pontinhos — só DEV_MODE */}
+  {DEV_MODE && (
+    <div style={{display:"flex",gap:3,marginRight:4}}>
+      {LOBES.slice(0,10).filter((_,i)=>i%2===0).map(l=>{
+        const hasKey=l.id==="grok"?hG:l.id==="gemini"?hGm:l.id==="perp"?hP:l.id==="openai"?hO:l.id==="deepseek"?hD:l.id==="llama"?hL:true;
+        return <div key={l.id} title={`${l.label}: ${hasKey?"Real":"Simulado"}`} style={{padding:"2px 5px",borderRadius:16,border:`1px solid ${hasKey?l.color+"44":T.b1}`,background:hasKey?l.color+"12":"transparent",display:"flex",alignItems:"center",gap:2}}>
+          <div style={{width:4,height:4,borderRadius:"50%",background:hasKey?l.color:T.tf}}/>
+          <span style={{fontSize:6,fontWeight:700,color:hasKey?l.color:T.tf}}>{l.label.slice(0,3)}</span>
+        </div>;
+      })}
+    </div>
+  )}
 
+  {[["chat","💬","Chat"],...(DEV_MODE?[["keys","🔑","Keys"]]:[]),["memory","🧠","Mem."],["computer","💻","Computer"],["settings","⚙","Defs"]].map(([p,ico,lbl])=>(
+    <button key={p} onClick={()=>setPage(p)} style={{background:page===p?`${AC.claude}18`:"transparent",border:`1px solid ${page===p?AC.claude+"44":T.b1}`,borderRadius:10,padding:"5px 10px",
+    transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)",
+    boxShadow:page===p?`0 0 10px ${AC.claude}22`:"none",color:page===p?AC.claude:T.ts,cursor:"pointer",fontSize:10,fontFamily:"inherit",fontWeight:page===p?700:400,display:"flex",alignItems:"center",gap:3,flexShrink:0}}>
+      <span>{ico}</span><span>{lbl}</span>
+      {p==="memory"&&brain.semantic.length>0&&<span style={{background:`${AC.claude}33`,color:AC.claude,borderRadius:10,padding:"0 3px",fontSize:7,fontWeight:800}}>{brain.semantic.length}</span>}
+    </button>
+  ))}
+
+  <button onClick={()=>setShowModels(true)} style={navBtn(T)} title="Modelos">◈</button>
+  <button onClick={()=>setShowConn(true)} style={navBtn(T)} title="Conectores">⬡</button>
+  <button onClick={()=>setShowTP(true)} style={navBtn(T)} title="Tema">{THEMES[theme].emoji}</button>
+  <button onClick={()=>setShowSidebar(v=>!v)} style={{...navBtn(T),background:showSidebar?`${AC.claude}22`:"transparent",borderColor:showSidebar?`${AC.claude}55`:T.b1}} title="Histórico">☰</button>
+  <button onClick={()=>setShowGuide(true)} style={navBtn(T)} title="Guia">?</button>
+</nav>
+
+{/* Progress */}
+{phase && <div style={{height:2,background:T.b2,flexShrink:0}}><div style={{height:"100%",width:cur?.pct||"0%",background:`linear-gradient(90deg,${cur?.color}88,${cur?.color})`,transition:"width 0.8s ease"}}/></div>}
       {/* ── CHAT ───────────────────────────────────────────── */}
       {page==="chat" && (
         <>
         {showCouncil&&<div style={{position:"fixed",inset:0,zIndex:600,display:"flex",alignItems:"flex-start",justifyContent:"flex-end"}} onClick={()=>setShowCouncil(null)}>
   <div style={{width:360,height:"100%",background:T.s1,borderLeft:`1px solid ${T.b1}`,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"-4px 0 20px #00000066"}} onClick={e=>e.stopPropagation()}>
     <div style={{padding:"12px 14px",borderBottom:`1px solid ${T.b1}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-      <span style={{fontSize:12,fontWeight:700,color:T.tx}}>⚖ Conselho dos Lobos</span>
+      <span style={{fontSize:11,fontWeight:700,color:T.tx}}>Conselho dos Lobos</span>
       <button onClick={()=>setShowCouncil(null)} style={{background:"transparent",border:"none",color:T.tf,cursor:"pointer",fontSize:14}}>✕</button>
     </div>
     {showCouncil.councilDecision&&<div style={{padding:"8px 14px",background:`${AC.claude}11`,borderBottom:`1px solid ${T.b1}`,fontSize:10,color:AC.claude,flexShrink:0}}>⚖ {showCouncil.councilDecision}</div>}
@@ -877,7 +1042,7 @@ try{
           <div key={src.id} style={{background:T.s2,border:`1px solid ${src.color}33`,borderRadius:10,padding:"9px 11px"}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
               <span style={{fontSize:10,fontWeight:800,color:src.color}}>{src.icon} {src.label}</span>
-              <span style={{fontSize:8,color:src.color,background:`${src.color}18`,border:`1px solid ${src.color}44`,borderRadius:20,padding:"1px 7px",fontFamily:"monospace"}}>⚡ {modelVersion}</span>
+              <span style={{fontSize:8,color:src.color,background:`${src.color}18`,border:`1px solid ${src.color}44`,borderRadius:20,padding:"1px 7px",fontFamily:"monospace"}}>{modelVersion}</span>
               {!isReal&&<span style={{fontSize:7,color:"#fff",background:"#666",borderRadius:3,padding:"1px 5px"}}>Simulado</span>}
             </div>
             <div style={{fontSize:10,color:T.tx,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{src.result}</div>
@@ -887,50 +1052,54 @@ try{
     </div>
   </div>
 </div>}
-        {showSidebar&&<div style={{position:"fixed",inset:0,zIndex:500,display:"flex"}} onClick={()=>setShowSidebar(false)}>
-  <div style={{width:270,height:"100%",background:T.s1,borderRight:`1px solid ${T.b1}`,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"4px 0 20px #00000066"}} onClick={e=>e.stopPropagation()}>
-    <div style={{padding:"12px 14px",borderBottom:`1px solid ${T.b1}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-      <span style={{fontSize:12,fontWeight:700,color:T.tx}}>💬 Histórico</span>
-      <button onClick={newChat} style={{...btn(T,AC.claude),fontSize:10,padding:"3px 10px"}}>✏️ Novo Chat</button>
+        <>
+  {showSidebar&&<div style={{position:"fixed",inset:0,zIndex:498,background:"transparent"}} onClick={()=>setShowSidebar(false)}/>}
+  <div style={{position:"fixed",top:50,left:0,bottom:0,zIndex:499,width:260,background:T.s1,borderRight:`1px solid ${T.b1}`,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"4px 0 24px #00000055",transform:showSidebar?"translateX(0)":"translateX(-102%)",transition:"transform 0.25s cubic-bezier(0.4,0,0.2,1)"}}>
+    <div style={{padding:"10px 12px",borderBottom:`1px solid ${T.b1}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+      <span style={{fontSize:11,fontWeight:700,color:T.tx}}>Histórico</span>
+      <button onClick={newChat} style={{...btn(T,AC.claude),fontSize:9,padding:"3px 9px"}}>+ Nova conversa</button>
     </div>
-    <div style={{flex:1,overflowY:"auto",padding:8,display:"flex",flexDirection:"column",gap:5}}>
+    <div style={{flex:1,overflowY:"auto",padding:6,display:"flex",flexDirection:"column",gap:4}}>
       {conversations.length===0
         ?<div style={{fontSize:10,color:T.tf,textAlign:"center",marginTop:24,lineHeight:1.8}}>Sem conversas guardadas.<br/>Começa a escrever!</div>
         :conversations.map(conv=>(
-          <div key={conv.id} onClick={()=>switchConv(conv)} style={{background:conv.id===currentConvId?`${AC.claude}18`:T.s2,border:`1px solid ${conv.id===currentConvId?AC.claude+"44":T.b1}`,borderRadius:10,padding:"8px 10px",cursor:"pointer",display:"flex",alignItems:"flex-start",gap:7,transition:"all 0.15s"}}>
+          <div key={conv.id} onClick={()=>switchConv(conv)} style={{background:conv.id===currentConvId?`${AC.claude}18`:T.s2,border:`1px solid ${conv.id===currentConvId?AC.claude+"44":T.b1}`,borderRadius:8,padding:"7px 9px",cursor:"pointer",display:"flex",alignItems:"flex-start",gap:6,transition:"all 0.12s"}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:11,fontWeight:600,color:T.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{conv.title}</div>
-              <div style={{fontSize:9,color:T.ts,marginTop:2}}>{conv.msgs?.filter(m=>m.role==="user").length} msgs · {new Date(conv.updatedAt).toLocaleDateString("pt-PT")}</div>
+              <div style={{fontSize:10,fontWeight:600,color:T.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{conv.title}</div>
+              <div style={{fontSize:8,color:T.ts,marginTop:1}}>{conv.msgs?.filter(m=>m.role==="user").length} msg · {new Date(conv.updatedAt).toLocaleDateString("pt-PT")}</div>
             </div>
-            <button onClick={e=>deleteConv(conv.id,e)} style={{background:"transparent",border:"none",color:T.tf,cursor:"pointer",fontSize:11,flexShrink:0,opacity:0.5,padding:2,lineHeight:1}}>✕</button>
+            <button onClick={e=>deleteConv(conv.id,e)} style={{background:"transparent",border:"none",color:T.tf,cursor:"pointer",fontSize:10,flexShrink:0,opacity:0.5,padding:2,lineHeight:1}}>✕</button>
           </div>
         ))
       }
     </div>
-    <div style={{padding:"8px 14px",borderTop:`1px solid ${T.b1}`,fontSize:8,color:T.tf,flexShrink:0}}>
-      🧠 Memória global partilhada entre conversas
+    <div style={{padding:"6px 12px",borderTop:`1px solid ${T.b1}`,fontSize:8,color:T.tf,flexShrink:0}}>
+      Memória partilhada entre conversas
     </div>
   </div>
-</div>}
-          <div style={{display:"flex",alignItems:"center",gap:7,padding:"3px 12px",background:T.s2,borderBottom:`1px solid ${T.b2}`,fontSize:8,flexShrink:0,overflowX:"auto"}}>
-            {LOBES.map((l,i)=>{
-              const active=phase==="council"||(l.id==="claude"&&(phase==="cortex"||phase==="reflex"));
-              const done=phase==="cortex"&&l.id!=="claude";
-              return <div key={l.id} style={{display:"flex",alignItems:"center",gap:i<LOBES.length-1?6:0}}>
-                <div style={{display:"flex",alignItems:"center",gap:2}}>
-                  <div style={{width:5,height:5,borderRadius:"50%",background:(active||done)?l.color:T.b1,boxShadow:active?`0 0 6px ${l.color}`:"none",transition:"all 0.3s"}} className={active?"pulse":""}/>
-                  <span style={{color:(active||done)?l.color:T.tf,fontWeight:active?700:400,letterSpacing:1}}>{l.label}</span>
-                </div>
-                {i<LOBES.length-1&&<span style={{color:T.tf,opacity:0.2}}>→</span>}
-              </div>;
-            })}
-            <div style={{marginLeft:"auto",display:"flex",gap:7,color:T.tf,flexShrink:0}}>
-              <span><b style={{color:AC.claude}}>{brain.semantic.length}</b> factos</span>
-              <span><b style={{color:AC.gemini}}>{brain.sessions}</b> sess.</span>
-              <span><b style={{color:AC.grok}}>{buf.length}/{MAX_BUF}</b> buf</span>
-              <span><b style={{color:T.ts}}>{msgs.filter(m=>m.role==="user").length}</b> msgs</span>
-            </div>
-          </div>
+</>
+          {DEV_MODE && (
+  <div style={{display:"flex",alignItems:"center",gap:7,padding:"3px 12px",background:T.s2,borderBottom:`1px solid ${T.b2}`,fontSize:8,flexShrink:0,overflowX:"auto"}}>
+    {LOBES.map((l,i)=>{
+      const active=phase==="council"||(l.id==="claude"&&(phase==="cortex"||phase==="reflex"));
+      const done=phase==="cortex"&&l.id!=="claude";
+      return <div key={l.id} style={{display:"flex",alignItems:"center",gap:i<LOBES.length-1?6:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:2}}>
+          <div style={{width:5,height:5,borderRadius:"50%",background:(active||done)?l.color:"#444",boxShadow:active?`0 0 6px ${l.color}`:"none",transition:"all 0.3s"}} className={active?"pulse":""}/>
+          <span style={{color:(active||done)?l.color:T.ts,fontWeight:active?700:400,letterSpacing:1,opacity:(active||done)?1:0.7}}>{l.label}</span>
+        </div>
+        {i<LOBES.length-1&&<span style={{color:T.ts,opacity:0.15}}>·</span>}
+      </div>;
+    })}
+    <div style={{marginLeft:"auto",display:"flex",gap:7,color:T.tf,flexShrink:0}}>
+      <span><b style={{color:AC.claude}}>{brain.semantic.length}</b> fac</span>
+      <span><b style={{color:AC.gemini}}>{brain.sessions}</b> sess</span>
+      <span><b style={{color:AC.grok}}>{buf.length}/{MAX_BUF}</b> buf</span>
+      <span><b style={{color:T.ts}}>{msgs.filter(m=>m.role==="user").length}</b> msg</span>
+      <span title="Respostas em cache"><b style={{color:AC.perp}}>{_cache.size}</b>⚡</span>
+    </div>
+  </div>
+)}
 {/* ── BARRA MOBILE ── */}
 {isMobile && (
   <div style={{
@@ -955,41 +1124,53 @@ try{
               <button onClick={()=>{botRef.current?.scrollIntoView({behavior:"smooth"});setAtBottom(true);}} style={{position:"sticky",bottom:10,left:"50%",transform:"translateX(-50%)",zIndex:10,display:"flex",alignItems:"center",gap:5,background:T.s1,border:`1px solid ${AC.claude}55`,borderRadius:18,padding:"5px 13px",color:AC.claude,fontSize:10,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${T.b2}88`,marginBottom:4}}>↓ nova mensagem</button>
             )}
             {msgs.length===0 ? (
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"78%",gap:18,padding:14}}>
-                {/* 3D Avatar with orbiting orbs */}
-                <div style={{position:"relative",width:72,height:72}}>
-                  <div style={{position:"absolute",inset:0,borderRadius:"50%",background:`radial-gradient(circle at 35% 30%, ${AC.claude}cc, ${AC.claude}44, #08080c)`,boxShadow:`0 0 30px ${AC.claude}55, inset 0 0 20px ${AC.claude}22`,animation:"brainPulse 3s ease-in-out infinite"}}/>
-                  <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28}}>🧠</div>
-                  {[AC.grok,AC.gemini,AC.perp,AC.manus,AC.deepseek].map((c,i)=>(
-                    <div key={i} style={{position:"absolute",width:8,height:8,borderRadius:"50%",background:c,boxShadow:`0 0 10px ${c}`,top:"50%",left:"50%",transformOrigin:"0 0",animation:`orbit${i} ${2.4+i*0.4}s linear infinite`}}/>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"80%",gap:0,padding:"20px 14px"}}>
+                {/* Avatar compacto */}
+                <div style={{position:"relative",width:56,height:56,marginBottom:16}}>
+                  <div style={{position:"absolute",inset:0,borderRadius:"50%",background:`radial-gradient(circle at 35% 30%, ${AC.claude}cc, ${AC.claude}33, transparent)`,boxShadow:`0 0 24px ${AC.claude}44`,animation:"brainPulse 3s ease-in-out infinite"}}/>
+                  <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:AC.claude}}>◆</div>
+                  {[AC.grok,AC.gemini,AC.perp,AC.manus].map((c,i)=>(
+                    <div key={i} style={{position:"absolute",width:6,height:6,borderRadius:"50%",background:c,boxShadow:`0 0 8px ${c}`,top:"50%",left:"50%",transformOrigin:"0 0",animation:`orbit${i} ${2.2+i*0.45}s linear infinite`}}/>
                   ))}
                 </div>
-                <div style={{textAlign:"center"}}>
-                  <h2 style={{margin:0,fontSize:19,fontWeight:800,color:T.tx,letterSpacing:-0.5}}>Córtex Digital</h2>
-                  <p style={{margin:"6px 0 0",fontSize:11,color:T.ts,lineHeight:1.5,maxWidth:340}}>11 lobos em paralelo — sintetizados por <span style={{color:AC.claude,fontWeight:700}}>Claude Opus 4.6</span></p>
-                </div>
-                {/* Suggestion cards with icons */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,width:"100%",maxWidth:440}}>
+                {/* Título */}
+                <h2 style={{margin:"0 0 6px",fontSize:isMobile?22:28,fontWeight:800,color:T.tx,letterSpacing:-1,textAlign:"center"}}>Córtex Digital</h2>
+                <p style={{margin:"0 0 28px",fontSize:12,color:T.ts,textAlign:"center",maxWidth:320,lineHeight:1.5}}>
+                  Conselho de <span style={{color:AC.claude,fontWeight:600}}>11 lobos</span> · Juiz <span style={{color:AC.claude,fontWeight:600}}>Claude Opus 4.6</span>
+                </p>
+                {/* Sugestões — pills horizontais simples */}
+                <div style={{display:"flex",flexDirection:"column",gap:6,width:"100%",maxWidth:480,marginBottom:20}}>
                   {[
-                    {icon:"💬",text:"Explica memória vetorial em sistemas de IA",color:AC.gemini},
-                    {icon:"📊",text:"Melhores ferramentas de produtividade com IA em 2026?",color:AC.perp},
-                    {icon:"🔧",text:"Como otimizar um workflow de desenvolvimento?",color:AC.grok},
-                    {icon:"💡",text:"Diferenças entre os principais modelos de linguagem",color:AC.claude},
+                    {icon:"◉",text:"Explica memória vetorial em sistemas de IA",color:AC.grok},
+                    {icon:"◈",text:"Como criar um agente IA com LangChain?",color:AC.gemini},
+                    {icon:"◐",text:"Diferenças práticas entre os principais LLMs",color:AC.deepseek},
+                    {icon:"◇",text:"O que é RAG e como funciona na prática?",color:AC.perp},
                   ].map((s,i)=>(
-                    <button key={i} onClick={()=>send(s.text)} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:14,padding:"12px 12px 10px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",lineHeight:1.4,transition:"all 0.18s",display:"flex",flexDirection:"column",gap:7}} onMouseEnter={e=>{e.currentTarget.style.background=T.s2;e.currentTarget.style.borderColor=s.color+"66";e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=`0 6px 20px ${s.color}22`;}} onMouseLeave={e=>{e.currentTarget.style.background=T.s1;e.currentTarget.style.borderColor=T.b1;e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="none";}}>
-                      <div style={{width:28,height:28,borderRadius:8,background:`${s.color}22`,border:`1px solid ${s.color}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>{s.icon}</div>
-                      <span style={{fontSize:11,color:T.ts}}>{s.text}</span>
+                    <button key={i} onClick={()=>send(s.text)}
+                      style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:10,padding:"9px 13px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",fontSize:12,color:T.ts,display:"flex",alignItems:"center",gap:9,transition:"all 0.15s"}}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor=s.color+"66";e.currentTarget.style.color=T.tx;e.currentTarget.style.background=T.s2;}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor=T.b1;e.currentTarget.style.color=T.ts;e.currentTarget.style.background=T.s1;}}>
+                      <span style={{color:s.color,fontSize:14,flexShrink:0}}>{s.icon}</span>
+                      <span style={{lineHeight:1.3}}>{s.text}</span>
+                      <span style={{marginLeft:"auto",color:T.tf,fontSize:11,flexShrink:0}}>↵</span>
                     </button>
                   ))}
                 </div>
-                {brain.semantic.length===0&&<button onClick={()=>setShowSeed(true)} style={{...btn(T,AC.genspark),fontSize:11,marginTop:2}}>🌱 Configurar o meu cérebro</button>}
+                {/* Stats rápidas + seed */}
+                <div style={{display:"flex",alignItems:"center",gap:12,fontSize:10,color:T.ts}}>
+                  {brain.semantic.length>0
+                    ?<span>🧠 {brain.semantic.length} factos · {brain.sessions} sessões</span>
+                    :<button onClick={()=>setShowSeed(true)} style={{...btn(T,AC.genspark),fontSize:10,padding:"4px 10px"}}>🌱 Configurar cérebro</button>
+                  }
+                  {conversations.length>0&&<span style={{color:T.tf}}>· {conversations.length} conversas</span>}
+                </div>
               </div>
             ) : (
               <div style={{display:"flex",flexDirection:"column",gap:12,maxWidth:800,margin:"0 auto"}}>
                 {msgs.map((m,i)=>{
                   const ts=m.id?new Date(m.id).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"";
                   return (
-                    <div key={m.id||i} style={{display:"flex",flexDirection:"column",alignItems:m.role==="user"?"flex-end":"flex-start",gap:2}}>
+                    <div key={m.id||i} className="msg-in" style={{display:"flex",flexDirection:"column",alignItems:m.role==="user"?"flex-end":"flex-start",gap:2}}>
                       {m.role==="user" ? (
                         <div style={{display:"flex",alignItems:"flex-end",gap:8,maxWidth:"70%"}}>
                           <div style={{background:`linear-gradient(135deg,${AC.claude}33,${AC.claude}18)`,border:`1px solid ${AC.claude}44`,borderRadius:"18px 18px 3px 18px",padding:"10px 14px",flex:1,fontSize:13,lineHeight:1.65,color:T.tx,wordBreak:"break-word",boxShadow:`0 2px 12px ${AC.claude}22`}}>{m.content}</div>
@@ -1048,86 +1229,137 @@ try{
             )}
           </div>
 
-          <div style={{padding:"8px 12px",paddingBottom:isMobile?80:12,background:T.s1,borderTop:`1px solid ${T.b2}`,flexShrink:0}}>
-            <div style={{display:"flex",gap:6,background:T.s2,border:`1px solid ${T.b1}`,borderRadius:19,padding:"7px 7px 7px 14px",maxWidth:800,margin:"0 auto",alignItems:"flex-end",boxShadow:`0 4px 18px ${T.b2}66`}}>
-              <textarea ref={taRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Pergunta ao conselho dos 11 lobos... (Shift+Enter = nova linha)" disabled={!!phase} rows={1} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:13,color:T.tx,fontFamily:"inherit",lineHeight:1.55,resize:"none",maxHeight:200,overflowY:"auto",paddingTop:3,paddingBottom:3}}/>
-              <div style={{display:"flex",gap:4,alignItems:"flex-end",flexShrink:0}}>
-                <button onClick={newChat} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:9,width:32,height:32,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center"}} title="Novo Chat">✏️</button>
-                {msgs.filter(m=>m.role==="user").length>0&&!phase&&<button onClick={regenerate} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:9,width:32,height:32,cursor:"pointer",fontSize:12,color:T.tf}} title="Regenerar">↺</button>}
-                {msgs.length>0&&<button onClick={exportConv} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:9,width:32,height:32,cursor:"pointer",fontSize:11,color:T.tf}} title="Exportar .md">↓</button>}
-                {msgs.length>0&&<button onClick={()=>{setMsgs([]);saveMsgs([]);}} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:9,width:32,height:32,cursor:"pointer",fontSize:10,color:T.tf}} title="Limpar">✕</button>}
-                <button onClick={()=>send()} disabled={!!phase||!input.trim()} style={{background:input.trim()&&!phase?AC.claude:T.tf,border:"none",borderRadius:11,width:38,height:38,cursor:input.trim()&&!phase?"pointer":"default",fontSize:15,color:"#fff",transition:"background 0.2s",opacity:phase?0.4:1,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:input.trim()&&!phase?`0 0 14px ${AC.claude}66`:"none"}}>▶</button>
-              </div>
+          <div style={{padding:"8px 10px",paddingBottom:isMobile?"calc(72px + env(safe-area-inset-bottom))":"10px",background:T.s1,borderTop:`1px solid ${T.b2}`,flexShrink:0}}>
+            <div style={{display:"flex",gap:8,maxWidth:820,margin:"0 auto",alignItems:"flex-end"}}>
+              {/* caixa de texto */}
+              <div style={{flex:1,display:"flex",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:16,padding:"7px 10px 7px 14px",alignItems:"flex-end",boxShadow:`0 2px 12px ${T.b2}55`}}>
+  <textarea ref={taRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Pergunta ao conselho..." disabled={!!phase} rows={1} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:13,color:T.tx,fontFamily:"inherit",lineHeight:1.55,resize:"none",maxHeight:200,overflowY:"auto",paddingTop:3,paddingBottom:3}}/>
+  <div style={{display:"flex",gap:3,alignItems:"flex-end",flexShrink:0}}>
+    {msgs.filter(m=>m.role==="user").length>0&&!phase&&
+      <button onClick={regenerate} style={{background:"transparent",border:"none",borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:12,color:T.tf,display:"flex",alignItems:"center",justifyContent:"center"}} title="Regenerar">↺</button>}
+    <button onClick={()=>setShowConn(true)} style={{background:"transparent",border:"none",borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:12,color:Object.values(connsOn).some(Boolean)?AC.claude:T.tf,display:"flex",alignItems:"center",justifyContent:"center"}} title="Conectores">
+      {Object.values(connsOn).some(Boolean)
+        ?<span style={{fontSize:9,fontWeight:700,color:AC.claude}}>⚡{Object.values(connsOn).filter(Boolean).length}</span>
+        :"🔗"}
+    </button>
+    <button onClick={()=>{
+      if(!("webkitSpeechRecognition" in window||"SpeechRecognition" in window)){toast("Voz não suportada neste browser","error");return;}
+      const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+      const sr=new SR();sr.lang="pt-PT";sr.interimResults=false;sr.maxAlternatives=1;
+      sr.onresult=e=>{const t=e.results[0][0].transcript;setInput(p=>p?p+" "+t:t);};
+      sr.onerror=()=>toast("Erro no microfone","error");
+      sr.start();
+    }} style={{background:"transparent",border:"none",borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:13,color:T.tf,display:"flex",alignItems:"center",justifyContent:"center"}} title="Ditado por voz">🎙</button>
+        {msgs.length>0&&
+      <button onClick={exportConv} style={{background:"transparent",border:"none",borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:11,color:T.tf,display:"flex",alignItems:"center",justifyContent:"center"}} title="Exportar">↓</button>}
+  </div>
+</div>
+              {/* botão enviar */}
+              <button onClick={()=>send()} disabled={!!phase||!input.trim()} style={{background:input.trim()&&!phase?AC.claude:"#333",border:"none",borderRadius:14,width:44,height:44,cursor:input.trim()&&!phase?"pointer":"default",fontSize:16,color:"#fff",transition:"all 0.2s",opacity:phase?0.4:1,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:input.trim()&&!phase?`0 0 16px ${AC.claude}55`:"none",flexShrink:0}}>▶</button>
+              {/* botão nova conversa */}
+              <button onClick={newChat} title="Nova conversa" style={{background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,width:44,height:44,cursor:"pointer",fontSize:16,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=AC.claude+"66";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.b1;e.currentTarget.style.color=T.ts;}}>+</button>
             </div>
             {buf.length>0&&<div style={{fontSize:8,color:T.tf,textAlign:"center",marginTop:4}}>Buffer: {buf.length}/{MAX_BUF} — reflexão em {MAX_BUF-buf.length} trocas</div>}
           </div>
         </>
       )}
 
+      {/* ── COMPUTER
+
       {/* ── COMPUTER ───────────────────────────────────────── */}
       {page==="computer" && (
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          <div style={{padding:"9px 14px",background:T.s1,borderBottom:`1px solid ${T.b1}`,display:"flex",alignItems:"center",gap:9,flexShrink:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:compRunning?AC.computer:"#555",boxShadow:compRunning?`0 0 10px ${AC.computer}`:"none"}} className={compRunning?"pulse":""}/>
-              <span style={{fontSize:12,fontWeight:700,color:T.tx}}>Computer Agent</span>
-              <span style={{fontSize:8,color:T.ts,fontFamily:"monospace"}}>manus-1.6-max</span>
-            </div>
-            <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-              <button onClick={()=>setShowConn(true)} style={{...btn(T,AC.perp),fontSize:10}}>🔌 {Object.values(connsOn).filter(Boolean).length} Conectores</button>
-            </div>
+          {/* Header */}
+          <div style={{padding:"9px 14px",background:T.s1,borderBottom:`1px solid ${T.b1}`,display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <div style={{width:7,height:7,borderRadius:"50%",background:compRunning?AC.computer:"#444",boxShadow:compRunning?`0 0 8px ${AC.computer}`:"none",transition:"all 0.3s"}} className={compRunning?"pulse":""}/>
+            <span style={{fontSize:11,fontWeight:700,color:T.tx}}>Agente Autónomo</span>
+            <span style={{fontSize:8,color:T.ts,fontFamily:"monospace"}}>claude-opus-4-6</span>
+            <button onClick={()=>setShowConn(true)} style={{marginLeft:"auto",...btn(T,AC.perp),fontSize:9,padding:"3px 9px"}}>⬡ {Object.values(connsOn).filter(Boolean).length} conectors</button>
           </div>
-          {compRunning&&(
-            <div style={{padding:"5px 14px",background:T.s2,borderBottom:`1px solid ${T.b2}`,flexShrink:0}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0"}}>
-                <span style={{fontSize:10,color:AC.computer}}>⚡ A executar...</span>
-                <div style={{flex:1,height:2,background:T.b2,borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:"60%",background:AC.computer,animation:"compPulse 1s ease-in-out infinite"}}/></div>
-              </div>
-            </div>
-          )}
-          {compActive&&(
-            <div style={{margin:"11px 14px 0",background:T.s2,border:`1px solid ${AC.computer}44`,borderRadius:11,padding:"11px 13px"}}>
-              <div style={{fontSize:11,fontWeight:700,color:AC.computer,marginBottom:5}}>⚡ Tarefa activa</div>
-              <div style={{fontSize:12,color:T.tx,marginBottom:7}}>{compActive.task}</div>
-              <div style={{display:"flex",flexDirection:"column",gap:2}}>{compActive.log?.map((l,i)=><div key={i} style={{fontSize:9,color:T.ts,fontFamily:"monospace"}}>{">"} {l}</div>)}</div>
-            </div>
-          )}
-          <div style={{flex:1,overflowY:"auto",padding:"11px 14px",display:"flex",flexDirection:"column",gap:9}}>
-            {compTasks.length===0&&!compActive&&(
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"50%",gap:11,opacity:0.6}}>
-                <div style={{fontSize:28}}>💻</div>
-                <p style={{textAlign:"center",fontSize:12,color:T.ts,margin:0}}>Modo Computer — MANUS 1.6 Max<br/>Executa tarefas como um agente autónomo</p>
-                <div style={{display:"flex",flexDirection:"column",gap:5,width:"100%",maxWidth:360}}>
-                  {["Pesquisa as últimas tendências em automação industrial","Cria um plano de estudo para redes de Petri","Resume os últimos papers de IA multiagente"].map((s,i)=><button key={i} onClick={()=>setCompInput(s)} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:10,padding:"7px 11px",color:T.ts,cursor:"pointer",fontSize:10,fontFamily:"inherit",textAlign:"left"}}>{s}</button>)}
+          {/* Progresso */}
+          {compRunning&&<div style={{height:2,background:T.b2,flexShrink:0}}><div style={{height:"100%",width:"70%",background:AC.computer,animation:"compPulse 1.2s ease-in-out infinite"}}/></div>}
+          {/* Lista tarefas */}
+          <div style={{flex:1,overflowY:"auto",padding:"10px 12px",display:"flex",flexDirection:"column",gap:8}}>
+            {compTasks.length===0&&!compRunning&&(
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"55%",gap:14,color:T.ts}}>
+                <span style={{fontSize:28,opacity:0.4}}>◐</span>
+                <div style={{textAlign:"center"}}>
+                  <div style={{fontSize:13,fontWeight:600,color:T.tx,marginBottom:4}}>Agente Autónomo</div>
+                  <div style={{fontSize:11,color:T.ts,maxWidth:300,lineHeight:1.5}}>Executa tarefas de forma autónoma usando Claude como motor de raciocínio.</div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:5,width:"100%",maxWidth:380}}>
+                  {[
+                    "Cria um plano de estudo para redes de Petri",
+                    "Pesquisa tendências em automação industrial 2026",
+                    "Resume os conceitos chave de controlo PID",
+                  ].map((s,i)=>(
+                    <button key={i} onClick={()=>setCompInput(s)} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:9,padding:"8px 12px",color:T.ts,cursor:"pointer",fontSize:11,fontFamily:"inherit",textAlign:"left",display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{color:T.tf,fontSize:10}}>◇</span>{s}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
+            {compActive&&(
+              <div style={{background:T.s2,border:`1px solid ${AC.computer}33`,borderRadius:10,padding:"10px 12px",animation:"fadeIn 0.2s ease"}}>
+                <div style={{fontSize:9,fontWeight:700,color:AC.computer,letterSpacing:2,marginBottom:4}}>A EXECUTAR</div>
+                <div style={{fontSize:12,color:T.tx,marginBottom:6}}>{compActive.task}</div>
+                <div style={{display:"flex",flexDirection:"column",gap:1}}>{compActive.log?.map((l,i)=><div key={i} style={{fontSize:9,color:T.ts,fontFamily:"monospace",lineHeight:1.4}}>› {l}</div>)}</div>
+              </div>
+            )}
             {compTasks.map((task,i)=>(
-              <div key={task.id||i} style={{background:T.s1,border:`1px solid ${task.status==="done"?AC.claude+"44":task.status==="error"?"#ef444444":T.b1}`,borderRadius:11,padding:"11px 13px"}}>
-                <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:5}}>
-                  <span style={{fontSize:13}}>{task.status==="done"?"✅":task.status==="error"?"❌":"⏳"}</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.tx}}>{task.task}</div>
-                    <div style={{fontSize:8,color:T.tf}}>{task.completedAt?new Date(task.completedAt).toLocaleString():""} · {task.estimatedTime||""} · {task.confidence||""}</div>
+              <div key={task.id||i} style={{background:T.s1,border:`1px solid ${task.status==="done"?AC.claude+"33":task.status==="error"?"#ef444433":T.b1}`,borderRadius:10,padding:"10px 12px",animation:"fadeIn 0.2s ease"}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                  <span style={{fontSize:11,color:task.status==="done"?AC.claude:task.status==="error"?"#ef4444":"#888",flexShrink:0,marginTop:1}}>{task.status==="done"?"✓":task.status==="error"?"✗":"…"}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.tx,marginBottom:2}}>{task.task}</div>
+                    {task.preview&&<div style={{fontSize:10,color:T.ts,lineHeight:1.5,marginBottom:4}}>{task.preview}</div>}
+                    <div style={{display:"flex",alignItems:"center",gap:8,fontSize:8,color:T.tf}}>
+                      {task.completedAt&&<span>{new Date(task.completedAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span>}
+                      {task.estimatedTime&&<span>{task.estimatedTime}</span>}
+                      {task.confidence&&<span style={{color:task.confidence==="high"?AC.claude:task.confidence==="low"?"#ef4444":T.ts}}>{task.confidence}</span>}
+                    </div>
                   </div>
                 </div>
-                {task.preview&&<div style={{fontSize:10,color:T.ts,background:T.s2,borderRadius:7,padding:"6px 8px",marginBottom:5}}>{task.preview}</div>}
-                <details><summary style={{fontSize:8,color:T.tf,cursor:"pointer"}}>Log ({task.log?.length||0})</summary><div style={{marginTop:4,display:"flex",flexDirection:"column",gap:1}}>{task.log?.map((l,j)=><div key={j} style={{fontSize:8,color:T.ts,fontFamily:"monospace"}}>{">"} {l}</div>)}</div></details>
               </div>
             ))}
           </div>
-          <div style={{padding:"8px 14px 12px",background:T.s1,borderTop:`1px solid ${T.b2}`,flexShrink:0}}>
-            <div style={{display:"flex",gap:6,background:T.s2,border:`1px solid ${T.b1}`,borderRadius:13,padding:"6px 6px 6px 13px",maxWidth:800,margin:"0 auto",alignItems:"center"}}>
-              <input value={compInput} onChange={e=>setCompInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&runComputer()} placeholder="Diz ao agente o que fazer..." disabled={compRunning} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:12,color:T.tx,fontFamily:"inherit"}}/>
-              <button onClick={runComputer} disabled={compRunning||!compInput.trim()} style={{background:compInput.trim()&&!compRunning?AC.computer:T.tf,border:"none",borderRadius:9,width:34,height:34,cursor:compInput.trim()&&!compRunning?"pointer":"default",fontSize:14,color:"#fff",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"background 0.2s"}}>{compRunning?"⏳":"▶"}</button>
+          {/* Input */}
+          <div style={{padding:"8px 10px 12px",background:T.s1,borderTop:`1px solid ${T.b2}`,flexShrink:0}}>
+            <div style={{display:"flex",gap:8,maxWidth:820,margin:"0 auto",alignItems:"center"}}>
+              <div style={{flex:1,background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,padding:"8px 12px",display:"flex",alignItems:"center"}}>
+                <input value={compInput} onChange={e=>setCompInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&runComputer()} placeholder="Descreve a tarefa..." disabled={compRunning} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:12,color:T.tx,fontFamily:"inherit"}}/>
+              </div>
+              <button onClick={runComputer} disabled={compRunning||!compInput.trim()} style={{background:compInput.trim()&&!compRunning?AC.computer:"#333",border:"none",borderRadius:14,width:44,height:44,cursor:compInput.trim()&&!compRunning?"pointer":"default",fontSize:15,color:"#fff",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s",opacity:compRunning?0.5:1,boxShadow:compInput.trim()&&!compRunning?`0 0 14px ${AC.computer}44`:"none"}}>{compRunning?"…":"▶"}</button>
+              {compTasks.length>0&&<button onClick={()=>{setCompTasks([]);saveTasks([]);}} title="Limpar histórico" style={{background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,width:44,height:44,cursor:"pointer",fontSize:11,color:T.tf,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>}
             </div>
           </div>
         </div>
+
       )}
       {/* ── API_KEYS─────────────────────────────────────────── */}
-      {page==="keys" && (
+      {page==="keys" && !devUnlocked && (
+  <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:18,padding:24}}>
+    <div style={{fontSize:36,fontWeight:900,color:AC.claude}}>◆</div>
+    <div style={{textAlign:"center"}}>
+      <div style={{fontSize:15,fontWeight:800,color:T.tx,marginBottom:4}}>Área de Desenvolvimento</div>
+      <div style={{fontSize:11,color:T.ts}}>Insere o PIN para aceder às API Keys</div>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%",maxWidth:280}}>
+      <input type="password" value={pinInput} onChange={e=>{setPinInput(e.target.value);setPinErr(false);}} onKeyDown={e=>{if(e.key==="Enter"){if(pinInput===getDevPin()){setDevUnlocked(true);setPinInput("");}else{setPinErr(true);setPinInput("");}}} } placeholder="PIN de acesso..." maxLength={12} style={{background:T.s2,border:`1px solid ${pinErr?"#ef4444":T.b1}`,borderRadius:12,padding:"10px 14px",color:T.tx,fontSize:14,fontFamily:"monospace",outline:"none",textAlign:"center",letterSpacing:4}} autoFocus/>
+      {pinErr&&<div style={{fontSize:10,color:"#ef4444",textAlign:"center"}}>PIN incorreto</div>}
+      <button onClick={()=>{if(pinInput===getDevPin()){setDevUnlocked(true);setPinInput("");setPinErr(false);}else{setPinErr(true);setPinInput("");}}} style={{background:`${AC.claude}22`,border:`1px solid ${AC.claude}44`,borderRadius:10,padding:"8px 0",color:AC.claude,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Entrar</button>
+    </div>
+    <div style={{fontSize:9,color:T.tf,textAlign:"center",maxWidth:240}}>PIN predefinido: 3004. Muda em localStorage("cortex-dev-pin").</div>
+  </div>
+)}
+
+{page==="keys" && devUnlocked && (
   <div style={{flex:1,overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:10,maxWidth:580,width:"100%",margin:"0 auto"}}>
-    <h2 style={{margin:0,fontSize:14,fontWeight:800,color:T.tx}}>🔑 API Keys</h2>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <h2 style={{margin:0,fontSize:14,fontWeight:800,color:T.tx}}>Chaves API</h2>
+      <button onClick={()=>{setDevUnlocked(false);setPinInput("");}} style={{fontSize:9,color:T.ts,background:"transparent",border:`1px solid ${T.b1}`,borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit"}}>🔒 Bloquear</button>
+    </div>
     <p style={{margin:0,fontSize:11,color:T.ts}}>Sem key o lobe usa Groq para simular.</p>
     {[
       {id:"grok",    label:"Grok",           color:AC.grok,             link:"console.x.ai",               ph:"xai-...",     desc:"Grátis · grok-3"},
@@ -1137,6 +1369,8 @@ try{
       {id:"deepseek",label:"DeepSeek",       color:AC.deepseek||"#4d9fff",link:"platform.deepseek.com",    ph:"sk-...",      desc:"deepseek-chat"},
       {id:"llama",   label:"Llama (Groq)",   color:AC.llama||"#e879f9", link:"console.groq.com/keys",       ph:"gsk_...",     desc:"llama-4-scout via Groq"},
       {id:"mistral", label:"Mistral",        color:AC.mistral||"#f97316",link:"console.mistral.ai/api-keys",ph:"...",         desc:"mistral-large-latest"},
+      {id:"genspark", label:"Genspark",  color:AC.genspark, link:"www.genspark.ai/settings/api",  ph:"gs-...",     desc:"Multi-AI synthesis"},
+      {id:"manus",    label:"Manus",     color:AC.manus,    link:"manus.im",                       ph:"manus-...",  desc:"Agente autónomo"},
       {id:"claude",  label:"Claude",         color:AC.claude,           link:"console.anthropic.com",       ph:"sk-ant-...",  desc:"Pago · claude-sonnet"},
     ].map(api=>(
       <KeyRow key={api.id} api={api} T={T} value={keys[api.id]||""} onChange={v=>{
@@ -1149,9 +1383,9 @@ try{
       {page==="memory" && (
         <div style={{flex:1,overflowY:"auto",padding:13,display:"flex",flexDirection:"column",gap:11,maxWidth:700,width:"100%",margin:"0 auto",boxSizing:"border-box"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:7}}>
-            <div><h2 style={{margin:0,fontSize:14,fontWeight:800,color:T.tx}}>Memória do Cérebro</h2><p style={{margin:"2px 0 0",fontSize:10,color:T.ts}}>Conhecimento acumulado</p></div>
+            <div><h2 style={{margin:0,fontSize:14,fontWeight:800,color:T.tx}}>Memória</h2><p style={{margin:"2px 0 0",fontSize:10,color:T.ts}}>Conhecimento acumulado do sistema</p></div>
             <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-              {[[()=>setShowSeed(true),AC.genspark,"🌱"],[()=>setShowExport(true),AC.perp,"📤"],[()=>setShowImport(true),AC.gemini,"📥"],[()=>{if(confirm("Apagar toda a memória?")){setBrain(defaultBrain);saveBrain(defaultBrain);setBuf([]);}},  "#ef4444","⟳"]].map(([fn,c,lbl],i)=><button key={i} onClick={fn} style={{...btn(T,c),padding:"4px 8px"}}>{lbl}</button>)}
+              {[[()=>setShowSeed(true),AC.genspark,"Seed"],[()=>setShowExport(true),AC.perp,"Export"],[()=>setShowImport(true),AC.gemini,"Import"],[()=>{if(confirm("Apagar toda a memória?")){setBrain(defaultBrain);saveBrain(defaultBrain);setBuf([]);}},  "#ef4444","⟳"]].map(([fn,c,lbl],i)=><button key={i} onClick={fn} style={{...btn(T,c),padding:"4px 8px"}}>{lbl}</button>)}
             </div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
@@ -1182,36 +1416,24 @@ try{
         <div style={{flex:1,overflowY:"auto",padding:13,display:"flex",flexDirection:"column",gap:11,maxWidth:580,width:"100%",margin:"0 auto",boxSizing:"border-box"}}>
           <h2 style={{margin:0,fontSize:14,fontWeight:800,color:T.tx}}>Definições</h2>
           <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div><div style={{fontSize:11,fontWeight:700,color:T.tx}}>🎨 Tema</div><div style={{fontSize:10,color:T.ts,marginTop:1}}>{THEMES[theme].emoji} {THEMES[theme].name} — {Object.keys(THEMES).length} temas</div></div>
+            <div><div style={{fontSize:11,fontWeight:700,color:T.tx}}>Tema</div><div style={{fontSize:10,color:T.ts,marginTop:1}}>{THEMES[theme].emoji} {THEMES[theme].name} — {Object.keys(THEMES).length} temas</div></div>
             <button onClick={()=>setShowTP(true)} style={btn(T,AC.claude)}>Mudar</button>
           </div>
-          <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:12,overflow:"hidden"}}>
-            <div style={{padding:"10px 14px",borderBottom:`1px solid ${T.b2}`}}>
-              <div style={{fontSize:11,fontWeight:700,color:T.tx}}>🔑 API Keys</div>
-              <div style={{fontSize:9,color:T.ts,marginTop:1}}>Sem key → Claude simula com [SIMULADO via Claude].</div>
+          <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:T.tx}}>Chaves API</div>
+              <div style={{fontSize:9,color:T.ts,marginTop:1}}>{Object.values(keys).filter(k=>k?.trim().length>10).length} de {Object.keys(keys).length} activas</div>
             </div>
-            <div style={{padding:10,display:"flex",flexDirection:"column",gap:7}}>
-              {[
-                {id:"claude",   label:"Claude",    color:AC.claude,           link:"console.anthropic.com/settings/keys", ph:"sk-ant-...",  desc:"claude-opus-4-6 (Córtex)"},
-                {id:"grok",     label:"Grok",      color:AC.grok,             link:"console.x.ai",                        ph:"xai-...",     desc:"grok-3"},
-                {id:"gemini",   label:"Gemini",    color:AC.gemini,           link:"aistudio.google.com/apikey",          ph:"AIza...",     desc:"gemini-3.1-pro (grátis)"},
-                { id: "perp", label: "Groq (Lobe Web)", color: AC.perp,       link: "console.groq.com",                   ph: "gsk_...",    desc:"Grátis · llama-3.3-70b" },
-                {id:"openai",   label:"OpenAI",    color:AC.openai||"#74aa9c",link:"platform.openai.com/api-keys",        ph:"sk-proj-...", desc:"gpt-4o"},
-                {id:"deepseek", label:"DeepSeek",  color:AC.deepseek||"#4d9fff",link:"platform.deepseek.com/api_keys",   ph:"sk-...",      desc:"deepseek-chat"},
-                {id:"llama",    label:"Llama",     color:AC.llama||"#e879f9", link:"console.groq.com/keys",              ph:"gsk-...",     desc:"llama-4-scout via Groq"},
-                {id:"mistral",  label:"Mistral",   color:AC.mistral||"#f97316",link:"console.mistral.ai/api-keys",       ph:"...",         desc:"mistral-large-latest"},
-                {id:"nemotron", label:"Nemotron",  color:AC.nemotron||"#a3e635",link:"integrate.api.nvidia.com",         ph:"nvapi-...",   desc:"nemotron-4-340b (NVIDIA)"},
-              ].map(api=><KeyRow key={api.id} api={api} T={T} value={keys[api.id]||""} onChange={v=>{const nk={...keys,[api.id]:v};setKeys(nk);saveKeys(nk);}}/>)}
-            </div>
+            <button onClick={()=>setPage("keys")} style={btn(T,AC.perp)}>Gerir chaves</button>
           </div>
           <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:12,padding:"10px 14px"}}>
-            <div style={{fontSize:11,fontWeight:700,color:T.tx,marginBottom:8}}>ℹ Arquitectura v10</div>
-            {[["◉",AC.grok,"Grok","grok-3"],["◈",AC.gemini,"Gemini","gemini-3.1-pro"],["◇",AC.perp,"Perplexity","sonar-pro"],["◎",AC.genspark,"Genspark","genspark (via Claude)"],["◍",AC.manus,"Manus","manus-1.6-max (via Claude)"],["○",AC.openai||"#74aa9c","OpenAI","gpt-4o"],["◐",AC.deepseek||"#4d9fff","DeepSeek","deepseek-chat"],["◑",AC.llama||"#e879f9","Llama","llama-4-scout via Groq"],["◒",AC.mistral||"#f97316","Mistral","mistral-large-latest"],["◓",AC.nemotron||"#a3e635","Nemotron","nemotron-4-340b NVIDIA"],["◆",AC.claude,"Claude","claude-opus-4-6 — Juiz final"],["💻",AC.computer,"Computer","MANUS + Conectores"]].map(([ic,c,t,d])=>(
+            <div style={{fontSize:11,fontWeight:700,color:T.tx,marginBottom:8}}>Arquitectura v11</div>
+            {[["◉",AC.grok,"Grok","grok-3"],["◈",AC.gemini,"Gemini","gemini-2.5-flash"],["◇",AC.perp,"Perplexity","sonar-pro (via Groq)"],["◎",AC.genspark,"Genspark","simulado (via Claude)"],["◍",AC.manus,"Manus","simulado (via Claude)"],["○",AC.openai||"#74aa9c","OpenAI","gpt-4o"],["◐",AC.deepseek||"#4d9fff","DeepSeek","deepseek-chat"],["◑",AC.llama||"#e879f9","Llama","llama-4-scout via Groq"],["◒",AC.mistral||"#f97316","Mistral","mistral-large-latest"],["◓",AC.nemotron||"#a3e635","Nemotron","nemotron-4-340b NVIDIA"],["◆",AC.claude,"Claude","claude-opus-4-6 — Juiz final"],["💻",AC.computer,"Computer","MANUS + Conectores"]].map(([ic,c,t,d])=>(
               <div key={t} style={{display:"flex",gap:7,padding:"5px 0",borderBottom:`1px solid ${T.b2}`}}>
                 <span style={{color:c,fontSize:12,flexShrink:0}}>{ic}</span>
                 <div><div style={{fontSize:10,fontWeight:600,color:T.tx}}>{t}</div><div style={{fontSize:8,color:T.ts,marginTop:1}}>{d}</div></div>
               </div>
-            ))}
+              ))}
           </div>
         </div>
       )}
