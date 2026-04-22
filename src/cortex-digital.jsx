@@ -315,7 +315,12 @@ async function callGrok(sys,msg,key){
   const d=await r.json();if(d.error)throw new Error(JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
 }
 async function callGemini(sys,msg,key){
-  const r=await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:[{role:"user",parts:[{text:msg}]}],generationConfig:{maxOutputTokens:420}})});
+  // se tem key → direto; senão → proxy local com key de servidor
+  const url=key?.trim().length>10
+    ?`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`
+    :"/api/gemini/v1beta/models/gemini-2.5-flash:generateContent";
+  const opts={method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:[{role:"user",parts:[{text:msg}]}],generationConfig:{maxOutputTokens:420}})};
+  const r=await fetchWithTimeout(url,opts);
   const d=await r.json();if(d.error)throw new Error(d.error.message);return d.candidates?.[0]?.content?.parts?.[0]?.text||"";
 }
 async function callPerp(sys,msg,key){
@@ -505,7 +510,7 @@ function KeyRow({ api, T, value, onChange }) {
   );
 }
 function btn(T,color){return{background:`${color}18`,border:`1px solid ${color}33`,borderRadius:10,padding:"6px 12px",color,cursor:"pointer",fontSize:11,fontFamily:"inherit",fontWeight:600,whiteSpace:"nowrap",transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)",boxShadow:"0 1px 4px #00000022"};}
-function navBtn(T){return{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:9,padding:"5px 9px",color:T.ts,cursor:"pointer",fontSize:13,flexShrink:0,transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)"};}
+function navBtn(T){return{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:10,padding:"5px 10px",color:T.ts,cursor:"pointer",fontSize:12,flexShrink:0,transition:"all 0.2s cubic-bezier(0.4,0,0.2,1)",userSelect:"none"};}
 
 // ── MAIN ─────────────────────────────────────────────────────
 export default function Cortex(){
@@ -661,7 +666,7 @@ async function invoke(id,sys,msg){
     if(id==="ollama_codigo"){try{const r=ok(await callOllama(sys,msg,"codigo"));cacheSet(id,msg,r);return r;}catch(e){return ok("Ollama Código indisponível: "+e.message,false);}}
     if(id==="ollama_debug") {try{const r=ok(await callOllama(sys,msg,"debug")); cacheSet(id,msg,r);return r;}catch(e){return ok("Ollama Debug indisponível: "+e.message,false);}}
     if(id==="grok"     &&hG)  {const r=ok(await callGrok(sys,msg,keys.grok));    cacheSet(id,msg,r);return r;}
-    if(id==="gemini"   &&hGm) {const r=ok(await callGemini(sys,msg,keys.gemini));  cacheSet(id,msg,r);return r;}
+    if(id==="gemini") {const r=ok(await callGemini(sys,msg,keys.gemini||""));  cacheSet(id,msg,r);return r;}  // proxy fallback se sem key
     if(id==="perp"     &&hP)  {const r=ok(await callPerp(sys,msg,keys.perp));       cacheSet(id,msg,r);return r;}
     if(id==="openai"   &&hO)  {const r=ok(await callOpenAI(sys,msg,keys.openai));   cacheSet(id,msg,r);return r;}
     if(id==="deepseek" &&hD)  {const r=ok(await callDeepSeek(sys,msg,keys.deepseek));cacheSet(id,msg,r);return r;}
@@ -1112,9 +1117,11 @@ try{
       ["chat","💬"],["keys","🔑"],["memory","🧠"],["computer","💻"],["settings","⚙"]
     ].map(([p,ico])=>(
       <button key={p} onClick={()=>setPage(p)} style={{
-        minWidth:44,minHeight:44,border:"none",
+        minWidth:52,minHeight:52,border:"none",
         background:page===p?`${AC.claude}22`:"transparent",
-        color:page===p?AC.claude:T.ts,fontSize:18,fontWeight:page===p?700:400
+        color:page===p?AC.claude:T.ts,fontSize:20,fontWeight:page===p?700:400,
+        transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
+        borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center"
       }}>{ico}</button>
     ))}
   </div>
@@ -1232,15 +1239,15 @@ try{
           <div style={{padding:"8px 10px",paddingBottom:isMobile?"calc(72px + env(safe-area-inset-bottom))":"10px",background:T.s1,borderTop:`1px solid ${T.b2}`,flexShrink:0}}>
             <div style={{display:"flex",gap:8,maxWidth:820,margin:"0 auto",alignItems:"flex-end"}}>
               {/* caixa de texto */}
-              <div style={{flex:1,display:"flex",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:16,padding:"7px 10px 7px 14px",alignItems:"flex-end",boxShadow:`0 2px 12px ${T.b2}55`}}>
+              <div style={{flex:1,display:"flex",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:16,padding:"8px 10px 8px 14px",alignItems:"flex-end",boxShadow:`0 2px 14px ${T.b2}66`,transition:"border-color 0.2s"}}>
   <textarea ref={taRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Pergunta ao conselho..." disabled={!!phase} rows={1} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:13,color:T.tx,fontFamily:"inherit",lineHeight:1.55,resize:"none",maxHeight:200,overflowY:"auto",paddingTop:3,paddingBottom:3}}/>
   <div style={{display:"flex",gap:3,alignItems:"flex-end",flexShrink:0}}>
     {msgs.filter(m=>m.role==="user").length>0&&!phase&&
-      <button onClick={regenerate} style={{background:"transparent",border:"none",borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:12,color:T.tf,display:"flex",alignItems:"center",justifyContent:"center"}} title="Regenerar">↺</button>}
+      <button onClick={regenerate} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title="Regenerar">↺</button>}
     <button onClick={()=>setShowConn(true)} style={{background:"transparent",border:"none",borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:12,color:Object.values(connsOn).some(Boolean)?AC.claude:T.tf,display:"flex",alignItems:"center",justifyContent:"center"}} title="Conectores">
       {Object.values(connsOn).some(Boolean)
         ?<span style={{fontSize:9,fontWeight:700,color:AC.claude}}>⚡{Object.values(connsOn).filter(Boolean).length}</span>
-        :"🔗"}
+        :"⬡"}
     </button>
     <button onClick={()=>{
       if(!("webkitSpeechRecognition" in window||"SpeechRecognition" in window)){toast("Voz não suportada neste browser","error");return;}
@@ -1249,9 +1256,9 @@ try{
       sr.onresult=e=>{const t=e.results[0][0].transcript;setInput(p=>p?p+" "+t:t);};
       sr.onerror=()=>toast("Erro no microfone","error");
       sr.start();
-    }} style={{background:"transparent",border:"none",borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:13,color:T.tf,display:"flex",alignItems:"center",justifyContent:"center"}} title="Ditado por voz">🎙</button>
+    }} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.7}} onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0.7"} title="Ditado por voz">🎙</button>
         {msgs.length>0&&
-      <button onClick={exportConv} style={{background:"transparent",border:"none",borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:11,color:T.tf,display:"flex",alignItems:"center",justifyContent:"center"}} title="Exportar">↓</button>}
+      <button onClick={exportConv} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.gemini;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title="Exportar">↓</button>}
   </div>
 </div>
               {/* botão enviar */}
