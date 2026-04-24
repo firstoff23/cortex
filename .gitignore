@@ -8,10 +8,22 @@ dist/
 dist-ssr/
 *.local
 
-# Ambiente
+# Ambiente — NUNCA subir keys
 .env
 .env.local
 .env.*.local
+.env.production
+
+# Ficheiros de keys/segredos
+*api_key*
+*api-key*
+*apikey*
+*.key
+*secret*
+*token*
+pin_*
+keys.txt
+credentials.txt
 
 # Editor
 .vscode/
@@ -34,3 +46,10 @@ pnpm-debug.log*
 
 # Claude / skills (não subir para git)
 .claude/
+
+# Ficheiros temporários e notas locais
+*.tmp
+*.bak
+notes.txt
+todo.txt
+roadmap.txt
