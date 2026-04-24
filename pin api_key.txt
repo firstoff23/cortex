@@ -1,4 +1,0 @@
-3004
-apis keys 
-AIzaSyDJo6cHshbY0KrLlERtFoo9_7pqlQwuOeQ gemini
-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 groq
