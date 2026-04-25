@@ -1,0 +1,66 @@
+Ligações & APIs
+Conectar APIs reais — Gemini, OpenAI, Grok, Perplexity com as tuas API keys guardadas como variáveis de ambiente no Vercel
+
+Criar o proxy /api/gemini no Vercel Functions para não expor keys no frontend
+
+Webhook para notificações — quando um lobe responde, podes receber notificações por Discord ou Telegram
+
+🧠 Funcionalidades de IA
+Síntese do Council — Claude agrega e resume as respostas dos 6 lobes numa resposta final unificada
+
+Memória persistente — guardar conversas no localStorage ou numa base de dados (Supabase/Firebase)
+
+Modo de debate — dois lobes discutem entre si antes de chegar a consenso
+
+Roteador inteligente — o agente decide automaticamente quais lobes ativar consoante o tipo de pergunta
+
+🎨 Interface & UX
+Página de configurações — onde defines as API keys, temas, lobes ativos
+
+Histórico de chats com pesquisa
+
+Export de conversas em PDF ou Markdown
+
+Partilha de respostas — link público para uma conversa específica
+
+Mobile otimizado — menu adaptado para telemóvel
+
+⚙️ Infraestrutura
+Variáveis de ambiente no Vercel para API keys (nunca expostas no código)
+
+Rate limiting no proxy para não gastar créditos por acidente
+
+Logs de uso — ver quantas chamadas cada lobe fez
+
+PWA — instalar o Córtex como app no telemóvel
+
+ Mais ideias para implementar depois
+🔥 Alta prioridade (impacto imediato)
+Histórico de perguntas frequentes — as 5 perguntas mais feitas aparecem como sugestões rápidas
+
+Modo comparação — mostra dois lobes lado a lado para comparar respostas diretamente
+
+Exportar resposta como imagem — screenshot do card do Córtex com branding, perfeito para partilhar
+
+Atalhos de teclado — Ctrl+Enter envia, Ctrl+R regenera, Ctrl+K abre histórico
+
+🧠 Memória e contexto
+Tags nas conversas — marcar conversa como "trabalho", "estudo", "código"
+
+Resumo da sessão — no final de X mensagens, o Córtex gera um resumo automático
+
+Modo estudo — guarda automaticamente factos novos aprendidos em cada conversa
+
+🎨 UI/UX
+Tema personalizado — utilizador escolhe cor de acento
+
+Tamanho de fonte ajustável — slider nas definições (útil no mobile)
+
+Modo leitura — vista limpa só com a resposta do Córtex, sem os lobes
+
+🚀 Avançado (para mais tarde)
+ChromaDB / Supabase — memória persistente real em base de dados
+
+Webhooks — receber perguntas via Discord/Telegram
+
+API pública — endpoint /api/ask para integrar o Córtex noutros projetos

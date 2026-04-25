@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 
-const MV="cortex-v11";
+const MV="cortex-v12";
 const MAX_BUF=8,MAX_SEMANTIC=80,MAX_PATTERNS=12,MAX_EPISODIC=15,MAX_STORED=200;
+const BUILD = typeof __BUILD_NUM__ !== "undefined" ? __BUILD_NUM__ : "DEV";
+const APP_VERSION = `v12.${BUILD}`;
 
 const THEMES={
   cortex:    {name:"Córtex",     emoji:"🧠",bg:"#08080c",s1:"#0f0f16",s2:"#14141e",s3:"#1a1a26",b1:"#222232",b2:"#161622",tx:"#e8e8f8",ts:"#6868a0",tf:"#2a2a44"},
@@ -84,17 +86,6 @@ const MODELS=[
   {id:"ollama_debug",name:"Debug",version:"qwen2.5-coder:1.5b",color:AC.ollama_debug,free:true},
 ];
 
-const CONNECTORS=[
-  {cat:"Comunicação",   items:[{id:"slack",name:"Slack",e:"💬"},{id:"discord",name:"Discord",e:"🎮"},{id:"gmail",name:"Gmail",e:"📧"},{id:"outlook",name:"Outlook",e:"📮"},{id:"teams",name:"Teams",e:"👥"},{id:"telegram",name:"Telegram",e:"✈️"},{id:"whatsapp",name:"WhatsApp",e:"📱"}]},
-  {cat:"Produtividade", items:[{id:"notion",name:"Notion",e:"📝"},{id:"obsidian",name:"Obsidian",e:"💎"},{id:"todoist",name:"Todoist",e:"✅"},{id:"trello",name:"Trello",e:"📋"},{id:"asana",name:"Asana",e:"🎯"},{id:"linear",name:"Linear",e:"📐"},{id:"monday",name:"Monday",e:"📅"}]},
-  {cat:"Cloud & Docs",  items:[{id:"gdrive",name:"Google Drive",e:"📂"},{id:"onedrive",name:"OneDrive",e:"☁️"},{id:"dropbox",name:"Dropbox",e:"📦"},{id:"gdocs",name:"Google Docs",e:"📄"},{id:"gsheets",name:"Sheets",e:"📊"},{id:"sharepoint",name:"SharePoint",e:"🏢"}]},
-  {cat:"Calendário",    items:[{id:"gcal",name:"Google Cal",e:"📆"},{id:"cal",name:"Cal.com",e:"🗓️"},{id:"outlook_cal",name:"Outlook Cal",e:"📅"},{id:"calendly",name:"Calendly",e:"⏰"}]},
-  {cat:"Dev & Code",    items:[{id:"github",name:"GitHub",e:"🐙"},{id:"gitlab",name:"GitLab",e:"🦊"},{id:"jira",name:"Jira",e:"🔵"},{id:"confluence",name:"Confluence",e:"📚"},{id:"vercel",name:"Vercel",e:"▲"},{id:"supabase",name:"Supabase",e:"🟢"}]},
-  {cat:"Automação",     items:[{id:"zapier",name:"Zapier",e:"⚡"},{id:"make",name:"Make",e:"🔄"},{id:"n8n",name:"n8n",e:"🔁"},{id:"ifttt",name:"IFTTT",e:"🤖"},{id:"pipedream",name:"Pipedream",e:"🚀"}]},
-  {cat:"CRM & Negócio", items:[{id:"salesforce",name:"Salesforce",e:"☁️"},{id:"hubspot",name:"HubSpot",e:"🧲"},{id:"airtable",name:"Airtable",e:"📊"},{id:"stripe",name:"Stripe",e:"💳"}]},
-  {cat:"Dados & IA",    items:[{id:"perp_web",name:"Perplexity Web",e:"🔍"},{id:"wolfram",name:"Wolfram",e:"🧮"},{id:"arxiv",name:"ArXiv",e:"📜"},{id:"youtube",name:"YouTube",e:"▶️"},{id:"duckduckgo",name:"DuckDuckGo",e:"🦆"}]},
-];
-
 const ALL_SUGGESTIONS = [
   "Explica memória vetorial em sistemas de IA",
   "Melhores ferramentas de produtividade com IA em 2026?",
@@ -123,18 +114,18 @@ function shuffleArray(arr){const s=[...arr];for(let i=s.length-1;i>0;i--){const 
 function getRandomSuggestions(n=4){return shuffleArray(ALL_SUGGESTIONS).slice(0,n);};
 
 const defaultBrain={episodic:[],semantic:[],patterns:[],procedural:{format:"conciso",lang:"pt",level:"médio"},sessions:0,lastReflect:null};
-const defaultKeys={
-  grok:     "",
-  gemini:   "AIzaSyDJo6cHshbY0KrLlERtFoo9_7pqlQwuOeQ",   // grátis — aistudio.google.com
-  perp:     "Kgsk_ESkohDveDHwjdhB68TXLWGdyb3FYCTk3MUri06bFRBV6Cojyal1y groqEY_GROQ",     // grátis — console.groq.com
-  claude:   "",
-  openai:   "",
-  deepseek: "",
-  llama:    "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 groq",     // mesma key do Groq
-  mistral:  "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 groq",     // mesma key do Groq
-  nemotron: "",
-  genspark: "",
-  manus:    ""
+const defaultKeys = {
+  grok:"",
+  gemini:"", 
+  perp:"", 
+  claude:"",
+  openai:"", 
+  deepseek:"", 
+  llama:"",
+  mistral:"", 
+  nemotron:"", 
+  genspark:"", 
+  manus:""
 };
 
 // ── DEV PIN — muda em localStorage("cortex-dev-pin") ────────
@@ -409,7 +400,7 @@ function Toggle({on,onChange,color}){
 function Splash(){
   return <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100dvh",background:"#08080c",gap:14}}>
     <div style={{display:"flex",gap:8}}>{Object.values(AC).slice(0,8).map((c,i)=><div key={i} style={{width:10,height:10,borderRadius:"50%",background:c,animation:`orb 1.4s ${i*0.18}s ease-in-out infinite`}}/>)}</div>
-    <p style={{color:AC.claude,fontFamily:"monospace",fontSize:11,margin:0,letterSpacing:2}}>CÓRTEX v11</p>
+    <p style={{color:AC.claude,fontFamily:"monospace",fontSize:11,margin:0,letterSpacing:2}}>CÓRTEX {APP_VERSION}</p>
     <style>{`@keyframes orb{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.2;transform:scale(1.4)}}`}</style>
   </div>;
 }
@@ -537,7 +528,6 @@ export default function Cortex(){
   const [keys,setKeys]       = useState(defaultKeys);
   const [toasts,setToasts]   = useState([]);
   const [modelsOn,setModelsOn] = useState(Object.fromEntries(MODELS.map(m=>[m.id,true])));
-  const [connsOn,setConnsOn] = useState({});
   const [compInput,setCompInput] = useState("");
   const [compRunning,setCompRunning] = useState(false);
   const [compTasks,setCompTasks] = useState([]);
@@ -554,7 +544,6 @@ export default function Cortex(){
   const [seedO,setSeedO] = useState("");
   const [showTP,setShowTP]         = useState(false);
   const [showModels,setShowModels] = useState(false);
-  const [showConn,setShowConn]     = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showCouncil, setShowCouncil] = useState(null);
   const [conversations, setConversations] = useState([]);
@@ -605,7 +594,6 @@ export default function Cortex(){
       const k  = await safeGet("cortex-keys-global", null) || await safeGet(MV+"-keys", defaultKeys);
       const t  = await safeGet(MV+"-theme",  "cortex");
       const mo = await safeGet(MV+"-models", Object.fromEntries(MODELS.map(x=>[x.id,true])));
-      const co = await safeGet(MV+"-conns",  {});
       const ct = await safeGet(MV+"-tasks",  []);
       const convs = await safeGet(MV+"-convs", []);
       setConversations(Array.isArray(convs) ? convs : []);
@@ -614,7 +602,6 @@ export default function Cortex(){
       setKeys({...defaultKeys,...(k&&typeof k==="object"?k:{})});
       setTheme(typeof t==="string"&&THEMES[t]?t:"cortex");
       setModelsOn(mo&&typeof mo==="object"?mo:Object.fromEntries(MODELS.map(x=>[x.id,true])));
-      setConnsOn(co&&typeof co==="object"?co:{});
       setCompTasks(Array.isArray(ct)?ct:[]);
     }catch(e){toast("Falha ao carregar dados — reset para defaults");}
     setLoaded(true);
@@ -658,7 +645,6 @@ function autoSaveConv(currentMsgs, convId){
   const saveKeys   = k  => safePut("cortex-keys-global", k);
   const saveTheme  = t  => safePut(MV+"-theme",  t);
   const saveModels = mo => safePut(MV+"-models", mo);
-  const saveConns  = co => safePut(MV+"-conns",  co);
   const saveTasks  = ct => safePut(MV+"-tasks",  ct.slice(0,20));
 
 async function invoke(id,sys,msg){
@@ -786,11 +772,10 @@ try{
   async function runComputer(){
     const task=compInput.trim();if(!task||compRunning)return;
     setCompRunning(true);setCompInput("");
-    const activeConns=Object.entries(connsOn).filter(([,v])=>v).map(([k])=>k);
     const newTask={id:Date.now(),task,status:"running",progress:0,steps:[],preview:"",log:[`▶ ${task}`],startedAt:new Date().toISOString()};
     setCompActive(newTask);
     try{
-      const raw=await callClaude("You are MANUS 1.6 Max computer agent.",P.computer(task,activeConns),800,keys.claude,keys.perp);
+      const raw=await callClaude("You are MANUS 1.6 Max computer agent.",P.computer,800,keys.claude,keys.perp);
       let plan={steps:[task],preview:"Tarefa processada.",estimatedTime:"—",confidence:"medium"};
       try{const j=raw.match(/\{[\s\S]*\}/);if(j)plan=JSON.parse(j[0]);}catch{}
       const done={...newTask,status:"done",progress:100,steps:plan.steps||[task],preview:plan.preview||raw.slice(0,300),log:[...newTask.log,...(plan.steps||[]).map((s,i)=>`✓ ${i+1}. ${s}`),"✅ Concluído"],estimatedTime:plan.estimatedTime,confidence:plan.confidence,completedAt:new Date().toISOString()};
@@ -978,28 +963,6 @@ try{
         </Modal>
       )}
 
-      {showConn && (
-        <Modal T={T} title="Conectores" onClose={()=>setShowConn(false)}>
-          <p style={{fontSize:11,color:T.ts,marginBottom:9}}>Activa conectores para o modo Computer e memória semântica.</p>
-          <div style={{display:"flex",flexDirection:"column",gap:13,maxHeight:380,overflowY:"auto"}}>
-            {CONNECTORS.map(cat=>(
-              <div key={cat.cat}>
-                <div style={{fontSize:9,fontWeight:700,color:T.ts,letterSpacing:2,marginBottom:5}}>{cat.cat.toUpperCase()}</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                  {cat.items.map(c=>{
-                    const on=!!connsOn[c.id];
-                    return <button key={c.id} onClick={()=>{const ne={...connsOn,[c.id]:!on};setConnsOn(ne);saveConns(ne);}} style={{display:"flex",alignItems:"center",gap:4,background:on?`${AC.claude}22`:T.s2,border:`1px solid ${on?AC.claude+"55":T.b1}`,borderRadius:18,padding:"4px 9px",cursor:"pointer",fontFamily:"inherit",fontSize:10,color:on?AC.claude:T.ts,transition:"all 0.15s"}}>
-                      <span>{c.e}</span><span>{c.name}</span>{on&&<span style={{fontSize:8}}>✓</span>}
-                    </button>;
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div style={{marginTop:9,fontSize:9,color:T.tf}}>{Object.values(connsOn).filter(Boolean).length} conectores activos</div>
-        </Modal>
-      )}
-
       {/* ── NAV ────────────────────────────────────────────── */}
 <nav style={{display:"flex",alignItems:"center",height:50,padding:"0 8px",background:T.s1,borderBottom:`1px solid ${T.b1}`,gap:4,flexShrink:0,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
   <div style={{display:"flex",alignItems:"center",gap:7,marginRight:"auto",flexShrink:0}}>
@@ -1033,7 +996,6 @@ try{
   ))}
 
   <button onClick={()=>setShowModels(true)} style={navBtn(T)} title="Modelos">◈</button>
-  <button onClick={()=>setShowConn(true)} style={navBtn(T)} title="Conectores">⬡</button>
   <button onClick={()=>setShowTP(true)} style={navBtn(T)} title="Tema">{THEMES[theme].emoji}</button>
   <button onClick={()=>setShowSidebar(v=>!v)} style={{...navBtn(T),background:showSidebar?`${AC.claude}22`:"transparent",borderColor:showSidebar?`${AC.claude}55`:T.b1}} title="Histórico">☰</button>
   <button onClick={()=>setShowGuide(true)} style={navBtn(T)} title="Guia">?</button>
@@ -1271,11 +1233,6 @@ try{
   <div style={{display:"flex",gap:3,alignItems:"flex-end",flexShrink:0}}>
     {msgs.filter(m=>m.role==="user").length>0&&!phase&&
       <button onClick={regenerate} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title="Regenerar">↺</button>}
-    <button onClick={()=>setShowConn(true)} style={{background:"transparent",border:"none",borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:12,color:Object.values(connsOn).some(Boolean)?AC.claude:T.tf,display:"flex",alignItems:"center",justifyContent:"center"}} title="Conectores">
-      {Object.values(connsOn).some(Boolean)
-        ?<span style={{fontSize:9,fontWeight:700,color:AC.claude}}>⚡{Object.values(connsOn).filter(Boolean).length}</span>
-        :"⬡"}
-    </button>
     <button onClick={()=>{
       if(!("webkitSpeechRecognition" in window||"SpeechRecognition" in window)){toast("Voz não suportada neste browser","error");return;}
       const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -1308,7 +1265,6 @@ try{
             <div style={{width:7,height:7,borderRadius:"50%",background:compRunning?AC.computer:"#444",boxShadow:compRunning?`0 0 8px ${AC.computer}`:"none",transition:"all 0.3s"}} className={compRunning?"pulse":""}/>
             <span style={{fontSize:11,fontWeight:700,color:T.tx}}>Agente Autónomo</span>
             <span style={{fontSize:8,color:T.ts,fontFamily:"monospace"}}>claude-opus-4-6</span>
-            <button onClick={()=>setShowConn(true)} style={{marginLeft:"auto",...btn(T,AC.perp),fontSize:9,padding:"3px 9px"}}>⬡ {Object.values(connsOn).filter(Boolean).length} conectors</button>
           </div>
           {/* Progresso */}
           {compRunning&&<div style={{height:2,background:T.b2,flexShrink:0}}><div style={{height:"100%",width:"70%",background:AC.computer,animation:"compPulse 1.2s ease-in-out infinite"}}/></div>}

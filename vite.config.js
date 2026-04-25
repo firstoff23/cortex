@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __BUILD_NUM__: JSON.stringify(Date.now().toString(36).slice(-4).toUpperCase())
+  },
   server: {
     proxy: {
       '/api/groq': {
@@ -28,7 +32,6 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/grok/, ''),
         secure: true
       },
-      // Gemini proxy — usa key do servidor (proxy.js) como fallback
       '/api/gemini': {
         target: 'http://localhost:3333',
         changeOrigin: true,
