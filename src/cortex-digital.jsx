@@ -552,6 +552,7 @@ export default function Cortex(){
   const [devUnlocked,setDevUnlocked] = useState(()=>DEV_MODE);
   const [pinInput,setPinInput]       = useState("");
   const [pinErr,setPinErr]           = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
 
   const taRef   = useRef(null);
   const botRef  = useRef(null);
@@ -1084,26 +1085,137 @@ try{
     </div>
   </div>
 )}
-{/* ── BARRA MOBILE ── */}
+{/* ── FAB MOBILE ── */}
 {isMobile && (
-  <div style={{
-    position:"fixed",left:0,right:0,bottom:0,zIndex:1200,
-    display:"flex",justifyContent:"space-around",
-    padding:"8px 0 calc(8px + env(safe-area-inset-bottom))",
-    background:T.s1,borderTop:`1px solid ${T.b1}`
-  }}>
-    {[
-      ["chat","💬"],["keys","🔑"],["memory","🧠"],["computer","💻"],["settings","⚙"]
-    ].map(([p,ico])=>(
-      <button key={p} onClick={()=>setPage(p)} style={{
-        minWidth:52,minHeight:52,border:"none",
-        background:page===p?`${AC.claude}22`:"transparent",
-        color:page===p?AC.claude:T.ts,fontSize:20,fontWeight:page===p?700:400,
-        transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
-        borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center"
-      }}>{ico}</button>
-    ))}
-  </div>
+  <>
+    {/* Backdrop */}
+    <div
+      onClick={() => setFabOpen(false)}
+      style={{
+        position:"fixed",inset:0,zIndex:1190,
+        background:"rgba(0,0,0,0.55)",
+        backdropFilter:"blur(2px)",
+        opacity: fabOpen ? 1 : 0,
+        pointerEvents: fabOpen ? "all" : "none",
+        transition:"opacity 300ms cubic-bezier(0.4,0,0.2,1)",
+      }}
+    />
+
+    {/* Drawer */}
+    <div style={{
+      position:"fixed",left:0,right:0,bottom:0,zIndex:1200,
+      background:T.s1,
+      borderTop:`1px solid ${T.b1}`,
+      borderRadius:"20px 20px 0 0",
+      boxShadow:"0 -8px 40px #00000077",
+      padding:"0 0 calc(16px + env(safe-area-inset-bottom))",
+      transform: fabOpen ? "translateY(0)" : "translateY(110%)",
+      transition:"transform 300ms cubic-bezier(0.4,0,0.2,1)",
+      willChange:"transform",
+    }}>
+      {/* Handle + Header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 18px 10px"}}>
+        <div style={{width:36,height:4,borderRadius:2,background:T.b1,margin:"0 auto"}}/>
+        <button
+          onClick={() => setFabOpen(false)}
+          style={{
+            position:"absolute",right:16,top:14,
+            background:"transparent",border:`1px solid ${T.b1}`,
+            borderRadius:"50%",width:28,height:28,
+            color:T.ts,cursor:"pointer",fontSize:13,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            transition:"all 300ms cubic-bezier(0.4,0,0.2,1)",
+          }}
+        >✕</button>
+      </div>
+
+      {/* Items */}
+      <div style={{display:"flex",justifyContent:"space-around",padding:"8px 12px 4px",gap:8}}>
+        {[
+          {page:"memory", icon:"🧠", label:"Mem."},
+          {page:"models", icon:"🤖", label:"Modelos", action:()=>{setShowModels(true);setFabOpen(false);}},
+          {page:"theme",  icon:"🎨", label:"Tema",    action:()=>{setShowTP(true);setFabOpen(false);}},
+          {page:"guide",  icon:"📖", label:"Guia",    action:()=>{setShowGuide(true);setFabOpen(false);}},
+        ].map((item) => {
+          const isActive = page === item.page;
+          const handleClick = item.action
+            ? item.action
+            : () => { setPage(item.page); setFabOpen(false); };
+          return (
+            <button
+              key={item.page}
+              onClick={handleClick}
+              style={{
+                flex:1,
+                display:"flex",flexDirection:"column",alignItems:"center",gap:5,
+                padding:"12px 8px",
+                background: isActive ? `${AC.claude}22` : T.s2,
+                border:`1px solid ${isActive ? AC.claude+"55" : T.b1}`,
+                borderRadius:14,cursor:"pointer",fontFamily:"inherit",
+                color: isActive ? AC.claude : T.tx,
+                transition:"all 300ms cubic-bezier(0.4,0,0.2,1)",
+              }}
+            >
+              <span style={{fontSize:22}}>{item.icon}</span>
+              <span style={{fontSize:10,fontWeight:600,letterSpacing:0.3}}>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Navegação rápida adicional */}
+      <div style={{display:"flex",justifyContent:"space-around",padding:"6px 12px 0",gap:8}}>
+        {[
+          ["chat","💬","Chat"],
+          ["keys","🔑","Keys"],
+          ["computer","💻","Agent"],
+          ["settings","⚙","Config"],
+        ].map(([p,ico,lbl])=>(
+          <button key={p} onClick={()=>{setPage(p);setFabOpen(false);}} style={{
+            flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,
+            padding:"8px 4px",
+            background: page===p ? `${AC.claude}15` : "transparent",
+            border:`1px solid ${page===p ? AC.claude+"33" : "transparent"}`,
+            borderRadius:10,cursor:"pointer",fontFamily:"inherit",
+            color: page===p ? AC.claude : T.ts,
+            transition:"all 300ms cubic-bezier(0.4,0,0.2,1)",
+          }}>
+            <span style={{fontSize:16}}>{ico}</span>
+            <span style={{fontSize:9,fontWeight:500}}>{lbl}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+
+    {/* FAB Button */}
+    <button
+      onClick={() => setFabOpen(v => !v)}
+      style={{
+        position:"fixed",
+        right:20,
+        bottom:`calc(20px + env(safe-area-inset-bottom))`,
+        zIndex:1201,
+        width:52,height:52,
+        borderRadius:"50%",
+        background: fabOpen
+          ? `linear-gradient(135deg,${AC.claude}cc,${AC.claude}88)`
+          : `linear-gradient(135deg,${T.s3},${T.s1})`,
+        border:`1px solid ${fabOpen ? AC.claude+"88" : T.b1}`,
+        color: fabOpen ? "#fff" : T.ts,
+        fontSize:20,cursor:"pointer",
+        boxShadow: fabOpen
+          ? `0 4px 24px ${AC.claude}66, 0 0 0 3px ${AC.claude}22`
+          : "0 4px 20px #00000055",
+        display:"flex",alignItems:"center",justifyContent:"center",
+        transform: fabOpen ? "rotate(45deg)" : "rotate(0deg)",
+        transition:"all 300ms cubic-bezier(0.4,0,0.2,1)",
+        willChange:"transform,box-shadow",
+      }}
+      aria-label={fabOpen ? "Fechar menu" : "Abrir menu"}
+    >
+      ⚙
+    </button>
+  </>
 )}
           <div ref={chatRef} onScroll={e=>{const el=e.currentTarget;setAtBottom(el.scrollHeight-el.scrollTop-el.clientHeight<60);}} style={{flex:1,overflowY:"auto",padding:"13px 12px 7px",position:"relative"}}>
             {!atBottom&&msgs.length>0&&(
