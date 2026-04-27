@@ -652,6 +652,7 @@ export default function Cortex(){
       const m  = await safeGet(MV+"-msgs",   []);
       const k  = await safeGet("cortex-keys-global", null) || await safeGet(MV+"-keys", defaultKeys);
       const t  = await safeGet(MV+"-theme",  "cortex");
+      const mo = await safeGet(MV+"-models", null); // ← ADICIONA ESTA LINHA
       // const ct = await safeGet(MV+"-tasks",  []); // REMOVIDO v12
       const convs = await safeGet(MV+"-convs", []);
       setConversations(Array.isArray(convs) ? convs : []);
