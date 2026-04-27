@@ -1033,7 +1033,7 @@ try{
   <div style={{display:"flex",alignItems:"center",gap:7,marginRight:"auto",flexShrink:0}}>
     <div style={{width:28,height:28,borderRadius:8,background:`${AC.claude}22`,border:`1px solid ${AC.claude}33`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:AC.claude}}>C</div>
     <div>
-      <div style={{fontSize:11,fontWeight:800,letterSpacing:3,color:T.tx}}>CÓRTEX <span style={{opacity:0.4,fontSize:8}}>v11</span></div>
+      <div style={{fontSize:11,fontWeight:800,letterSpacing:3,color:T.tx}}>CÓRTEX <span style={{opacity:0.4,fontSize:8}}>{MV.split("-")[1]}</span></div>
       <div style={{fontSize:7,color:T.tf,letterSpacing:1}}>11 Lobos · Council · Claude Opus 4.6</div>
     </div>
   </div>
