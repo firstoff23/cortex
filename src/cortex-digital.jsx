@@ -202,28 +202,33 @@ const P={
   nemotron:(m,q)=>`You are NEMOTRON — scientific rigor. Evidence-based, cite mechanisms. Memory:\n${m}\nQuestion: ${q}\nMax 100w. ${detectLang(q)}`,
   ollama_codigo:(m,q)=>`Local coding assistant. Give clean working code with brief explanation. Memory:\n${m}\nQuestion: ${q}\nMax 100w. ${detectLang(q)}`,
   ollama_debug:(m,q)=>`Local debug expert. Find root cause, give exact fix. Memory:\n${m}\nQuestion: ${q}\nMax 100w. ${detectLang(q)}`,
-  cortex:  (m,q,lobes)=>`You are the PREFRONTAL CORTEX — the judge and synthesizer of a multi-AI council (claude-opus-4-6).
+cortex: (m, q, lobes) => `
+Tu és o Córtex Pré-Frontal — o juiz e sintetizador de um conselho multi-IA.
+Regras obrigatórias:
+1. Responde sempre em Português de Portugal.
+2. Identifica as respostas mais úteis, resolve contradições e sintetiza numa única resposta abrangente.
+3. Se houver código, usa markdown.
+4. NÃO escrevas introduções, nem números antes das frases, nem "⚡ Síntese:".
+5. Devolve APENAS um objeto JSON válido (sem markdown), com esta estrutura exata:
+{
+  "final": "resposta detalhada e abrangente",
+  "consensus": ["ponto concordante 1", "ponto concordante 2"],
+  "divergence": ["ponto de divergência 1"],
+  "confidence": "alta",
+  "nextActions": ["passo 1", "passo 2"]
+}
 
-MEMORY:\n${m}
+MEMÓRIA:
+${m}
 
-USER QUESTION: ${q}
+PERGUNTA DO UTILIZADOR:
+${q}
 
-COUNCIL RESPONSES:\n${lobes.map(l=>`[${l.label}]: ${l.result}`).join("\n\n")}
+RESPOSTAS DOS LOBOS DO CONSELHO:
+${lobes.map(l => "[ " + l.label + " ]: " + l.result).join("\n\n")}
+`.trim(),
 
-YOUR TASK:
-1. Identify which lobe(s) gave the most accurate and useful information
-2. Resolve any contradictions between lobes
-3. Synthesize into ONE clear, comprehensive answer
-4. If the question involves code, format it properly with markdown
-5. End with a line starting with "⚡ Síntese:" summarizing the key insight in one sentence
-
-Be direct. No intro. ${detectLang(q)}`,
-  judge:   (q,lobes)=>`Judge of an 11-lobe AI council. ONE sentence: which lobe(s) were most helpful and why. Same language.\n\nQUESTION: ${q}\n\n${lobes.map(l=>`${l.label}:\n${l.result}`).join("\n\n")}`,
-  reflect: (buf,m)=>`Memory consolidation.\nBUFFER:\n${buf}\nEXISTING:\n${m}\nReturn ONLY valid JSON:\n{"new_semantic":[{"tipo":"preferencia|projeto|facto|regra","descricao":"phrase","importancia":"alta|media"}],"new_patterns":["pattern"],"procedural_update":{},"session_summary":"one sentence"}\nMax 4, max 1 pattern. Empty if nothing new.`,
-  // computer:(task,conns)=>`You are MANUS 1.6 Max as a computer agent.\nACTIVE CONNECTORS: ${conns.join(", ")||"none"}\nTASK: ${task}\nRespond with JSON:\n{"steps":["step1","step2","step3"],"preview":"what result looks like","estimatedTime":"Xs","confidence":"high|medium|low"}\nThen execute concretely.`, // v12 remove Computer Mode, mas deixo prompt aqui para referência futura de agente executor direto
 };
-
-
 // ── CACHE DE RESPOSTAS (5 min TTL) ──────────────────────────
 const _cache=new Map();
 const CACHE_TTL=5*60*1000;
@@ -586,6 +591,9 @@ export default function Cortex(){
   const [showImport,setShowImport] = useState(false);
   const [importTxt,setImportTxt]   = useState("");
   const [importErr,setImportErr]   = useState("");
+  const [exportKind,setExportKind] = useState("brain"); // brain | current-chat | full-backup
+  const [importMode,setImportMode] = useState("replace"); // replace | merge (para brain: merge sem duplicar, para chats: importa como novas conversas)
+  const [importPreview,setImportPreview] = useState(null); 
   const [showSeed,setShowSeed]     = useState(false);
   const [seedP,setSeedP] = useState("");
   const [seedC,setSeedC] = useState("");
@@ -772,38 +780,100 @@ const councilLobes = LOBES.filter(l =>
     const isErr=!r.result||r.result.startsWith("[")||r.result.startsWith("Tempo");
     return {...l,_key:l.id+i,result:r.result,srcModel:r.model,srcReal:r.real,isErr};
 });
-    setPhase("cortex");
-    let cR;
+setPhase("cortex");
+let cR;
+let structured;
 try{
   const validLobes=lobeResults.filter(l=>!l.isErr&&l.result?.length>10);
-    if(hC||hP) cR=await callClaude("Executive judge of a multi-AI council brain.",P.cortex(mem,q,validLobes.length?validLobes:lobeResults),5400,keys.claude,keys.perp);
-  // Groq fallback já tratado em callClaude
+  if(hC||hP) cR=await callClaude(
+    "Executive judge of a multi-AI council brain.",
+    P.cortex(mem,q,validLobes.length?validLobes:lobeResults),
+    5400,
+    keys.claude,
+    keys.perp
+  );
   else{
     const validFb=lobeResults.filter(l=>!l.isErr&&l.result?.length>10);
-    cR=validFb.length>0?validFb.map(l=>`**${l.label}:** ${l.result}`).join("\n\n"):"Nenhum serviço respondeu. Verifica a ligação.";
+    cR=validFb.length>0
+      ? validFb.map(l=>`**${l.label}:** ${l.result}`).join("\n\n")
+      : "Nenhum serviço respondeu. Verifica a ligação.";
   }
-}catch(e){cR=lobeResults.map(l=>`**${l.label}:** ${l.result}`).join("\n\n");toast(`Córtex: ${e.message}`);}
-    let cDecision=heuristicDecision(q);
-    try{cDecision=await callClaude("Judge of an 11-lobe AI council.",P.judge(q,lobeResults),80,keys.claude,keys.perp);}catch{}
-    const council=Object.fromEntries(lobeResults.map(l=>[l.id,l.result]));
-    const aMsg={id:Date.now()+Math.random(),role:"assistant",content:cR,council,lobeResults,usedMemory:usedMem,councilDecision:cDecision};
-    const fm=[...nm,aMsg];setMsgs(fm);saveMsgs(fm);
-    const buf2=[...newBuf,`BRAIN: ${cR}`];setBuf(buf2);
-    let nb={...brain,sessions:brain.sessions+1};let reflexOk=false;
-    if(buf2.length>=MAX_BUF&&nb.sessions>=1){
-      setPhase("reflex");
-      try{
-        const raw=await callClaude("Return only valid JSON.",P.reflect(buf2.join("\n"),buildMem(nb)), 480, keys.claude, keys.perp);
-        const ext=safeParseReflect(raw);
-        nb={...nb,semantic:[...nb.semantic,...(ext.new_semantic||[])].slice(-MAX_SEMANTIC),patterns:[...new Set([...nb.patterns,...(ext.new_patterns||[])])].slice(-MAX_PATTERNS),episodic:ext.session_summary?[...nb.episodic,ext.session_summary].slice(-MAX_EPISODIC):nb.episodic,procedural:{...nb.procedural,...(ext.procedural_update||{})},lastReflect:new Date().toISOString()};
-        reflexOk=!!(ext.new_semantic?.length||ext.new_patterns?.length||ext.session_summary);
-      }catch{toast("Falha na reflexão subconsciente.");}
-      setBuf([]);
-    }
-    setBrain(nb);saveBrain(nb);setPhase(null);
-    if(reflexOk){const note={id:Date.now()+Math.random(),role:"assistant",content:"◉ Memória atualizada.",systemNote:true};setMsgs(prev=>{const u=[...prev,note];saveMsgs(u);return u;});}
-    autoSaveConv(fm, currentConvId);
-    setTimeout(()=>taRef.current?.focus(),80);
+}catch(e){
+  cR=lobeResults.map(l=>`**${l.label}:** ${l.result}`).join("\n\n");
+  toast(`Córtex: ${e.message}`);
+}
+
+structured = normalizeCouncilPayload(cR, typeof cR === "string" ? cR : "");
+
+let cDecision=heuristicDecision(q);
+try{
+  cDecision=await callClaude(
+    "Judge of an 11-lobe AI council.",
+    P.judge(q,lobeResults),
+    80,
+    keys.claude,
+    keys.perp
+  );
+}catch{}
+
+const council = Object.fromEntries(lobeResults.map(l => [l.id, l.result]));
+
+const aMsg = {
+  id: Date.now() + Math.random(),
+  role: "assistant",
+  // Garante que o content é o final do struct, senão o texto cru de fallback
+  content: (structured?.final || cR || "").trim(),
+  structured, 
+  council,
+  lobeResults,
+  usedMemory: usedMem,
+  councilDecision: cDecision
+};
+
+const fm = [...nm, aMsg];
+setMsgs(fm);
+saveMsgs(fm);
+
+// O buffer também deve usar o mesmo fallback
+const buf2 = [...newBuf, `BRAIN: ${(structured?.final || cR || "").trim()}`];
+setBuf(buf2);
+let nb={...brain,sessions:brain.sessions+1};let reflexOk=false;
+
+if(buf2.length>=MAX_BUF&&nb.sessions>=1){
+  setPhase("reflex");
+  try{
+    const raw=await callClaude(
+      "Return only valid JSON.",
+      P.reflect(buf2.join("\n"),buildMem(nb)),
+      480,
+      keys.claude,
+      keys.perp
+    );
+    const ext=safeParseReflect(raw);
+    nb={
+      ...nb,
+      semantic:[...nb.semantic,...(ext.new_semantic||[])].slice(-MAX_SEMANTIC),
+      patterns:[...new Set([...nb.patterns,...(ext.new_patterns||[])])].slice(-MAX_PATTERNS),
+      episodic:ext.session_summary
+        ? [...nb.episodic,ext.session_summary].slice(-MAX_EPISODIC)
+        : nb.episodic,
+      procedural:{...nb.procedural,...(ext.procedural_update||{})},
+      lastReflect:new Date().toISOString()
+    };
+    reflexOk=!!(ext.new_semantic?.length||ext.new_patterns?.length||ext.session_summary);
+  }catch{
+    toast("Falha na reflexão subconsciente.");
+  }
+  setBuf([]);
+}
+
+setBrain(nb);saveBrain(nb);setPhase(null);
+if(reflexOk){
+  const note={id:Date.now()+Math.random(),role:"assistant",content:"◉ Memória atualizada.",systemNote:true};
+  setMsgs(prev=>{const u=[...prev,note];saveMsgs(u);return u;});
+}
+autoSaveConv(fm, currentConvId);
+setTimeout(()=>taRef.current?.focus(),80);
   }
 
   async function regenerate(){
@@ -873,6 +943,85 @@ try{
     cortex: {label:"Claude Opus 4.6 a sintetizar...", color:AC.claude, pct:"88%"},
     reflex: {label:"Reflexão subconsciente...",       color:AC.reflex, pct:"100%"},
   };
+  
+const safeParseJson = (value, fallback = null) => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+};
+
+const extractJsonBlock = (text) => {
+  if (!text || typeof text !== "string") return null;
+
+  const fenced = text.match(/```json\s*([\s\S]*?)\s*```/i);
+  if (fenced?.[1]) {
+    const parsed = safeParseJson(fenced[1], null);
+    if (parsed) return parsed;
+  }
+
+  const genericFence = text.match(/```[\s\S]*?([\{\[][\\s\\S]*[\}\]])[\s\S]*?```/);
+  if (genericFence?.[1]) {
+    const parsed = safeParseJson(genericFence[1], null);
+    if (parsed) return parsed;
+  }
+
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const candidate = text.slice(firstBrace, lastBrace + 1);
+    const parsed = safeParseJson(candidate, null);
+    if (parsed) return parsed;
+  }
+
+  return null;
+};
+
+const normalizeCouncilPayload = (raw, fallbackText = "") => {
+  if (!raw) {
+    return {
+      final: fallbackText || "Sem resposta estruturada.",
+      consensus: [],
+      divergence: [],
+      confidence: "média",
+      nextActions: []
+    };
+  }
+
+  if (typeof raw === "string") {
+    const parsed = extractJsonBlock(raw);
+    if (parsed) return normalizeCouncilPayload(parsed, raw);
+
+    return {
+      final: raw,
+      consensus: [],
+      divergence: [],
+      confidence: "média",
+      nextActions: []
+    };
+  }
+
+  const final =
+    raw.final ||
+    raw.answer ||
+    raw.response ||
+    raw.summary ||
+    fallbackText ||
+    "Sem resposta estruturada.";
+
+  return {
+    final,
+    consensus: Array.isArray(raw.consensus) ? raw.consensus : [],
+    divergence: Array.isArray(raw.divergence) ? raw.divergence : [],
+    confidence: raw.confidence || "média",
+    nextActions: Array.isArray(raw.nextActions)
+      ? raw.nextActions
+      : Array.isArray(raw.next_actions)
+      ? raw.next_actions
+      : []
+  };
+};
 
   if(!loaded)return <Splash/>;
   const cur=phase?phases[phase]:null;
@@ -1129,36 +1278,6 @@ try{
       {/* ── CHAT ───────────────────────────────────────────── */}
       {page==="chat" && (
         <>
-        {showCouncil&&<div style={{position:"fixed",inset:0,zIndex:600,display:"flex",alignItems:"flex-start",justifyContent:"flex-end"}} onClick={()=>setShowCouncil(null)}>
-  <div style={{width:360,height:"100%",background:T.s1,borderLeft:`1px solid ${T.b1}`,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"-4px 0 20px #00000066"}} onClick={e=>e.stopPropagation()}>
-    <div style={{padding:"12px 14px",borderBottom:`1px solid ${T.b1}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-      <span style={{fontSize:11,fontWeight:700,color:T.tx}}>Conselho dos Lobos</span>
-      <button onClick={()=>setShowCouncil(null)} style={{background:"transparent",border:"none",color:T.tf,cursor:"pointer",fontSize:14}}>✕</button>
-    </div>
-    {showCouncil.councilDecision&&<div style={{padding:"8px 14px",background:`${AC.claude}11`,borderBottom:`1px solid ${T.b1}`,fontSize:10,color:AC.claude,flexShrink:0}}>⚖ {showCouncil.councilDecision}</div>}
-    <div style={{flex:1,overflowY:"auto",padding:10,display:"flex",flexDirection:"column",gap:8}}>
-      {showCouncil.lobeResults?.map((src,_i)=>{
-        const modelVersion=MODELS.find(x=>x.id===src.id)?.version||"";
-        const isReal=!src.result?.startsWith("[SIMULADO");
-        return(
-          <div key={src.id} className="lobe-card" style={{background:T.s2,border:`1px solid ${focusMode && focusLobes.has(src.id) ? src.color+"88" : src.color+"33"}`,borderRadius:10,padding:"9px 11px",animationDelay:`${_i*0.06}s`}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-              <span style={{fontSize:10,fontWeight:800,color:src.color}}>{src.icon} {src.label}</span>
-              <span style={{fontSize:8,color:src.color,background:`${src.color}18`,border:`1px solid ${src.color}44`,borderRadius:20,padding:"1px 7px",fontFamily:"monospace"}}>{modelVersion}</span>
-              {!isReal&&<span style={{fontSize:7,color:"#fff",background:"#666",borderRadius:3,padding:"1px 5px"}}>Simulado</span>}
-            </div>
-            {src.isErr
-              ?<div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 8px",background:"#ef444410",borderRadius:6,marginTop:4}}>
-                <span style={{color:"#ef4444",fontSize:12}}>○</span>
-                <span style={{fontSize:10,color:"#ef4444",opacity:0.8}}>Serviço indisponível — resposta omitida da síntese</span>
-               </div>
-              :<div style={{fontSize:10,color:T.tx,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{src.result}</div>}
-          </div>
-        );
-      })}
-    </div>
-  </div>
-</div>}
         <>
   {showSidebar &&<div style={{position:"fixed",inset:0,zIndex:498,background:"transparent"}} onClick={()=>setShowSidebar(false)}/>}
   <div style={{position:"fixed",top:50,left:0,bottom:0,zIndex:499,width:260,background:T.s1,borderRight:`1px solid ${T.b1}`,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"4px 0 24px #00000055",transform:showSidebar?"translateX(0)":"translateX(-102%)",opacity:showSidebar?1:0,transition:"transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.28s cubic-bezier(0.4,0,0.2,1)",willChange:"transform, opacity"}}>
@@ -1458,215 +1577,383 @@ try{
         animation:"fadeIn 250ms cubic-bezier(0.4,0,0.2,1), lobePop 250ms cubic-bezier(0.4,0,0.2,1)"
       }}>
         {/* Header resposta Córtex */}
-        <div style={{
-          display:"flex",
-          alignItems:"center",
-          justifyContent:"space-between",
-          gap:10,
-          padding:"12px 14px",
-          background:`linear-gradient(135deg, ${AC.claude}18 0%, ${AC.claude}08 100%)`,
-          borderBottom:`1px solid ${T.b1}`
-        }}>
-          <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
-            <div style={{
-              width:28,
-              height:28,
+<div style={{
+  display:"flex",
+  alignItems:"center",
+  justifyContent:"space-between",
+  gap:10,
+  padding:"12px 14px",
+  background:`linear-gradient(135deg, ${AC.claude}18 0%, ${AC.claude}08 100%)`,
+  borderBottom:`1px solid ${T.b1}`
+}}>
+  <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
+    <div style={{
+      width:28,
+      height:28,
+      borderRadius:10,
+      background:`${AC.claude}22`,
+      border:`1px solid ${AC.claude}44`,
+      display:"flex",
+      alignItems:"center",
+      justifyContent:"center",
+      color:AC.claude,
+      fontSize:13,
+      fontWeight:800,
+      flexShrink:0
+    }}>
+      C
+    </div>
+
+    <div style={{minWidth:0}}>
+      <div style={{fontSize:12,fontWeight:800,color:T.tx,letterSpacing:0.4}}>
+        Córtex
+      </div>
+      <div style={{fontSize:10,color:T.ts}}>
+        Síntese final do conselho
+      </div>
+    </div>
+  </div>
+
+  <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+    <CopyBtn text={(m.structured?.final || m.content || "").trim()} T={T} />
+
+    <button
+      onClick={async () => {
+        const finalText = (m.structured?.final || m.content || "").trim();
+        const consensus = m.structured?.consensus?.length
+          ? "\n\nConsenso:\n- " + m.structured.consensus.join("\n- ")
+          : "";
+        const divergence = m.structured?.divergence?.length
+          ? "\n\nDivergências:\n- " + m.structured.divergence.join("\n- ")
+          : "";
+        const nextActions = m.structured?.nextActions?.length
+          ? "\n\nPróximos passos:\n" + m.structured.nextActions.map(function(s, idx){
+              return (idx + 1) + ". " + s;
+            }).join("\n")
+          : "";
+        const confidence = m.structured?.confidence
+          ? "\n\nConfiança: " + m.structured.confidence
+          : "";
+
+        const question =
+          msgs.slice(0, i).reverse().find(x => x.role === "user")?.content || "";
+
+        const shareText =
+          "Pergunta:\n" + question +
+          "\n\nResposta:\n" + finalText +
+          consensus + divergence + nextActions + confidence;
+
+        if (navigator.share && isMobile) {
+          try {
+            await navigator.share({ text: shareText });
+          } catch {}
+        } else {
+          await navigator.clipboard?.writeText(shareText);
+          toast("Resposta copiada para partilha", "success");
+        }
+      }}
+      title="Partilhar"
+      style={{
+        background:"transparent",
+        border:`1px solid ${T.b1}`,
+        borderRadius:5,
+        padding:"2px 7px",
+        color:T.tf,
+        fontSize:9,
+        cursor:"pointer"
+      }}
+    >
+      📤
+    </button>
+
+    {m.lobeResults?.length > 0 && (
+      <button
+        onClick={() => setShowCouncil(showCouncil === m.id ? null : m.id)}
+        title={showCouncil === m.id ? "Ocultar conselho" : "Ver conselho"}
+        style={{
+          background: showCouncil === m.id ? `${AC.claude}16` : "transparent",
+          border: `1px solid ${showCouncil === m.id ? AC.claude + "44" : T.b1}`,
+          borderRadius:5,
+          padding:"2px 7px",
+          color: showCouncil === m.id ? AC.claude : T.tf,
+          fontSize:9,
+          cursor:"pointer"
+        }}
+      >
+        {showCouncil === m.id ? "Ocultar" : "Ver Conselho"}
+      </button>
+    )}
+  </div>
+</div>
+
+{/* Corpo resposta */}
+<div style={{padding:"14px 14px 8px",display:"flex",flexDirection:"column",gap:12}}>
+  {/* Síntese antiga compatível */}
+  {!m.structured?.final && m.content.includes("⚡ Síntese:") && (
+    <div style={{
+      background:`linear-gradient(135deg, ${AC.claude}14, ${AC.claude}08)`,
+      border:`1px solid ${AC.claude}26`,
+      borderRadius:14,
+      padding:"14px 15px",
+      boxShadow:"inset 0 1px 0 #ffffff08"
+    }}>
+      <div style={{
+        display:"flex",
+        alignItems:"center",
+        gap:8,
+        marginBottom:8,
+        color:AC.claude,
+        fontSize:11,
+        fontWeight:800,
+        letterSpacing:0.3
+      }}>
+        <span style={{fontSize:15}}>⚡</span>
+        <span>Síntese</span>
+      </div>
+      <div style={{
+        fontSize:14,
+        lineHeight:1.7,
+        color:T.tx,
+        fontWeight:600
+      }}>
+        {(m.content.split("⚡ Síntese:")[1] || "").trim()}
+      </div>
+    </div>
+  )}
+        
+  {/* Resposta principal */}
+  <div style={{
+    paddingBottom:4,
+    borderBottom:`1px solid ${T.b1}`
+  }}>
+    <div style={{
+      display:"flex",
+      alignItems:"center",
+      gap:8,
+      marginBottom:8,
+      color:AC.gemini,
+      fontSize:11,
+      fontWeight:800,
+      letterSpacing:0.3
+    }}>
+      <span>Resposta</span>
+    </div>
+    <Markdown
+      text={(m.structured?.final || m.content || "").trim()}
+      color={T.tx}
+      faint={T.ts}
+    />
+  </div>
+
+  {m.structured?.consensus?.length > 0 && (
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      gap:6,
+      paddingBottom:4,
+      borderBottom:`1px solid ${T.b1}`
+    }}>
+      <div style={{
+        color:AC.gemini,
+        fontSize:11,
+        fontWeight:800,
+        letterSpacing:0.3
+      }}>
+        Consenso
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {m.structured.consensus.map((item,idx)=>(
+          <div
+            key={idx}
+            style={{
+              background:T.s2,
+              border:`1px solid ${T.b1}`,
               borderRadius:10,
-              background:`${AC.claude}22`,
-              border:`1px solid ${AC.claude}44`,
-              display:"flex",
-              alignItems:"center",
-              justifyContent:"center",
-              color:AC.claude,
-              fontSize:13,
-              fontWeight:800,
-              flexShrink:0
-            }}>C</div>
-            <div style={{minWidth:0}}>
-              <div style={{fontSize:12,fontWeight:800,color:T.tx,letterSpacing:0.4}}>Córtex</div>
-              <div style={{fontSize:10,color:T.ts}}>Síntese final do conselho</div>
-            </div>
-          </div>
-
-          <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-            <CopyBtn text={m.content} T={T} />
-            <button
-              onClick={async()=>{
-                const synth = (m.content.split("⚡ Síntese:")[1] || m.content).trim();
-                const shareText = `Pergunta:\n${msgs.slice(0,i).reverse().find(x=>x.role==="user")?.content || ""}\n\nSíntese:\n${synth}`;
-                if (navigator.share && isMobile) {
-                  try { await navigator.share({ text: shareText }); }
-                  catch {}
-                } else {
-                  await navigator.clipboard?.writeText(shareText);
-                  toast("Resposta copiada para partilha","success");
-                }
-              }}
-              title="Partilhar"
-              style={{
-                background:"transparent",
-                border:`1px solid ${T.b1}`,
-                borderRadius:5,
-                padding:"2px 7px",
-                color:T.tf,
-                fontSize:9,
-                cursor:"pointer"
-              }}
-            >
-              📤
-            </button>
-            <button
-              onClick={()=>setShowCouncil(showCouncil===m.id?null:m.id)}
-              style={{
-                background:showCouncil===m.id?`${AC.claude}16`:"transparent",
-                border:`1px solid ${showCouncil===m.id?AC.claude+"44":T.b1}`,
-                borderRadius:5,
-                padding:"2px 7px",
-                color:showCouncil===m.id?AC.claude:T.tf,
-                fontSize:9,
-                cursor:"pointer"
-              }}
-            >
-              {showCouncil===m.id ? "Ocultar" : "Ver Conselho"}
-            </button>
-          </div>
-        </div>
-
-        {/* Corpo resposta */}
-        <div style={{padding:"14px 14px 8px",display:"flex",flexDirection:"column",gap:12}}>
-          {/* Síntese destacada */}
-          {m.content.includes("⚡ Síntese:") && (
-            <div style={{
-              background:`linear-gradient(135deg, ${AC.claude}14, ${AC.claude}08)`,
-              border:`1px solid ${AC.claude}26`,
-              borderRadius:14,
-              padding:"14px 15px",
-              boxShadow:"inset 0 1px 0 #ffffff08"
-            }}>
-              <div style={{
-                display:"flex",
-                alignItems:"center",
-                gap:8,
-                marginBottom:8,
-                color:AC.claude,
-                fontSize:11,
-                fontWeight:800,
-                letterSpacing:0.3
-              }}>
-                <span style={{fontSize:15}}>⚡</span>
-                <span>Síntese</span>
-              </div>
-              <div style={{
-                fontSize:14,
-                lineHeight:1.7,
-                color:T.tx,
-                fontWeight:600
-              }}>
-                {(m.content.split("⚡ Síntese:")[1] || "").trim()}
-              </div>
-            </div>
-          )}
-
-          {/* Resposta principal sem a síntese */}
-          <div style={{
-            paddingBottom:4,
-            borderBottom:`1px solid ${T.b1}`
-          }}>
-            <div style={{
-              display:"flex",
-              alignItems:"center",
-              gap:8,
-              marginBottom:8,
-              color:AC.gemini,
+              padding:"8px 10px",
               fontSize:11,
-              fontWeight:800,
-              letterSpacing:0.3
-            }}>
-              <span>Resposta</span>
-            </div>
-            <Markdown
-              text={m.content.replace(/\n?⚡ Síntese:[\s\S]*$/,"").trim()}
-              color={T.tx}
-              faint={T.ts}
-            />
+              color:T.tx,
+              lineHeight:1.6
+            }}
+          >
+            • {item}
           </div>
+        ))}
+      </div>
+    </div>
+  )}
 
-          {/* Decisão do conselho */}
-          {m.councilDecision && (
-            <div style={{
-              display:"flex",
-              flexDirection:"column",
-              gap:6,
-              paddingBottom:4,
-              borderBottom:`1px solid ${T.b1}`
-            }}>
-              <div style={{
-                color:AC.perp,
-                fontSize:11,
-                fontWeight:800,
-                letterSpacing:0.3
-              }}>
-                Decisão do conselho
-              </div>
-              <div style={{
-                fontSize:12,
-                color:T.ts,
-                lineHeight:1.7
-              }}>
-                {m.councilDecision}
-              </div>
-            </div>
-          )}
+  {m.structured?.divergence?.length > 0 && (
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      gap:6,
+      paddingBottom:4,
+      borderBottom:`1px solid ${T.b1}`
+    }}>
+      <div style={{
+        color:AC.grok,
+        fontSize:11,
+        fontWeight:800,
+        letterSpacing:0.3
+      }}>
+        Divergências
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {m.structured.divergence.map((item,idx)=>(
+          <div
+            key={idx}
+            style={{
+              background:T.s2,
+              border:`1px solid ${T.b1}`,
+              borderRadius:10,
+              padding:"8px 10px",
+              fontSize:11,
+              color:T.tx,
+              lineHeight:1.6
+            }}
+          >
+            • {item}
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
 
-          {/* Memória usada */}
-          {m.usedMemory?.length>0 && (
-            <div style={{
-              display:"flex",
-              flexDirection:"column",
-              gap:6
-            }}>
-              <div style={{
-                color:AC.grok,
-                fontSize:11,
-                fontWeight:800,
-                letterSpacing:0.3
-              }}>
-                Memória utilizada
-              </div>
-              <div style={{
-                display:"flex",
-                flexWrap:"wrap",
-                gap:6
-              }}>
-                {m.usedMemory.map((mem,j)=>(
-                  <div
-                    key={j}
-                    style={{
-                      background:T.s2,
-                      border:`1px solid ${T.b1}`,
-                      color:T.ts,
-                      fontSize:10,
-                      lineHeight:1.45,
-                      padding:"6px 8px",
-                      borderRadius:10,
-                      maxWidth:"100%"
-                    }}
-                  >
-                    {mem}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+  {m.structured?.nextActions?.length > 0 && (
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      gap:6,
+      paddingBottom:4,
+      borderBottom:`1px solid ${T.b1}`
+    }}>
+      <div style={{
+        color:AC.perp,
+        fontSize:11,
+        fontWeight:800,
+        letterSpacing:0.3
+      }}>
+        Próximos passos
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {m.structured.nextActions.map((item,idx)=>(
+          <div
+            key={idx}
+            style={{
+              background:T.s2,
+              border:`1px solid ${T.b1}`,
+              borderRadius:10,
+              padding:"8px 10px",
+              fontSize:11,
+              color:T.tx,
+              lineHeight:1.6
+            }}
+          >
+            {idx + 1}. {item}
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
 
-          {/* Conselho expandido */}
-          {showCouncil===m.id && m.lobeResults?.length>0 && (
-            <div style={{
-              display:"grid",
-              gridTemplateColumns:isMobile?"1fr":"repeat(2,minmax(0,1fr))",
-              gap:10,
-              paddingTop:2
-            }}>
+  {m.structured?.confidence && (
+    <div style={{
+      display:"flex",
+      alignItems:"center",
+      gap:8,
+      fontSize:10,
+      color:T.tf
+    }}>
+      <span>Confiança</span>
+      <span style={{
+        color:AC.claude,
+        fontWeight:800,
+        background:`${AC.claude}12`,
+        border:`1px solid ${AC.claude}22`,
+        borderRadius:999,
+        padding:"3px 8px"
+      }}>
+        {m.structured.confidence}
+      </span>
+    </div>
+  )}
+
+  {/* Decisão do conselho */}
+  {m.councilDecision && (
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      gap:6,
+      paddingBottom:4,
+      borderBottom:`1px solid ${T.b1}`
+    }}>
+      <div style={{
+        color:AC.perp,
+        fontSize:11,
+        fontWeight:800,
+        letterSpacing:0.3
+      }}>
+        Decisão do conselho
+      </div>
+      <div style={{
+        fontSize:12,
+        color:T.ts,
+        lineHeight:1.7
+      }}>
+        {m.councilDecision}
+      </div>
+    </div>
+  )}
+
+  {/* Memória usada */}
+  {m.usedMemory?.length>0 && (
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      gap:6
+    }}>
+      <div style={{
+        color:AC.grok,
+        fontSize:11,
+        fontWeight:800,
+        letterSpacing:0.3
+      }}>
+        Memória utilizada
+      </div>
+      <div style={{
+        display:"flex",
+        flexWrap:"wrap",
+        gap:6
+      }}>
+        {m.usedMemory.map((mem,j)=>(
+          <div
+            key={j}
+            style={{
+              background:T.s2,
+              border:`1px solid ${T.b1}`,
+              color:T.ts,
+              fontSize:10,
+              lineHeight:1.45,
+              padding:"6px 8px",
+              borderRadius:10,
+              maxWidth:"100%"
+            }}
+          >
+            {mem}
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  {/* Conselho expandido */}
+  {showCouncil===m.id && m.lobeResults?.length>0 && (
+    <div style={{
+      display:"grid",
+      gridTemplateColumns:isMobile?"1fr":"repeat(2,minmax(0,1fr))",
+      gap:10,
+      paddingTop:2
+    }}>
               {m.lobeResults.map((l,idx)=>(
                 <div
                   key={l._key || l.id || idx}
