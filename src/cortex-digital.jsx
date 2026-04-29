@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 const MV="cortex-v12";
+import { callOpenRouter, OR_MODELS } from "./lib/openrouter.js";
 const MAX_BUF=8,MAX_SEMANTIC=80,MAX_PATTERNS=12,MAX_EPISODIC=15,MAX_STORED=200;
 const BUILD = typeof __BUILD_NUM__ !== "undefined" ? __BUILD_NUM__ : "DEV";
 const APP_VERSION = `v12.${BUILD}`;
@@ -714,47 +715,36 @@ function autoSaveConv(currentMsgs, convId){
   const saveModels = mo => safePut(MV+"-models", mo);
 // const saveTasks  = ct => safePut(MV+"-tasks",  ct.slice(0,20)); // REMOVIDO v12
 
-async function invoke(id,sys,msg){
-  const LOBE_MODELS={
-    grok:"grok-3",gemini:"gemini-2.5-flash",perp:"llama-3.3-70b-versatile",
-    genspark:"simulado (Claude)",manus:"simulado (Claude)",openai:"gpt-4o",
-    deepseek:"deepseek-chat",llama:"llama-4-scout-17b-16e-instruct",
-    mistral:"mistral-large-latest",nemotron:"nvidia/nemotron-4-340b-instruct",
-    ollama_codigo:"qwen2.5-coder:1.5b",ollama_debug:"qwen2.5-coder:1.5b",
-  };
-  const ok=(text,real=true)=>({result:text,model:LOBE_MODELS[id]||id,real});
-  try{
-    const cached=cacheGet(id,msg);if(cached)return{...cached,fromCache:true};
-    if(id==="ollama_codigo"){try{const r=ok(await callOllama(sys,msg,"codigo"));cacheSet(id,msg,r);return r;}catch(e){return ok("Ollama Código indisponível: "+e.message,false);}}
-    if(id==="ollama_debug") {try{const r=ok(await callOllama(sys,msg,"debug")); cacheSet(id,msg,r);return r;}catch(e){return ok("Ollama Debug indisponível: "+e.message,false);}}
-    if(id==="grok"     &&hG)  {const r=ok(await callGrok(sys,msg,keys.grok));    cacheSet(id,msg,r);return r;}
-    if(id==="gemini") {const r=ok(await callGemini(sys,msg,keys.gemini||""));  cacheSet(id,msg,r);return r;}  // proxy fallback se sem key
-    if(id==="perp")  {const r=ok(await callPerp(sys,msg,keys.perp||""));       cacheSet(id,msg,r);return r;}  // proxy fallback se sem key
-    if(id==="openai"   &&hO)  {const r=ok(await callOpenAI(sys,msg,keys.openai));   cacheSet(id,msg,r);return r;}
-    if(id==="deepseek" &&hD)  {const r=ok(await callDeepSeek(sys,msg,keys.deepseek));cacheSet(id,msg,r);return r;}
-    if(id==="llama")  {const r=ok(await callGroq(sys,msg,keys.llama||""));       cacheSet(id,msg,r);return r;}  // proxy fallback se sem key
-    if(id==="mistral"  &&hM)  {const r=ok(await callMistral(sys,msg,keys.mistral)); cacheSet(id,msg,r);return r;}
-    if(id==="nemotron" &&hN)  {const r=ok(await callNemotron(sys,msg,keys.nemotron));cacheSet(id,msg,r);return r;}
-    // sem key específica → simula via proxy Groq do servidor
-    try{
-      const text=await callPerp(`You are simulating the "${id.toUpperCase()}" AI assistant lobe. ${sys}`,msg,keys.perp||"");
-      return ok(text,false);
-    }catch{
-      return ok(`[${id}: serviço indisponível de momento]`,false);
+
+async function invoke(id, sys, msg) {
+  const ok = (text, real = true) => ({ result: text, model: OR_MODELS[id] || id, real });
+
+  try {
+    const cached = cacheGet(id, msg);
+    if (cached) return { ...cached, fromCache: true };
+
+    // Ollama local — mantém lógica original
+    if (id === "ollama_codigo") {
+      try { const r = ok(await callOllama(sys, msg, "codigo")); cacheSet(id, msg, r); return r; }
+      catch (e) { return ok("Ollama Código indisponível: " + e.message, false); }
     }
-  }catch(e){
-    const errMsg=e.message||"";
-    const isAuthErr=new RegExp("401|403|invalid.api|api.key|unauthorized|incorrect|timeout","i").test(errMsg);
-    const isTimeout=/Timeout/i.test(errMsg);
-    if(isTimeout){
-      toast(id+": tempo esgotado — a tentar novamente será mais rápido","error");
-    } else if(isAuthErr){
-      // sem popup no mobile — só toast suave
-      toast(id+" sem acesso — a usar modelo alternativo","info");
-    } else {
-      toast(id+": "+errMsg.slice(0,80));
+    if (id === "ollama_debug") {
+      try { const r = ok(await callOllama(sys, msg, "debug")); cacheSet(id, msg, r); return r; }
+      catch (e) { return ok("Ollama Debug indisponível: " + e.message, false); }
     }
-    return {result:"[Erro em "+id+"]",model:id,real:false};
+
+    // Todos os outros lobos → OpenRouter via /api/chat
+    const text = await callOpenRouter(id, sys, msg, 420);
+    const r = ok(text);
+    cacheSet(id, msg, r);
+    return r;
+
+  } catch (e) {
+    const errMsg = e.message || "";
+    const isTimeout = /timeout/i.test(errMsg);
+    if (isTimeout) toast(id + ": tempo esgotado", "error");
+    else toast(id + ": " + errMsg.slice(0, 80));
+    return { result: "[Erro em " + id + "]", model: id, real: false };
   }
 }
   async function send(query){
