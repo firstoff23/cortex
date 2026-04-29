@@ -37,6 +37,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/gemini/, '/gemini'),
         secure: false
+      },
+      '/api/chat': {
+        target: 'https://openrouter.ai',
+        changeOrigin: true,
+        rewrite: () => '/api/v1/chat/completions',
+        secure: true
       }
     }
   }
