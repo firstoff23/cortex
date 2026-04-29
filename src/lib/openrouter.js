@@ -32,7 +32,7 @@ export async function callOpenRouter(lobeId, sys, msg, maxTok = 420) {
   const tid = setTimeout(() => ctrl.abort(), 30000);
 
   try {
-  const r = await fetch("/api/chat", {
+    const r = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: ctrl.signal,
@@ -47,7 +47,13 @@ export async function callOpenRouter(lobeId, sys, msg, maxTok = 420) {
     let data;
     try { data = JSON.parse(raw); }
     catch { throw new Error(`/api/chat não devolveu JSON (${r.status}). Usa 'vercel dev' localmente.`); }
-    if (data.error) throw new Error(data.error);
+
+    if (data.error) {
+      const msg = typeof data.error === "string"
+        ? data.error
+        : data.error.message || JSON.stringify(data.error);
+      throw new Error(msg);
+    }
     return data.choices?.[0]?.message?.content || "";
   } catch (e) {
     clearTimeout(tid);
