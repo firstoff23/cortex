@@ -1,17 +1,18 @@
 // src/lib/openrouter.js
 // Mapeamento dos ids do Córtex para modelos OpenRouter
+// Modelos :free não requerem créditos
 export const OR_MODELS = {
-  grok:           "x-ai/grok-3",
-  gemini:         "google/gemini-2.5-flash",
-  perp:           "perplexity/sonar-pro",
-  genspark:       "meta-llama/llama-3.3-70b-instruct",   // fallback — Genspark não está no OR
-  manus:          "anthropic/claude-3-5-sonnet",          // fallback para agente
-  openai:         "openai/gpt-4o",
-  deepseek:       "deepseek/deepseek-chat",
-  llama:          "meta-llama/llama-4-scout",
-  mistral:        "mistralai/mistral-large",
-  nemotron:       "nvidia/nemotron-4-340b-instruct",
-  claude:         "anthropic/claude-opus-4-6",
+  grok:           "x-ai/grok-3-mini:free",
+  gemini:         "google/gemini-2.0-flash-exp:free",
+  perp:           "perplexity/r1-1776:free",
+  genspark:       "meta-llama/llama-3.3-70b-instruct:free",
+  manus:          "anthropic/claude-3-5-haiku:free",
+  openai:         "openai/gpt-4o-mini:free",
+  deepseek:       "deepseek/deepseek-chat:free",
+  llama:          "meta-llama/llama-4-scout:free",
+  mistral:        "mistralai/mistral-small-3.1-24b-instruct:free",
+  nemotron:       "nvidia/llama-3.1-nemotron-70b-instruct:free",
+  claude:         "anthropic/claude-3-5-haiku:free",
   ollama_codigo:  null,   // local, tratado antes de chegar aqui
   ollama_debug:   null,
 };
