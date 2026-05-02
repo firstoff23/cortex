@@ -290,7 +290,7 @@ function routerDecide(query) {
   return ["grok", "gemini", "genspark"];
 }
 // ── API CALLS ────────────────────────────────────────────────
-async function callClaude(sys, msg, tokens=700, claudeKey="", groqKey="") {
+async function callClaude(sys, msg, tokens=700, claudeKey="") {
   if(claudeKey?.trim().length > 10) {
     const r = await fetchWithTimeout("/api/claude/v1/messages", {
       method:"POST",
@@ -302,16 +302,14 @@ async function callClaude(sys, msg, tokens=700, claudeKey="", groqKey="") {
     return d.content?.[0]?.text||"";
   }
   // fallback Groq: usa key de utilizador ou proxy do servidor
-  const groqUrl=groqKey?.trim().length>10?"https://api.groq.com/openai/v1/chat/completions":"/api/groq-proxy";
-  const groqHeaders=groqKey?.trim().length>10?{"Content-Type":"application/json","Authorization":`Bearer ${groqKey}`}:{"Content-Type":"application/json"};
-  const r = await fetchWithTimeout(groqUrl, {
-    method:"POST",
-    headers:groqHeaders,
-    body:JSON.stringify({model:"llama-3.3-70b-versatile",max_tokens:tokens,messages:[{role:"system",content:sys},{role:"user",content:msg}]})
+  const r = await fetchWithTimeout("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model:"meta-llama/llama-3.3-70b-instruct:free", system:sys, messages:[{role:"user",content:msg}], max_tokens:tokens })
   });
   const d = await r.json();
-  if(d.error) throw new Error(JSON.stringify(d.error));
-  return d.choices?.[0]?.message?.content||"";
+  if(d.error) throw new Error(d.error);
+  return d.content||"";
 }
 
 // ── FETCH COM TIMEOUT ─────────────────────────────────────
@@ -344,10 +342,12 @@ async function callGemini(sys,msg,key){
 }
 async function callPerp(sys,msg,key){
   // sem key → usa proxy do servidor (GROQ_API_KEY no Vercel)
-  const url=key?.trim().length>10?"https://api.groq.com/openai/v1/chat/completions":"/api/groq-proxy";
+  const url=key?.trim().length>10?"https://api.groq.com/openai/v1/chat/completions":"/api/chat";
   const headers=key?.trim().length>10?{"Content-Type":"application/json","Authorization":`Bearer ${key}`}:{"Content-Type":"application/json"};
-  const r=await fetchWithTimeout(url,{method:"POST",headers,body:JSON.stringify({model:"llama-3.3-70b-versatile",messages:[{role:"system",content:sys},{role:"user",content:msg}],max_tokens:420})});
-  const d=await r.json();if(d.error)throw new Error(JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
+  const body=key?.trim().length>10?{model:"llama-3.3-70b-versatile",messages:[{role:"system",content:sys},{role:"user",content:msg}],max_tokens:420}:{model:"meta-llama/llama-3.3-70b-instruct:free",system:sys,messages:[{role:"user",content:msg}],max_tokens:420};
+  const r=await fetchWithTimeout(url,{method:"POST",headers,body:JSON.stringify(body)});
+  const d=await r.json();if(d.error)throw new Error(JSON.stringify(d.error));
+  return key?.trim().length>10?d.choices?.[0]?.message?.content||"":d.content||"";
 }
 async function callOpenAI(sys,msg,key){
   const r=await fetchWithTimeout("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"gpt-4o",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
@@ -358,10 +358,12 @@ async function callDeepSeek(sys,msg,key){
   const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
 }
 async function callGroq(sys,msg,key){
-  const url=key?.trim().length>10?"https://api.groq.com/openai/v1/chat/completions":"/api/groq-proxy";
+  const url=key?.trim().length>10?"https://api.groq.com/openai/v1/chat/completions":"/api/chat";
   const headers=key?.trim().length>10?{"Content-Type":"application/json","Authorization":`Bearer ${key}`}:{"Content-Type":"application/json"};
-  const r=await fetchWithTimeout(url,{method:"POST",headers,body:JSON.stringify({model:"llama-4-scout-17b-16e-instruct",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
-  const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
+  const body=key?.trim().length>10?{model:"llama-4-scout-17b-16e-instruct",messages:[{role:"system",content:sys},{role:"user",content:msg}],max_tokens:420}:{model:"meta-llama/llama-3.3-70b-instruct:free",system:sys,messages:[{role:"user",content:msg}],max_tokens:420};
+  const r=await fetchWithTimeout(url,{method:"POST",headers,body:JSON.stringify(body)});
+  const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));
+  return key?.trim().length>10?d.choices?.[0]?.message?.content||"":d.content||"";
 }
 async function callMistral(sys,msg,key){
   const r=await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"mistral-large-latest",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
@@ -589,11 +591,8 @@ export default function Cortex(){
   const [msgs,setMsgs]       = useState([]);
   const [input,setInput]     = useState("");
   const [phase,setPhase]     = useState(null);
-  const [buf,setBuf]         = useState([]);
-  const [suggestions, setSuggestions] = useState(()=>getRandomSuggestions(4));
-  const [loaded,setLoaded]   = useState(false);
+  const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
-  const [expanded,setExpanded]= useState(null);
   const [theme,setTheme]     = useState("cortex");
   const [keys,setKeys]       = useState(defaultKeys);
   const [toasts,setToasts]   = useState([]);
@@ -611,9 +610,7 @@ export default function Cortex(){
   const [showImport,setShowImport] = useState(false);
   const [importTxt,setImportTxt]   = useState("");
   const [importErr,setImportErr]   = useState("");
-  const [exportKind,setExportKind] = useState("brain"); // brain | current-chat | full-backup
-  const [importMode,setImportMode] = useState("replace"); // replace | merge (para brain: merge sem duplicar, para chats: importa como novas conversas)
-  const [importPreview,setImportPreview] = useState(null); 
+  const [exportKind,setExportKind] = useState("brain"); // brain | current-chat | full-backup  const [importPreview,setImportPreview] = useState(null); 
   const [showSeed,setShowSeed]     = useState(false);
   const [seedP,setSeedP] = useState("");
   const [seedC,setSeedC] = useState("");
