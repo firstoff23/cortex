@@ -9,20 +9,15 @@ const FREE_FALLBACKS = [
   'microsoft/phi-3-mini-128k-instruct:free',
 ];
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   const origin = req.headers['origin'] || '';
 
   res.setHeader('Access-Control-Allow-Origin', origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido' });
-  }
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
 
   const body = req.body;
   const { model, messages, system, max_tokens } = body || {};
@@ -32,9 +27,7 @@ module.exports = async function handler(req, res) {
   }
 
   const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'OPENROUTER_API_KEY não configurada' });
-  }
+  if (!apiKey) return res.status(500).json({ error: 'OPENROUTER_API_KEY não configurada' });
 
   const payload = {
     max_tokens: max_tokens ?? 420,
@@ -72,7 +65,6 @@ module.exports = async function handler(req, res) {
   }
 
   const choice = data?.choices?.[0];
-
   if (!choice) {
     return res.status(502).json({ error: 'OpenRouter devolveu erro', status: lastStatus, detail: JSON.stringify(data) });
   }
@@ -83,4 +75,4 @@ module.exports = async function handler(req, res) {
     provider: 'openrouter',
     usage: data.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
   });
-};
+}
