@@ -1,12 +1,12 @@
-const PROD_ORIGIN = 'https://cortex-digital.vercel.app';
+const PROD_ORIGIN = 'https://cortex-five-hazel.vercel.app';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const FREE_FALLBACKS = [
-  'meta-llama/llama-3.2-3b-instruct:free',
-  'mistralai/mistral-7b-instruct:free',
   'google/gemma-3-4b-it:free',
-  'qwen/qwen-2-7b-instruct:free',
-  'microsoft/phi-3-mini-128k-instruct:free',
+  'google/gemma-3n-e4b-it:free',
+  'liquid/lfm-2.5-1.2b-instruct:free',
+  'openai/gpt-oss-120b:free',
+  'nvidia/nemotron-3-nano-30b-a3b:free',
 ];
 
 export default async function handler(req, res) {
@@ -61,7 +61,6 @@ export default async function handler(req, res) {
     data = await upstream.json();
     lastStatus = upstream.status;
     if (upstream.ok && !data.error) break;
-    if (lastStatus !== 404) break;
   }
 
   const choice = data?.choices?.[0];
