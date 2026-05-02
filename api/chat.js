@@ -1,5 +1,3 @@
-export const config = { runtime: 'edge' };
-
 const PROD_ORIGIN = 'https://cortex-digital.vercel.app';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
