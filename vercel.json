@@ -33,8 +33,7 @@
     }
   ],
   "functions": {
-    "api/chat.js":    { "maxDuration": 30 },
-    "api/reflect.js": { "maxDuration": 30 },
-    "api/tts.js":     { "maxDuration": 20 }
-  }
+  "api/chat.js":       { "maxDuration": 30 },
+  "api/groq-proxy.js": { "maxDuration": 30 }
+}
 }
