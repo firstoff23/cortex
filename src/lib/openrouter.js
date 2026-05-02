@@ -12,27 +12,46 @@ export const OR_MODELS = {
   manus:    "meta-llama/llama-3.3-70b-instruct:free",  // simulado agente
 };
 
+const FREE_FALLBACKS = [
+  "meta-llama/llama-3.2-3b-instruct:free",
+  "meta-llama/llama-3.1-8b-instruct:free",
+  "mistralai/mistral-7b-instruct:free",
+  "google/gemma-3-4b-it:free",
+  "qwen/qwen-2-7b-instruct:free",
+];
+
 export async function callOpenRouter(id, sys, msg, maxTokens = 420) {
-  const model = OR_MODELS[id];
+  let model = OR_MODELS[id];
   if (!model) throw new Error(`OR_MODELS: id desconhecido "${id}"`);
 
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      system: sys,
-      messages: [{ role: "user", content: msg }],
-      max_tokens: maxTokens,
-    }),
-  });
+  // Se for modelo :free, tenta com fallbacks automáticos
+  const isFree = model.endsWith(":free");
+  const toTry = isFree
+    ? [model, ...FREE_FALLBACKS.filter(m => m !== model)]
+    : [model];
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`/api/chat ${res.status}: ${err.slice(0, 120)}`);
+  let lastErr;
+  for (const m of toTry) {
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: m,
+          system: sys,
+          messages: [{ role: "user", content: msg }],
+          max_tokens: maxTokens,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && !data.error) return data.content ?? "";
+      lastErr = data.error || `HTTP ${res.status}`;
+      // Se não for 404, não tenta o seguinte
+      if (!String(lastErr).includes("404")) throw new Error(lastErr);
+    } catch (e) {
+      lastErr = e.message;
+      if (!String(e.message).includes("404")) throw e;
+    }
   }
-
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data.choices?.[0]?.message?.content ?? "";
+  throw new Error(`Todos os modelos falharam: ${lastErr}`);
 }
