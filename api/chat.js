@@ -1,6 +1,6 @@
 export const config = { runtime: 'edge' };
 
-const ALLOWED_ORIGIN = 'https://cortex-digital.vercel.app';
+const PROD_ORIGIN = 'https://cortex-digital.vercel.app';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 export default async function handler(req) {
@@ -25,7 +25,7 @@ export default async function handler(req) {
     return json({ error: 'Body inválido' }, 400, origin);
   }
 
-  const { model, messages, system } = body;
+const { model, messages, system, max_tokens } = body;
 
   if (!model || !messages || !Array.isArray(messages)) {
     return json({ error: 'Campos obrigatórios: model, messages' }, 400, origin);
@@ -36,12 +36,13 @@ export default async function handler(req) {
     return json({ error: 'OPENROUTER_API_KEY não configurada' }, 500, origin);
   }
 
-  const payload = {
-    model,
-    messages: system
-      ? [{ role: 'system', content: system }, ...messages]
-      : messages
-  };
+const payload = {
+  model,
+  max_tokens: max_tokens ?? 420,
+  messages: system
+    ? [{ role: 'system', content: system }, ...messages]
+    : messages
+};
 
   let upstream;
   try {
@@ -50,7 +51,7 @@ export default async function handler(req) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': ALLOWED_ORIGIN,
+        'HTTP-Referer': PROD_ORIGIN,
         'X-Title': 'Córtex Digital'
       },
       body: JSON.stringify(payload)
@@ -82,7 +83,9 @@ export default async function handler(req) {
 // --- helpers ---
 
 function corsHeaders(origin) {
-  const allowed = origin === ALLOWED_ORIGIN ? origin : ALLOWED_ORIGIN;
+  const allowed = (origin.endsWith('.vercel.app') || origin.includes('localhost'))
+    ? origin
+    : PROD_ORIGIN;
   return {
     'Access-Control-Allow-Origin': allowed,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',

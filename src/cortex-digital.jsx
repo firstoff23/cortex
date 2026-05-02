@@ -229,6 +229,25 @@ RESPOSTAS DOS LOBOS DO CONSELHO:
 ${lobes.map(l => "[ " + l.label + " ]: " + l.result).join("\n\n")}
 `.trim(),
 
+judge: (q, lobeResults) => `You are the judge of an 11-lobe AI council.
+Question: "${q}"
+Lobe responses:
+${lobeResults.map(l => `[${l.label}]: ${l.result?.slice(0, 120)}`).join("\n")}
+Write ONE sentence (max 80 words) in Portuguese explaining which lobes were most useful and why. No lists.`.trim(),
+
+reflect: (buf, mem) => `Analisa esta conversa e devolve APENAS JSON válido, sem markdown.
+Estrutura obrigatória:
+{
+  "new_semantic": [{"tipo": "string", "descricao": "string", "importancia": "alta|média|baixa"}],
+  "new_patterns": ["padrão 1", "padrão 2"],
+  "procedural_update": {"format": "conciso|detalhado", "lang": "pt|en", "level": "básico|médio|avançado"},
+  "session_summary": "resumo da sessão em 1 frase"
+}
+Regras: new_semantic máx 5 items; new_patterns máx 3; só factos novos não presentes na memória.
+MEMÓRIA ATUAL:
+${mem}
+CONVERSA:
+${buf}`.trim(),
 };
 // ── CACHE DE RESPOSTAS (5 min TTL) ──────────────────────────
 const _cache=new Map();

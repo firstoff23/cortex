@@ -1,35 +1,38 @@
-// Mapa lobe → modelo OpenRouter (todos gratuitos por defeito)
 export const OR_MODELS = {
-  grok:          "meta-llama/llama-3.1-8b-instruct:free",
-  gemini:        "google/gemma-3-12b-it:free",
-  perp:          "mistralai/mistral-7b-instruct:free",
-  genspark:      "meta-llama/llama-3.1-8b-instruct:free",
-  manus:         "meta-llama/llama-3.1-8b-instruct:free",
-  openai:        "openai/gpt-4o",
-  deepseek:      "deepseek/deepseek-r1:free",
-  llama:         "meta-llama/llama-3.1-70b-instruct:free",
-  mistral:       "mistralai/mistral-7b-instruct:free",
-  nemotron:      "nvidia/llama-3.1-nemotron-70b-instruct:free",
-  claude:        "anthropic/claude-3.5-sonnet",
+  grok:     "meta-llama/llama-3.1-8b-instruct:free",   // sem key grok-3 real
+  gemini:   "google/gemma-3-12b-it:free",
+  perp:     "mistralai/mistral-7b-instruct:free",
+  openai:   "meta-llama/llama-3.1-8b-instruct:free",   // fallback livre
+  deepseek: "deepseek/deepseek-r1:free",
+  llama:    "meta-llama/llama-3.3-70b-instruct:free",
+  mistral:  "mistralai/mistral-7b-instruct:free",
+  nemotron: "meta-llama/llama-3.3-70b-instruct:free",  // fallback livre
+  claude:   "anthropic/claude-3.5-sonnet",             // juiz — pago
+  genspark: "meta-llama/llama-3.1-8b-instruct:free",   // simulado
+  manus:    "meta-llama/llama-3.3-70b-instruct:free",  // simulado agente
 };
 
-export async function callOpenRouter(lobeId, system, userMsg, maxTokens = 500) {
-  const model = OR_MODELS[lobeId] || "meta-llama/llama-3.1-8b-instruct:free";
-  const r = await fetch("/api/chat", {
+export async function callOpenRouter(id, sys, msg, maxTokens = 420) {
+  const model = OR_MODELS[id];
+  if (!model) throw new Error(`OR_MODELS: id desconhecido "${id}"`);
+
+  const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model,
-      system,
-      messages: [{ role: "user", content: userMsg }],
-      max_tokens: maxTokens
-    })
+      system: sys,
+      messages: [{ role: "user", content: msg }],
+      max_tokens: maxTokens,
+    }),
   });
-  if (!r.ok) {
-    const e = await r.json().catch(() => ({}));
-    throw new Error(e.error?.message || `HTTP ${r.status}`);
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`/api/chat ${res.status}: ${err.slice(0, 120)}`);
   }
-  const d = await r.json();
-  if (d.error) throw new Error(typeof d.error === "string" ? d.error : JSON.stringify(d.error));
-  return { content: d.content, model };
+
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data.choices?.[0]?.message?.content ?? "";
 }
