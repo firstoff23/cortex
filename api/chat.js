@@ -2,47 +2,45 @@ const PROD_ORIGIN = 'https://cortex-digital.vercel.app';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const FREE_FALLBACKS = [
-  "meta-llama/llama-3.2-3b-instruct:free",
-  "mistralai/mistral-7b-instruct:free",
-  "google/gemma-3-4b-it:free",
-  "qwen/qwen-2-7b-instruct:free",
-  "microsoft/phi-3-mini-128k-instruct:free",
+  'meta-llama/llama-3.2-3b-instruct:free',
+  'mistralai/mistral-7b-instruct:free',
+  'google/gemma-3-4b-it:free',
+  'qwen/qwen-2-7b-instruct:free',
+  'microsoft/phi-3-mini-128k-instruct:free',
 ];
 
-export default async function handler(req) {
-  const origin = req.headers.get('origin') || '';
+module.exports = async function handler(req, res) {
+  const origin = req.headers['origin'] || '';
+
+  res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders(origin) });
+    return res.status(204).end();
   }
 
   if (req.method !== 'POST') {
-    return json({ error: 'Método não permitido' }, 405, origin);
+    return res.status(405).json({ error: 'Método não permitido' });
   }
 
-  let body;
-  try {
-    body = await req.json();
-  } catch {
-    return json({ error: 'Body inválido' }, 400, origin);
-  }
-
-  const { model, messages, system, max_tokens } = body;
+  const body = req.body;
+  const { model, messages, system, max_tokens } = body || {};
 
   if (!model || !messages || !Array.isArray(messages)) {
-    return json({ error: 'Campos obrigatórios: model, messages' }, 400, origin);
+    return res.status(400).json({ error: 'Campos obrigatórios: model, messages' });
   }
 
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    return json({ error: 'OPENROUTER_API_KEY não configurada' }, 500, origin);
+    return res.status(500).json({ error: 'OPENROUTER_API_KEY não configurada' });
   }
 
   const payload = {
     max_tokens: max_tokens ?? 420,
     messages: system
       ? [{ role: 'system', content: system }, ...messages]
-      : messages
+      : messages,
   };
 
   const isFree = model.endsWith(':free');
@@ -60,12 +58,12 @@ export default async function handler(req) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
           'HTTP-Referer': PROD_ORIGIN,
-          'X-Title': 'Córtex Digital'
+          'X-Title': 'Córtex Digital',
         },
-        body: JSON.stringify({ ...payload, model: m })
+        body: JSON.stringify({ ...payload, model: m }),
       });
     } catch (err) {
-      return json({ error: 'Falha na ligação ao OpenRouter', detail: err.message }, 502, origin);
+      return res.status(502).json({ error: 'Falha na ligação ao OpenRouter', detail: err.message });
     }
     data = await upstream.json();
     lastStatus = upstream.status;
@@ -76,31 +74,13 @@ export default async function handler(req) {
   const choice = data?.choices?.[0];
 
   if (!choice) {
-    return json({ error: 'OpenRouter devolveu erro', status: lastStatus, detail: JSON.stringify(data) }, 502, origin);
+    return res.status(502).json({ error: 'OpenRouter devolveu erro', status: lastStatus, detail: JSON.stringify(data) });
   }
 
-  return json({
+  return res.status(200).json({
     content: choice.message?.content ?? '',
     model: data.model ?? model,
     provider: 'openrouter',
-    usage: data.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
-  }, 200, origin);
-}
-
-function corsHeaders(origin) {
-  const allowed = (origin.endsWith('.vercel.app') || origin.includes('localhost'))
-    ? origin
-    : PROD_ORIGIN;
-  return {
-    'Access-Control-Allow-Origin': allowed,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
-  };
-}
-
-function json(data, status = 200, origin = '') {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) }
+    usage: data.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
   });
-}
+};
