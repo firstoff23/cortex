@@ -53,3 +53,6 @@ pnpm-debug.log*
 notes.txt
 todo.txt
 roadmap.txt
+.vercel
+.env*.local
+.env.local
