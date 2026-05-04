@@ -1,16 +1,63 @@
-# React + Vite
+# Córtex Digital v12
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Sistema de chat multi-agente com council de 11 lobos IA e síntese final por Claude.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Frontend:** React 18 + Vite 5.4.21
+- **Deploy:** Vercel
+- **APIs:** Proxied via Vercel serverless functions (`/api/*`)
+- **Memória:** localStorage (migração Supabase planeada)
 
-## React Compiler
+## Arquitetura
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+O Córtex usa um padrão **council multi-modelo**:
 
-## Expanding the ESLint configuration
+1. O utilizador envia uma query
+2. O `routerDecide()` decide quais lobos ativar
+3. Os lobos são chamados em paralelo via `invoke()`
+4. Claude sintetiza as respostas como juiz final
+5. A reflexão e memória são atualizadas
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Modelos disponíveis (lobos)
+
+| ID | Modelo | Provedor |
+|---|---|---|
+| claude | Claude 3.5 Sonnet | Anthropic |
+| gpt | GPT-4o | OpenAI |
+| gemini | Gemini 2.0 Flash | Google |
+| grok | Grok-3 | xAI |
+| groq | Llama 3.3 70B | Groq |
+| perp | Sonar Pro | Perplexity |
+| mistral | Mistral Large | Mistral |
+| cohere | Command R+ | Cohere |
+| deepseek | DeepSeek V3 | DeepSeek |
+| qwen | Qwen 2.5 72B | Alibaba |
+| ollama | Llama local | Ollama |
+
+## Desenvolvimento local
+
+```bash
+npm install
+npm run dev
+```
+
+## Deploy
+
+```bash
+npm run build
+# ou push para main — Vercel faz deploy automático
+```
+
+## Variáveis de ambiente (Vercel)
+
+As API keys são geridas via painel do Vercel como env vars do servidor.
+Nunca expor keys no cliente.
+
+## Roadmap
+
+- [ ] Migração `invoke()` para OpenRouter
+- [ ] Persistência com Supabase
+- [ ] Conectores on-demand (Tavily, ElevenLabs, Notion, Obsidian)
+- [ ] Cloudflare DNS + WAF + Turnstile
+- [ ] Memória vetorial com Supabase pgvector

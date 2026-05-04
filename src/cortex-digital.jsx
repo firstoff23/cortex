@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 
-const MV="cortex-v11";
+const MV="cortex-v12";
+import { callOpenRouter, OR_MODELS } from "./lib/openrouter.js";
 const MAX_BUF=8,MAX_SEMANTIC=80,MAX_PATTERNS=12,MAX_EPISODIC=15,MAX_STORED=200;
+const BUILD = typeof __BUILD_NUM__ !== "undefined" ? __BUILD_NUM__ : "DEV";
+const APP_VERSION = `v12.${BUILD}`;
 
 const THEMES={
   cortex:    {name:"Córtex",     emoji:"🧠",bg:"#08080c",s1:"#0f0f16",s2:"#14141e",s3:"#1a1a26",b1:"#222232",b2:"#161622",tx:"#e8e8f8",ts:"#6868a0",tf:"#2a2a44"},
@@ -30,7 +33,7 @@ const THEMES={
 
 const AC={
   grok:"#f59e0b",gemini:"#8b5cf6",perp:"#0ea5e9",genspark:"#ff6b6b",
-  manus:"#22d3ee",claude:"#10b981",reflex:"#6366f1",computer:"#f472b6",
+  manus:"#22d3ee",claude:"#10b981",reflex:"#6366f1",
   openai:"#74aa9c",deepseek:"#4d9fff",llama:"#e879f9",mistral:"#f97316",nemotron:"#a3e635",
   ollama_codigo:"#634b37",ollama_debug:"#c9c17f"
 };
@@ -84,17 +87,6 @@ const MODELS=[
   {id:"ollama_debug",name:"Debug",version:"qwen2.5-coder:1.5b",color:AC.ollama_debug,free:true},
 ];
 
-const CONNECTORS=[
-  {cat:"Comunicação",   items:[{id:"slack",name:"Slack",e:"💬"},{id:"discord",name:"Discord",e:"🎮"},{id:"gmail",name:"Gmail",e:"📧"},{id:"outlook",name:"Outlook",e:"📮"},{id:"teams",name:"Teams",e:"👥"},{id:"telegram",name:"Telegram",e:"✈️"},{id:"whatsapp",name:"WhatsApp",e:"📱"}]},
-  {cat:"Produtividade", items:[{id:"notion",name:"Notion",e:"📝"},{id:"obsidian",name:"Obsidian",e:"💎"},{id:"todoist",name:"Todoist",e:"✅"},{id:"trello",name:"Trello",e:"📋"},{id:"asana",name:"Asana",e:"🎯"},{id:"linear",name:"Linear",e:"📐"},{id:"monday",name:"Monday",e:"📅"}]},
-  {cat:"Cloud & Docs",  items:[{id:"gdrive",name:"Google Drive",e:"📂"},{id:"onedrive",name:"OneDrive",e:"☁️"},{id:"dropbox",name:"Dropbox",e:"📦"},{id:"gdocs",name:"Google Docs",e:"📄"},{id:"gsheets",name:"Sheets",e:"📊"},{id:"sharepoint",name:"SharePoint",e:"🏢"}]},
-  {cat:"Calendário",    items:[{id:"gcal",name:"Google Cal",e:"📆"},{id:"cal",name:"Cal.com",e:"🗓️"},{id:"outlook_cal",name:"Outlook Cal",e:"📅"},{id:"calendly",name:"Calendly",e:"⏰"}]},
-  {cat:"Dev & Code",    items:[{id:"github",name:"GitHub",e:"🐙"},{id:"gitlab",name:"GitLab",e:"🦊"},{id:"jira",name:"Jira",e:"🔵"},{id:"confluence",name:"Confluence",e:"📚"},{id:"vercel",name:"Vercel",e:"▲"},{id:"supabase",name:"Supabase",e:"🟢"}]},
-  {cat:"Automação",     items:[{id:"zapier",name:"Zapier",e:"⚡"},{id:"make",name:"Make",e:"🔄"},{id:"n8n",name:"n8n",e:"🔁"},{id:"ifttt",name:"IFTTT",e:"🤖"},{id:"pipedream",name:"Pipedream",e:"🚀"}]},
-  {cat:"CRM & Negócio", items:[{id:"salesforce",name:"Salesforce",e:"☁️"},{id:"hubspot",name:"HubSpot",e:"🧲"},{id:"airtable",name:"Airtable",e:"📊"},{id:"stripe",name:"Stripe",e:"💳"}]},
-  {cat:"Dados & IA",    items:[{id:"perp_web",name:"Perplexity Web",e:"🔍"},{id:"wolfram",name:"Wolfram",e:"🧮"},{id:"arxiv",name:"ArXiv",e:"📜"},{id:"youtube",name:"YouTube",e:"▶️"},{id:"duckduckgo",name:"DuckDuckGo",e:"🦆"}]},
-];
-
 const ALL_SUGGESTIONS = [
   "Explica memória vetorial em sistemas de IA",
   "Melhores ferramentas de produtividade com IA em 2026?",
@@ -123,18 +115,18 @@ function shuffleArray(arr){const s=[...arr];for(let i=s.length-1;i>0;i--){const 
 function getRandomSuggestions(n=4){return shuffleArray(ALL_SUGGESTIONS).slice(0,n);};
 
 const defaultBrain={episodic:[],semantic:[],patterns:[],procedural:{format:"conciso",lang:"pt",level:"médio"},sessions:0,lastReflect:null};
-const defaultKeys={
-  grok:     "",
-  gemini:   "AIzaSyDJo6cHshbY0KrLlERtFoo9_7pqlQwuOeQ",   // grátis — aistudio.google.com
-  perp:     "Kgsk_ESkohDveDHwjdhB68TXLWGdyb3FYCTk3MUri06bFRBV6Cojyal1y groqEY_GROQ",     // grátis — console.groq.com
-  claude:   "",
-  openai:   "",
-  deepseek: "",
-  llama:    "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 groq",     // mesma key do Groq
-  mistral:  "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 groq",     // mesma key do Groq
-  nemotron: "",
-  genspark: "",
-  manus:    ""
+const defaultKeys = {
+  grok:"",
+  gemini:"", 
+  perp:"", 
+  claude:"",
+  openai:"", 
+  deepseek:"", 
+  llama:"",
+  mistral:"", 
+  nemotron:"", 
+  genspark:"", 
+  manus:""
 };
 
 // ── DEV PIN — muda em localStorage("cortex-dev-pin") ────────
@@ -211,29 +203,52 @@ const P={
   nemotron:(m,q)=>`You are NEMOTRON — scientific rigor. Evidence-based, cite mechanisms. Memory:\n${m}\nQuestion: ${q}\nMax 100w. ${detectLang(q)}`,
   ollama_codigo:(m,q)=>`Local coding assistant. Give clean working code with brief explanation. Memory:\n${m}\nQuestion: ${q}\nMax 100w. ${detectLang(q)}`,
   ollama_debug:(m,q)=>`Local debug expert. Find root cause, give exact fix. Memory:\n${m}\nQuestion: ${q}\nMax 100w. ${detectLang(q)}`,
-  cortex:  (m,q,lobes)=>`You are the PREFRONTAL CORTEX — the judge and synthesizer of a multi-AI council (claude-opus-4-6).
+cortex: (m, q, lobes) => `
+Tu és o Córtex Pré-Frontal — o juiz e sintetizador de um conselho multi-IA.
+Regras obrigatórias:
+1. Responde sempre em Português de Portugal.
+2. Identifica as respostas mais úteis, resolve contradições e sintetiza numa única resposta abrangente.
+3. Se houver código, usa markdown.
+4. NÃO escrevas introduções, nem números antes das frases, nem "⚡ Síntese:".
+5. Devolve APENAS um objeto JSON válido (sem markdown), com esta estrutura exata:
+{
+  "final": "resposta detalhada e abrangente",
+  "consensus": ["ponto concordante 1", "ponto concordante 2"],
+  "divergence": ["ponto de divergência 1"],
+  "confidence": "alta",
+  "nextActions": ["passo 1", "passo 2"]
+}
 
-MEMORY:\n${m}
+MEMÓRIA:
+${m}
 
-USER QUESTION: ${q}
+PERGUNTA DO UTILIZADOR:
+${q}
 
-COUNCIL RESPONSES:\n${lobes.map(l=>`[${l.label}]: ${l.result}`).join("\n\n")}
+RESPOSTAS DOS LOBOS DO CONSELHO:
+${lobes.map(l => "[ " + l.label + " ]: " + l.result).join("\n\n")}
+`.trim(),
 
-YOUR TASK:
-1. Identify which lobe(s) gave the most accurate and useful information
-2. Resolve any contradictions between lobes
-3. Synthesize into ONE clear, comprehensive answer
-4. If the question involves code, format it properly with markdown
-5. End with a line starting with "⚡ Síntese:" summarizing the key insight in one sentence
+judge: (q, lobeResults) => `You are the judge of an 11-lobe AI council.
+Question: "${q}"
+Lobe responses:
+${lobeResults.map(l => `[${l.label}]: ${l.result?.slice(0, 120)}`).join("\n")}
+Write ONE sentence (max 80 words) in Portuguese explaining which lobes were most useful and why. No lists.`.trim(),
 
-Be direct. No intro. ${detectLang(q)}`,
-  judge:   (q,lobes)=>`Judge of an 11-lobe AI council. ONE sentence: which lobe(s) were most helpful and why. Same language.\n\nQUESTION: ${q}\n\n${lobes.map(l=>`${l.label}:\n${l.result}`).join("\n\n")}`,
-  reflect: (buf,m)=>`Memory consolidation.\nBUFFER:\n${buf}\nEXISTING:\n${m}\nReturn ONLY valid JSON:\n{"new_semantic":[{"tipo":"preferencia|projeto|facto|regra","descricao":"phrase","importancia":"alta|media"}],"new_patterns":["pattern"],"procedural_update":{},"session_summary":"one sentence"}\nMax 4, max 1 pattern. Empty if nothing new.`,
-  computer:(task,conns)=>`You are MANUS 1.6 Max as a computer agent.\nACTIVE CONNECTORS: ${conns.join(", ")||"none"}\nTASK: ${task}\nRespond with JSON:\n{"steps":["step1","step2","step3"],"preview":"what result looks like","estimatedTime":"Xs","confidence":"high|medium|low"}\nThen execute concretely.`,
+reflect: (buf, mem) => `Analisa esta conversa e devolve APENAS JSON válido, sem markdown.
+Estrutura obrigatória:
+{
+  "new_semantic": [{"tipo": "string", "descricao": "string", "importancia": "alta|média|baixa"}],
+  "new_patterns": ["padrão 1", "padrão 2"],
+  "procedural_update": {"format": "conciso|detalhado", "lang": "pt|en", "level": "básico|médio|avançado"},
+  "session_summary": "resumo da sessão em 1 frase"
+}
+Regras: new_semantic máx 5 items; new_patterns máx 3; só factos novos não presentes na memória.
+MEMÓRIA ATUAL:
+${mem}
+CONVERSA:
+${buf}`.trim(),
 };
-
-
-
 // ── CACHE DE RESPOSTAS (5 min TTL) ──────────────────────────
 const _cache=new Map();
 const CACHE_TTL=5*60*1000;
@@ -275,7 +290,7 @@ function routerDecide(query) {
   return ["grok", "gemini", "genspark"];
 }
 // ── API CALLS ────────────────────────────────────────────────
-async function callClaude(sys, msg, tokens=700, claudeKey="", groqKey="") {
+async function callClaude(sys, msg, tokens=700, claudeKey="") {
   if(claudeKey?.trim().length > 10) {
     const r = await fetchWithTimeout("/api/claude/v1/messages", {
       method:"POST",
@@ -287,16 +302,14 @@ async function callClaude(sys, msg, tokens=700, claudeKey="", groqKey="") {
     return d.content?.[0]?.text||"";
   }
   // fallback Groq: usa key de utilizador ou proxy do servidor
-  const groqUrl=groqKey?.trim().length>10?"https://api.groq.com/openai/v1/chat/completions":"/api/groq-proxy";
-  const groqHeaders=groqKey?.trim().length>10?{"Content-Type":"application/json","Authorization":`Bearer ${groqKey}`}:{"Content-Type":"application/json"};
-  const r = await fetchWithTimeout(groqUrl, {
-    method:"POST",
-    headers:groqHeaders,
-    body:JSON.stringify({model:"llama-3.3-70b-versatile",max_tokens:tokens,messages:[{role:"system",content:sys},{role:"user",content:msg}]})
+  const r = await fetchWithTimeout("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model:"meta-llama/llama-3.3-70b-instruct:free", system:sys, messages:[{role:"user",content:msg}], max_tokens:tokens })
   });
   const d = await r.json();
-  if(d.error) throw new Error(JSON.stringify(d.error));
-  return d.choices?.[0]?.message?.content||"";
+  if(d.error) throw new Error(d.error);
+  return d.content||"";
 }
 
 // ── FETCH COM TIMEOUT ─────────────────────────────────────
@@ -329,10 +342,12 @@ async function callGemini(sys,msg,key){
 }
 async function callPerp(sys,msg,key){
   // sem key → usa proxy do servidor (GROQ_API_KEY no Vercel)
-  const url=key?.trim().length>10?"https://api.groq.com/openai/v1/chat/completions":"/api/groq-proxy";
+  const url=key?.trim().length>10?"https://api.groq.com/openai/v1/chat/completions":"/api/chat";
   const headers=key?.trim().length>10?{"Content-Type":"application/json","Authorization":`Bearer ${key}`}:{"Content-Type":"application/json"};
-  const r=await fetchWithTimeout(url,{method:"POST",headers,body:JSON.stringify({model:"llama-3.3-70b-versatile",messages:[{role:"system",content:sys},{role:"user",content:msg}],max_tokens:420})});
-  const d=await r.json();if(d.error)throw new Error(JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
+  const body=key?.trim().length>10?{model:"llama-3.3-70b-versatile",messages:[{role:"system",content:sys},{role:"user",content:msg}],max_tokens:420}:{model:"meta-llama/llama-3.3-70b-instruct:free",system:sys,messages:[{role:"user",content:msg}],max_tokens:420};
+  const r=await fetchWithTimeout(url,{method:"POST",headers,body:JSON.stringify(body)});
+  const d=await r.json();if(d.error)throw new Error(JSON.stringify(d.error));
+  return key?.trim().length>10?d.choices?.[0]?.message?.content||"":d.content||"";
 }
 async function callOpenAI(sys,msg,key){
   const r=await fetchWithTimeout("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"gpt-4o",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
@@ -343,10 +358,12 @@ async function callDeepSeek(sys,msg,key){
   const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
 }
 async function callGroq(sys,msg,key){
-  const url=key?.trim().length>10?"https://api.groq.com/openai/v1/chat/completions":"/api/groq-proxy";
+  const url=key?.trim().length>10?"https://api.groq.com/openai/v1/chat/completions":"/api/chat";
   const headers=key?.trim().length>10?{"Content-Type":"application/json","Authorization":`Bearer ${key}`}:{"Content-Type":"application/json"};
-  const r=await fetchWithTimeout(url,{method:"POST",headers,body:JSON.stringify({model:"llama-4-scout-17b-16e-instruct",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
-  const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
+  const body=key?.trim().length>10?{model:"llama-4-scout-17b-16e-instruct",messages:[{role:"system",content:sys},{role:"user",content:msg}],max_tokens:420}:{model:"meta-llama/llama-3.3-70b-instruct:free",system:sys,messages:[{role:"user",content:msg}],max_tokens:420};
+  const r=await fetchWithTimeout(url,{method:"POST",headers,body:JSON.stringify(body)});
+  const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));
+  return key?.trim().length>10?d.choices?.[0]?.message?.content||"":d.content||"";
 }
 async function callMistral(sys,msg,key){
   const r=await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"mistral-large-latest",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
@@ -409,21 +426,52 @@ function Toggle({on,onChange,color}){
 function Splash(){
   return <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100dvh",background:"#08080c",gap:14}}>
     <div style={{display:"flex",gap:8}}>{Object.values(AC).slice(0,8).map((c,i)=><div key={i} style={{width:10,height:10,borderRadius:"50%",background:c,animation:`orb 1.4s ${i*0.18}s ease-in-out infinite`}}/>)}</div>
-    <p style={{color:AC.claude,fontFamily:"monospace",fontSize:11,margin:0,letterSpacing:2}}>CÓRTEX v11</p>
+    <p style={{color:AC.claude,fontFamily:"monospace",fontSize:11,margin:0,letterSpacing:2}}>CÓRTEX {APP_VERSION}</p>
     <style>{`@keyframes orb{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.2;transform:scale(1.4)}}`}</style>
   </div>;
 }
 
 function Modal({T,title,onClose,children}){
-  return <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:14}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-    <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:17,padding:18,maxWidth:520,width:"100%",maxHeight:"84vh",overflowY:"auto",display:"flex",flexDirection:"column",gap:11,boxShadow:"0 20px 60px #00000088"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <h3 style={{margin:0,fontSize:13,fontWeight:800,color:T.tx}}>{title}</h3>
-        <button onClick={onClose} style={{background:"transparent",border:"none",cursor:"pointer",color:T.ts,fontSize:17,lineHeight:1}}>✕</button>
+  return (
+    <div
+      onClick={e=>{if(e.target===e.currentTarget)onClose();}}
+      style={{
+        position:"fixed",inset:0,background:"#00000099",zIndex:1000,
+        display:"flex",alignItems:"center",justifyContent:"center",padding:14,
+        animation:"modalFadeIn 220ms cubic-bezier(0.4,0,0.2,1)"
+      }}
+    >
+      <div style={{
+        background:T.s1,
+        border:`1px solid ${T.b1}`,
+        borderRadius:17,
+        padding:18,
+        maxWidth:520,
+        width:"100%",
+        maxHeight:"84vh",
+        overflowY:"auto",
+        display:"flex",
+        flexDirection:"column",
+        gap:11,
+        boxShadow:"0 20px 60px #00000088",
+        animation:"modalSlideIn 220ms cubic-bezier(0.4,0,0.2,1)"
+      }}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <h3 style={{margin:0,fontSize:13,fontWeight:800,color:T.tx}}>{title}</h3>
+          <button
+            onClick={onClose}
+            style={{
+              background:"transparent",border:"none",cursor:"pointer",
+              color:T.ts,fontSize:17,lineHeight:1,
+              width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",
+              borderRadius:"50%",transition:"background 220ms cubic-bezier(0.4,0,0.2,1)"
+            }}
+          >✕</button>
+        </div>
+        {children}
       </div>
-      {children}
     </div>
-  </div>;
+  );
 }
 
 function KeyRow({ api, T, value, onChange }) {
@@ -519,7 +567,22 @@ function KeyRow({ api, T, value, onChange }) {
   );
 }
 function btn(T,color){return{background:`${color}18`,border:`1px solid ${color}33`,borderRadius:10,padding:"6px 12px",color,cursor:"pointer",fontSize:11,fontFamily:"inherit",fontWeight:600,whiteSpace:"nowrap",transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)",boxShadow:"0 1px 4px #00000022"};}
-function navBtn(T){return{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:10,padding:"5px 10px",color:T.ts,cursor:"pointer",fontSize:12,flexShrink:0,transition:"all 0.2s cubic-bezier(0.4,0,0.2,1)",userSelect:"none"};}
+function navBtn(T){
+  return {
+    background:"transparent",
+    border:`1px solid ${T.b1}`,
+    borderRadius:10,
+    padding:"8px 10px",
+    minWidth:44,
+    minHeight:44,
+    color:T.ts,
+    cursor:"pointer",
+    fontSize:12,
+    flexShrink:0,
+    transition:"all 220ms cubic-bezier(0.4,0,0.2,1)",
+    userSelect:"none"
+  };
+}
 
 // ── MAIN ─────────────────────────────────────────────────────
 export default function Cortex(){
@@ -528,33 +591,32 @@ export default function Cortex(){
   const [msgs,setMsgs]       = useState([]);
   const [input,setInput]     = useState("");
   const [phase,setPhase]     = useState(null);
-  const [buf,setBuf]         = useState([]);
-  const [suggestions, setSuggestions] = useState(()=>getRandomSuggestions(4));
-  const [loaded,setLoaded]   = useState(false);
+  const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
-  const [expanded,setExpanded]= useState(null);
   const [theme,setTheme]     = useState("cortex");
   const [keys,setKeys]       = useState(defaultKeys);
   const [toasts,setToasts]   = useState([]);
   const [modelsOn,setModelsOn] = useState(Object.fromEntries(MODELS.map(m=>[m.id,true])));
-  const [connsOn,setConnsOn] = useState({});
-  const [compInput,setCompInput] = useState("");
-  const [compRunning,setCompRunning] = useState(false);
-  const [compTasks,setCompTasks] = useState([]);
-  const [compActive,setCompActive] = useState(null);
+
+// ── REMOVIDO v12 — Computer Mode (mantido para referência futura) ──
+// const [compInput,setCompInput] = useState("");
+// const [compRunning,setCompRunning] = useState(false);
+// const [compTasks,setCompTasks] = useState([]);
+// const [compActive,setCompActive] = useState(null);
+
   // modals
   const [showGuide,setShowGuide]   = useState(false);
   const [showExport,setShowExport] = useState(false);
   const [showImport,setShowImport] = useState(false);
   const [importTxt,setImportTxt]   = useState("");
   const [importErr,setImportErr]   = useState("");
+  const [exportKind,setExportKind] = useState("brain"); // brain | current-chat | full-backup  const [importPreview,setImportPreview] = useState(null); 
   const [showSeed,setShowSeed]     = useState(false);
   const [seedP,setSeedP] = useState("");
   const [seedC,setSeedC] = useState("");
   const [seedO,setSeedO] = useState("");
   const [showTP,setShowTP]         = useState(false);
   const [showModels,setShowModels] = useState(false);
-  const [showConn,setShowConn]     = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showCouncil, setShowCouncil] = useState(null);
   const [conversations, setConversations] = useState([]);
@@ -563,6 +625,9 @@ export default function Cortex(){
   const [devUnlocked,setDevUnlocked] = useState(()=>DEV_MODE);
   const [pinInput,setPinInput]       = useState("");
   const [pinErr,setPinErr]           = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [focusLobes, setFocusLobes] = useState(new Set(LOBES.map(l=>l.id)));
 
   const taRef   = useRef(null);
   const botRef  = useRef(null);
@@ -598,15 +663,22 @@ export default function Cortex(){
     return ()=>window.removeEventListener("resize",handler);
   },[]);
 
+  useEffect(()=>{
+    if(!isMobile) setFabOpen(false);
+  },[isMobile]);
+
+  useEffect(()=>{
+    if(showGuide || showModels || showTP || showSidebar) setFabOpen(false);
+  },[showGuide,showModels,showTP,showSidebar]);
+
   async function load(){
     try{
       const b  = await safeGet(MV+"-brain",  defaultBrain);
       const m  = await safeGet(MV+"-msgs",   []);
       const k  = await safeGet("cortex-keys-global", null) || await safeGet(MV+"-keys", defaultKeys);
       const t  = await safeGet(MV+"-theme",  "cortex");
-      const mo = await safeGet(MV+"-models", Object.fromEntries(MODELS.map(x=>[x.id,true])));
-      const co = await safeGet(MV+"-conns",  {});
-      const ct = await safeGet(MV+"-tasks",  []);
+      const mo = await safeGet(MV+"-models", null); // ← ADICIONA ESTA LINHA
+      // const ct = await safeGet(MV+"-tasks",  []); // REMOVIDO v12
       const convs = await safeGet(MV+"-convs", []);
       setConversations(Array.isArray(convs) ? convs : []);
       setBrain(normBrain(b));
@@ -614,8 +686,7 @@ export default function Cortex(){
       setKeys({...defaultKeys,...(k&&typeof k==="object"?k:{})});
       setTheme(typeof t==="string"&&THEMES[t]?t:"cortex");
       setModelsOn(mo&&typeof mo==="object"?mo:Object.fromEntries(MODELS.map(x=>[x.id,true])));
-      setConnsOn(co&&typeof co==="object"?co:{});
-      setCompTasks(Array.isArray(ct)?ct:[]);
+      // setCompTasks(Array.isArray(ct)?ct:[]); // REMOVIDO v12
     }catch(e){toast("Falha ao carregar dados — reset para defaults");}
     setLoaded(true);
   }
@@ -658,50 +729,38 @@ function autoSaveConv(currentMsgs, convId){
   const saveKeys   = k  => safePut("cortex-keys-global", k);
   const saveTheme  = t  => safePut(MV+"-theme",  t);
   const saveModels = mo => safePut(MV+"-models", mo);
-  const saveConns  = co => safePut(MV+"-conns",  co);
-  const saveTasks  = ct => safePut(MV+"-tasks",  ct.slice(0,20));
+// const saveTasks  = ct => safePut(MV+"-tasks",  ct.slice(0,20)); // REMOVIDO v12
 
-async function invoke(id,sys,msg){
-  const LOBE_MODELS={
-    grok:"grok-3",gemini:"gemini-2.5-flash",perp:"llama-3.3-70b-versatile",
-    genspark:"simulado (Claude)",manus:"simulado (Claude)",openai:"gpt-4o",
-    deepseek:"deepseek-chat",llama:"llama-4-scout-17b-16e-instruct",
-    mistral:"mistral-large-latest",nemotron:"nvidia/nemotron-4-340b-instruct",
-    ollama_codigo:"qwen2.5-coder:1.5b",ollama_debug:"qwen2.5-coder:1.5b",
-  };
-  const ok=(text,real=true)=>({result:text,model:LOBE_MODELS[id]||id,real});
-  try{
-    const cached=cacheGet(id,msg);if(cached)return{...cached,fromCache:true};
-    if(id==="ollama_codigo"){try{const r=ok(await callOllama(sys,msg,"codigo"));cacheSet(id,msg,r);return r;}catch(e){return ok("Ollama Código indisponível: "+e.message,false);}}
-    if(id==="ollama_debug") {try{const r=ok(await callOllama(sys,msg,"debug")); cacheSet(id,msg,r);return r;}catch(e){return ok("Ollama Debug indisponível: "+e.message,false);}}
-    if(id==="grok"     &&hG)  {const r=ok(await callGrok(sys,msg,keys.grok));    cacheSet(id,msg,r);return r;}
-    if(id==="gemini") {const r=ok(await callGemini(sys,msg,keys.gemini||""));  cacheSet(id,msg,r);return r;}  // proxy fallback se sem key
-    if(id==="perp")  {const r=ok(await callPerp(sys,msg,keys.perp||""));       cacheSet(id,msg,r);return r;}  // proxy fallback se sem key
-    if(id==="openai"   &&hO)  {const r=ok(await callOpenAI(sys,msg,keys.openai));   cacheSet(id,msg,r);return r;}
-    if(id==="deepseek" &&hD)  {const r=ok(await callDeepSeek(sys,msg,keys.deepseek));cacheSet(id,msg,r);return r;}
-    if(id==="llama")  {const r=ok(await callGroq(sys,msg,keys.llama||""));       cacheSet(id,msg,r);return r;}  // proxy fallback se sem key
-    if(id==="mistral"  &&hM)  {const r=ok(await callMistral(sys,msg,keys.mistral)); cacheSet(id,msg,r);return r;}
-    if(id==="nemotron" &&hN)  {const r=ok(await callNemotron(sys,msg,keys.nemotron));cacheSet(id,msg,r);return r;}
-    // sem key específica → simula via proxy Groq do servidor
-    try{
-      const text=await callPerp(`You are simulating the "${id.toUpperCase()}" AI assistant lobe. ${sys}`,msg,keys.perp||"");
-      return ok(text,false);
-    }catch{
-      return ok(`[${id}: serviço indisponível de momento]`,false);
+
+async function invoke(id, sys, msg) {
+  const ok = (text, real = true) => ({ result: text, model: OR_MODELS[id] || id, real });
+
+  try {
+    const cached = cacheGet(id, msg);
+    if (cached) return { ...cached, fromCache: true };
+
+    // Ollama local — mantém lógica original
+    if (id === "ollama_codigo") {
+      try { const r = ok(await callOllama(sys, msg, "codigo")); cacheSet(id, msg, r); return r; }
+      catch (e) { return ok("Ollama Código indisponível: " + e.message, false); }
     }
-  }catch(e){
-    const errMsg=e.message||"";
-    const isAuthErr=new RegExp("401|403|invalid.api|api.key|unauthorized|incorrect|timeout","i").test(errMsg);
-    const isTimeout=/Timeout/i.test(errMsg);
-    if(isTimeout){
-      toast(id+": tempo esgotado — a tentar novamente será mais rápido","error");
-    } else if(isAuthErr){
-      // sem popup no mobile — só toast suave
-      toast(id+" sem acesso — a usar modelo alternativo","info");
-    } else {
-      toast(id+": "+errMsg.slice(0,80));
+    if (id === "ollama_debug") {
+      try { const r = ok(await callOllama(sys, msg, "debug")); cacheSet(id, msg, r); return r; }
+      catch (e) { return ok("Ollama Debug indisponível: " + e.message, false); }
     }
-    return {result:"[Erro em "+id+"]",model:id,real:false};
+
+    // Todos os outros lobos → OpenRouter via /api/chat
+    const text = await callOpenRouter(id, sys, msg, 420);
+    const r = ok(text);
+    cacheSet(id, msg, r);
+    return r;
+
+  } catch (e) {
+    const errMsg = e.message || "";
+    const isTimeout = /timeout/i.test(errMsg);
+    if (isTimeout) toast(id + ": tempo esgotado", "error");
+    else toast(id + ": " + errMsg.slice(0, 80));
+    return { result: "[Erro em " + id + "]", model: id, real: false };
   }
 }
   async function send(query){
@@ -716,8 +775,10 @@ async function invoke(id,sys,msg){
 const councilLobes = LOBES.filter(l =>
   l.id !== "claude" &&
   modelsOn[l.id] !== false &&
-  routedIds.includes(l.id)
+  routedIds.includes(l.id) &&
+  (!focusMode || focusLobes.has(l.id))
 );
+
     setPhase("council");
     const results=await Promise.allSettled(councilLobes.map(l=>invoke(l.id,P[l.id]?.(mem,q)||`Answer: ${q}`,q)));
     const lobeResults=councilLobes.map((l,i)=>{
@@ -725,38 +786,100 @@ const councilLobes = LOBES.filter(l =>
     const isErr=!r.result||r.result.startsWith("[")||r.result.startsWith("Tempo");
     return {...l,_key:l.id+i,result:r.result,srcModel:r.model,srcReal:r.real,isErr};
 });
-    setPhase("cortex");
-    let cR;
+setPhase("cortex");
+let cR;
+let structured;
 try{
   const validLobes=lobeResults.filter(l=>!l.isErr&&l.result?.length>10);
-    if(hC||hP) cR=await callClaude("Executive judge of a multi-AI council brain.",P.cortex(mem,q,validLobes.length?validLobes:lobeResults),5400,keys.claude,keys.perp);
-  // Groq fallback já tratado em callClaude
+  if(hC||hP) cR=await callClaude(
+    "Executive judge of a multi-AI council brain.",
+    P.cortex(mem,q,validLobes.length?validLobes:lobeResults),
+    5400,
+    keys.claude,
+    keys.perp
+  );
   else{
     const validFb=lobeResults.filter(l=>!l.isErr&&l.result?.length>10);
-    cR=validFb.length>0?validFb.map(l=>`**${l.label}:** ${l.result}`).join("\n\n"):"Nenhum serviço respondeu. Verifica a ligação.";
+    cR=validFb.length>0
+      ? validFb.map(l=>`**${l.label}:** ${l.result}`).join("\n\n")
+      : "Nenhum serviço respondeu. Verifica a ligação.";
   }
-}catch(e){cR=lobeResults.map(l=>`**${l.label}:** ${l.result}`).join("\n\n");toast(`Córtex: ${e.message}`);}
-    let cDecision=heuristicDecision(q);
-    try{cDecision=await callClaude("Judge of an 11-lobe AI council.",P.judge(q,lobeResults),80,keys.claude,keys.perp);}catch{}
-    const council=Object.fromEntries(lobeResults.map(l=>[l.id,l.result]));
-    const aMsg={id:Date.now()+Math.random(),role:"assistant",content:cR,council,lobeResults,usedMemory:usedMem,councilDecision:cDecision};
-    const fm=[...nm,aMsg];setMsgs(fm);saveMsgs(fm);
-    const buf2=[...newBuf,`BRAIN: ${cR}`];setBuf(buf2);
-    let nb={...brain,sessions:brain.sessions+1};let reflexOk=false;
-    if(buf2.length>=MAX_BUF&&nb.sessions>=1){
-      setPhase("reflex");
-      try{
-        const raw=await callClaude("Return only valid JSON.",P.reflect(buf2.join("\n"),buildMem(nb)), 480, keys.claude, keys.perp);
-        const ext=safeParseReflect(raw);
-        nb={...nb,semantic:[...nb.semantic,...(ext.new_semantic||[])].slice(-MAX_SEMANTIC),patterns:[...new Set([...nb.patterns,...(ext.new_patterns||[])])].slice(-MAX_PATTERNS),episodic:ext.session_summary?[...nb.episodic,ext.session_summary].slice(-MAX_EPISODIC):nb.episodic,procedural:{...nb.procedural,...(ext.procedural_update||{})},lastReflect:new Date().toISOString()};
-        reflexOk=!!(ext.new_semantic?.length||ext.new_patterns?.length||ext.session_summary);
-      }catch{toast("Falha na reflexão subconsciente.");}
-      setBuf([]);
-    }
-    setBrain(nb);saveBrain(nb);setPhase(null);
-    if(reflexOk){const note={id:Date.now()+Math.random(),role:"assistant",content:"◉ Memória atualizada.",systemNote:true};setMsgs(prev=>{const u=[...prev,note];saveMsgs(u);return u;});}
-    autoSaveConv(fm, currentConvId);
-    setTimeout(()=>taRef.current?.focus(),80);
+}catch(e){
+  cR=lobeResults.map(l=>`**${l.label}:** ${l.result}`).join("\n\n");
+  toast(`Córtex: ${e.message}`);
+}
+
+structured = normalizeCouncilPayload(cR, typeof cR === "string" ? cR : "");
+
+let cDecision=heuristicDecision(q);
+try{
+  cDecision=await callClaude(
+    "Judge of an 11-lobe AI council.",
+    P.judge(q,lobeResults),
+    80,
+    keys.claude,
+    keys.perp
+  );
+}catch{}
+
+const council = Object.fromEntries(lobeResults.map(l => [l.id, l.result]));
+
+const aMsg = {
+  id: Date.now() + Math.random(),
+  role: "assistant",
+  // Garante que o content é o final do struct, senão o texto cru de fallback
+  content: (structured?.final || cR || "").trim(),
+  structured, 
+  council,
+  lobeResults,
+  usedMemory: usedMem,
+  councilDecision: cDecision
+};
+
+const fm = [...nm, aMsg];
+setMsgs(fm);
+saveMsgs(fm);
+
+// O buffer também deve usar o mesmo fallback
+const buf2 = [...newBuf, `BRAIN: ${(structured?.final || cR || "").trim()}`];
+setBuf(buf2);
+let nb={...brain,sessions:brain.sessions+1};let reflexOk=false;
+
+if(buf2.length>=MAX_BUF&&nb.sessions>=1){
+  setPhase("reflex");
+  try{
+    const raw=await callClaude(
+      "Return only valid JSON.",
+      P.reflect(buf2.join("\n"),buildMem(nb)),
+      480,
+      keys.claude,
+      keys.perp
+    );
+    const ext=safeParseReflect(raw);
+    nb={
+      ...nb,
+      semantic:[...nb.semantic,...(ext.new_semantic||[])].slice(-MAX_SEMANTIC),
+      patterns:[...new Set([...nb.patterns,...(ext.new_patterns||[])])].slice(-MAX_PATTERNS),
+      episodic:ext.session_summary
+        ? [...nb.episodic,ext.session_summary].slice(-MAX_EPISODIC)
+        : nb.episodic,
+      procedural:{...nb.procedural,...(ext.procedural_update||{})},
+      lastReflect:new Date().toISOString()
+    };
+    reflexOk=!!(ext.new_semantic?.length||ext.new_patterns?.length||ext.session_summary);
+  }catch{
+    toast("Falha na reflexão subconsciente.");
+  }
+  setBuf([]);
+}
+
+setBrain(nb);saveBrain(nb);setPhase(null);
+if(reflexOk){
+  const note={id:Date.now()+Math.random(),role:"assistant",content:"◉ Memória atualizada.",systemNote:true};
+  setMsgs(prev=>{const u=[...prev,note];saveMsgs(u);return u;});
+}
+autoSaveConv(fm, currentConvId);
+setTimeout(()=>taRef.current?.focus(),80);
   }
 
   async function regenerate(){
@@ -783,26 +906,25 @@ try{
     toast("Conversa exportada como .md","success");
   }
 
-  async function runComputer(){
-    const task=compInput.trim();if(!task||compRunning)return;
-    setCompRunning(true);setCompInput("");
-    const activeConns=Object.entries(connsOn).filter(([,v])=>v).map(([k])=>k);
-    const newTask={id:Date.now(),task,status:"running",progress:0,steps:[],preview:"",log:[`▶ ${task}`],startedAt:new Date().toISOString()};
-    setCompActive(newTask);
-    try{
-      const raw=await callClaude("You are MANUS 1.6 Max computer agent.",P.computer(task,activeConns),800,keys.claude,keys.perp);
-      let plan={steps:[task],preview:"Tarefa processada.",estimatedTime:"—",confidence:"medium"};
-      try{const j=raw.match(/\{[\s\S]*\}/);if(j)plan=JSON.parse(j[0]);}catch{}
-      const done={...newTask,status:"done",progress:100,steps:plan.steps||[task],preview:plan.preview||raw.slice(0,300),log:[...newTask.log,...(plan.steps||[]).map((s,i)=>`✓ ${i+1}. ${s}`),"✅ Concluído"],estimatedTime:plan.estimatedTime,confidence:plan.confidence,completedAt:new Date().toISOString()};
-      const updated=[done,...compTasks].slice(0,20);setCompTasks(updated);saveTasks(updated);
-      toast(`Tarefa concluída: ${task.slice(0,40)}...`,"success");
-    }catch(e){
-      const failed={...newTask,status:"error",log:[...newTask.log,`✗ ${e.message}`]};
-      const updated=[failed,...compTasks].slice(0,20);setCompTasks(updated);saveTasks(updated);
-      toast(`Computer: ${e.message}`);
-    }
-    setCompActive(null);setCompRunning(false);
-  }
+  //async function runComputer(){
+   // const task=compInput.trim();if(!task||compRunning)return;
+    //setCompRunning(true);setCompInput("");
+    //const newTask={id:Date.now(),task,status:"running",progress:0,steps:[],preview:"",log:[`▶ ${task}`],startedAt:new Date().toISOString()};
+    //setCompActive(newTask);
+    //try{
+      // const raw=await callClaude("You are MANUS 1.6 Max computer agent.",P.computer,800,keys.claude,keys.perp);
+     // let plan={steps:[task],preview:"Tarefa processada.",estimatedTime:"—",confidence:"medium"};
+     // try{const j=raw.match(/\{[\s\S]*\}/);if(j)plan=JSON.parse(j[0]);}catch{}
+   //   const done={...newTask,status:"done",progress:100,steps:plan.steps||[task],preview:plan.preview||raw.slice(0,300),log:[...newTask.log,...(plan.steps||[]).map((s,i)=>`✓ ${i+1}. ${s}`),"✅ Concluído"],estimatedTime:plan.estimatedTime,confidence:plan.confidence,completedAt:new Date().toISOString()};
+   //   const updated=[done,...compTasks].slice(0,20);setCompTasks(updated);saveTasks(updated);
+   //   toast(`Tarefa concluída: ${task.slice(0,40)}...`,"success");
+   // }catch(e){
+    //  const failed={...newTask,status:"error",log:[...newTask.log,`✗ ${e.message}`]};
+    //  const updated=[failed,...compTasks].slice(0,20);setCompTasks(updated);saveTasks(updated);
+    //  toast(`Computer: ${e.message}`);
+   // }
+   // setCompActive(null);setCompRunning(false);
+ // }
 
   function applySeed(){
     const entries=[...seedToMem(seedP,"facto"),...seedToMem(seedC,"facto"),...seedToMem(seedO,"objetivo")];
@@ -827,6 +949,85 @@ try{
     cortex: {label:"Claude Opus 4.6 a sintetizar...", color:AC.claude, pct:"88%"},
     reflex: {label:"Reflexão subconsciente...",       color:AC.reflex, pct:"100%"},
   };
+  
+const safeParseJson = (value, fallback = null) => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+};
+
+const extractJsonBlock = (text) => {
+  if (!text || typeof text !== "string") return null;
+
+  const fenced = text.match(/```json\s*([\s\S]*?)\s*```/i);
+  if (fenced?.[1]) {
+    const parsed = safeParseJson(fenced[1], null);
+    if (parsed) return parsed;
+  }
+
+  const genericFence = text.match(/```[\s\S]*?([\{\[][\\s\\S]*[\}\]])[\s\S]*?```/);
+  if (genericFence?.[1]) {
+    const parsed = safeParseJson(genericFence[1], null);
+    if (parsed) return parsed;
+  }
+
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const candidate = text.slice(firstBrace, lastBrace + 1);
+    const parsed = safeParseJson(candidate, null);
+    if (parsed) return parsed;
+  }
+
+  return null;
+};
+
+const normalizeCouncilPayload = (raw, fallbackText = "") => {
+  if (!raw) {
+    return {
+      final: fallbackText || "Sem resposta estruturada.",
+      consensus: [],
+      divergence: [],
+      confidence: "média",
+      nextActions: []
+    };
+  }
+
+  if (typeof raw === "string") {
+    const parsed = extractJsonBlock(raw);
+    if (parsed) return normalizeCouncilPayload(parsed, raw);
+
+    return {
+      final: raw,
+      consensus: [],
+      divergence: [],
+      confidence: "média",
+      nextActions: []
+    };
+  }
+
+  const final =
+    raw.final ||
+    raw.answer ||
+    raw.response ||
+    raw.summary ||
+    fallbackText ||
+    "Sem resposta estruturada.";
+
+  return {
+    final,
+    consensus: Array.isArray(raw.consensus) ? raw.consensus : [],
+    divergence: Array.isArray(raw.divergence) ? raw.divergence : [],
+    confidence: raw.confidence || "média",
+    nextActions: Array.isArray(raw.nextActions)
+      ? raw.nextActions
+      : Array.isArray(raw.next_actions)
+      ? raw.next_actions
+      : []
+  };
+};
 
   if(!loaded)return <Splash/>;
   const cur=phase?phases[phase]:null;
@@ -842,10 +1043,12 @@ try{
   @keyframes orbit2{from{transform:translate(-50%,-50%) rotate(144deg) translateX(40px)}to{transform:translate(-50%,-50%) rotate(504deg) translateX(40px)}}
   @keyframes orbit3{from{transform:translate(-50%,-50%) rotate(216deg) translateX(32px)}to{transform:translate(-50%,-50%) rotate(576deg) translateX(32px)}}
   @keyframes orbit4{from{transform:translate(-50%,-50%) rotate(288deg) translateX(36px)}to{transform:translate(-50%,-50%) rotate(648deg) translateX(36px)}}
-  @keyframes compPulse{0%,100%{opacity:1}50%{opacity:0.3}}
-        @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
-        @keyframes lobePop{0%{opacity:0;transform:scale(0.94) translateY(5px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+  @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+  @keyframes lobePop{0%{opacity:0;transform:scale(0.94) translateY(5px)}100%{opacity:1;transform:scale(1) translateY(0)}}
   @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes modalFadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes modalSlideIn{from{opacity:0;transform:translateY(-8px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes sidebarSlideIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
   .pulse{animation:pulse 1.5s ease-in-out infinite}
   .msg-in{animation:fadeIn 0.22s ease}
   .lobe-card{animation:lobePop 0.2s ease both}
@@ -866,11 +1069,14 @@ try{
       box-shadow 0.24s cubic-bezier(0.4,0,0.2,1)!important;
     will-change:transform,opacity;
   }
+  @media (hover:hover){
   button:hover{
     opacity:0.92;
     transform:translateY(-1px);
     box-shadow:0 3px 10px #00000028;
   }
+}
+
   button:active{
     transform:translateY(0px) scale(0.97)!important;
     opacity:0.82;
@@ -903,9 +1109,9 @@ try{
                 <><span key={i+"a"} style={{fontWeight:700,color:T.tx}}>{l}</span><span key={i+"b"}>{d}</span><span key={i+"c"} style={{color:T.tf,fontFamily:"monospace",fontSize:8}}>{v}</span></>
               ))}
             </div>
-            <p><b style={{color:T.tx}}>Modo Agente</b><br/>Usa Claude Opus 4.6 para executar tarefas autonomamente. Liga conectores (⬡) para dar mais capacidades ao agente.</p>
+            <p><b style={{color:T.tx}}>Córtex</b><br/>O Claude Opus 4.6 atua como juiz do conselho e sintetiza a resposta final com base nos lobes ativos.</p>
             <p><b style={{color:T.tx}}>Memória</b><br/>Usa "Seed" para dar contexto inicial. A cada {MAX_BUF} trocas o sistema consolida memórias automaticamente.</p>
-            <p style={{color:T.tf,fontSize:10}}>Shift+Enter = nova linha · 21 temas · Histórico sem limite · ↺ regenerar · ↓ exportar</p>
+            <p style={{color:T.tf,fontSize:10}}>Shift+Enter = nova linha · 21 temas · Histórico sem limite · ↺ regenerar · ↓ exportar · 📤 partilhar</p>
           </div>
         </Modal>
       )}
@@ -978,35 +1184,13 @@ try{
         </Modal>
       )}
 
-      {showConn && (
-        <Modal T={T} title="Conectores" onClose={()=>setShowConn(false)}>
-          <p style={{fontSize:11,color:T.ts,marginBottom:9}}>Activa conectores para o modo Computer e memória semântica.</p>
-          <div style={{display:"flex",flexDirection:"column",gap:13,maxHeight:380,overflowY:"auto"}}>
-            {CONNECTORS.map(cat=>(
-              <div key={cat.cat}>
-                <div style={{fontSize:9,fontWeight:700,color:T.ts,letterSpacing:2,marginBottom:5}}>{cat.cat.toUpperCase()}</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                  {cat.items.map(c=>{
-                    const on=!!connsOn[c.id];
-                    return <button key={c.id} onClick={()=>{const ne={...connsOn,[c.id]:!on};setConnsOn(ne);saveConns(ne);}} style={{display:"flex",alignItems:"center",gap:4,background:on?`${AC.claude}22`:T.s2,border:`1px solid ${on?AC.claude+"55":T.b1}`,borderRadius:18,padding:"4px 9px",cursor:"pointer",fontFamily:"inherit",fontSize:10,color:on?AC.claude:T.ts,transition:"all 0.15s"}}>
-                      <span>{c.e}</span><span>{c.name}</span>{on&&<span style={{fontSize:8}}>✓</span>}
-                    </button>;
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div style={{marginTop:9,fontSize:9,color:T.tf}}>{Object.values(connsOn).filter(Boolean).length} conectores activos</div>
-        </Modal>
-      )}
-
       {/* ── NAV ────────────────────────────────────────────── */}
 <nav style={{display:"flex",alignItems:"center",height:50,padding:"0 8px",background:T.s1,borderBottom:`1px solid ${T.b1}`,gap:4,flexShrink:0,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
   <div style={{display:"flex",alignItems:"center",gap:7,marginRight:"auto",flexShrink:0}}>
     <div style={{width:28,height:28,borderRadius:8,background:`${AC.claude}22`,border:`1px solid ${AC.claude}33`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:AC.claude}}>C</div>
     <div>
-      <div style={{fontSize:11,fontWeight:800,letterSpacing:3,color:T.tx}}>CÓRTEX <span style={{opacity:0.4,fontSize:8}}>v11</span></div>
-      <div style={{fontSize:7,color:T.tf,letterSpacing:1}}>11 Lobos · Council · Computer</div>
+      <div style={{fontSize:11,fontWeight:800,letterSpacing:3,color:T.tx}}>CÓRTEX <span style={{opacity:0.4,fontSize:8}}>{MV.split("-")[1]}</span></div>
+      <div style={{fontSize:7,color:T.tf,letterSpacing:1}}>11 Lobos · Council · Claude Opus 4.6</div>
     </div>
   </div>
 
@@ -1023,60 +1207,86 @@ try{
     </div>
   )}
 
-  {[["chat","💬","Chat"],...(DEV_MODE?[["keys","🔑","Keys"]]:[]),["memory","🧠","Mem."],["computer","💻","Computer"],["settings","⚙","Defs"]].map(([p,ico,lbl])=>(
-    <button key={p} onClick={()=>setPage(p)} style={{background:page===p?`${AC.claude}18`:"transparent",border:`1px solid ${page===p?AC.claude+"44":T.b1}`,borderRadius:10,padding:"5px 10px",
-    transition:"all 0.22s cubic-bezier(0.4,0,0.2,1)",
-    boxShadow:page===p?`0 0 10px ${AC.claude}22`:"none",color:page===p?AC.claude:T.ts,cursor:"pointer",fontSize:10,fontFamily:"inherit",fontWeight:page===p?700:400,display:"flex",alignItems:"center",gap:3,flexShrink:0}}>
-      <span>{ico}</span><span>{lbl}</span>
-      {p==="memory"&&brain.semantic.length>0&&<span style={{background:`${AC.claude}33`,color:AC.claude,borderRadius:10,padding:"0 3px",fontSize:7,fontWeight:800}}>{brain.semantic.length}</span>}
-    </button>
-  ))}
+  {!isMobile && [["chat","💬","Chat"],...(DEV_MODE?[["keys","🔑","Keys"]]:[]),["memory","🧠","Mem."],["settings","⚙","Defs"]].map(([p,ico,lbl])=>(
+  <button
+    key={p}
+    onClick={()=>setPage(p)}
+    style={{
+      background:page===p?`${AC.claude}18`:"transparent",
+      border:`1px solid ${page===p?AC.claude+"44":T.b1}`,
+      borderRadius:10,
+      minHeight:44,
+      padding:"8px 12px",
+      transition:"all 220ms cubic-bezier(0.4,0,0.2,1)",
+      boxShadow:page===p?`0 0 10px ${AC.claude}22`:"none",
+      color:page===p?AC.claude:T.ts,
+      cursor:"pointer",
+      fontSize:11,
+      fontFamily:"inherit",
+      fontWeight:page===p?700:500,
+      display:"flex",
+      alignItems:"center",
+      gap:5,
+      flexShrink:0
+    }}
+  >
+    <span>{ico}</span>
+    <span>{lbl}</span>
+    {p==="memory"&&brain.semantic.length>0&&(
+      <span style={{background:`${AC.claude}33`,color:AC.claude,borderRadius:10,padding:"0 4px",fontSize:8,fontWeight:800}}>
+        {brain.semantic.length}
+      </span>
+    )}
+  </button>
+))}
 
-  <button onClick={()=>setShowModels(true)} style={navBtn(T)} title="Modelos">◈</button>
-  <button onClick={()=>setShowConn(true)} style={navBtn(T)} title="Conectores">⬡</button>
-  <button onClick={()=>setShowTP(true)} style={navBtn(T)} title="Tema">{THEMES[theme].emoji}</button>
-  <button onClick={()=>setShowSidebar(v=>!v)} style={{...navBtn(T),background:showSidebar?`${AC.claude}22`:"transparent",borderColor:showSidebar?`${AC.claude}55`:T.b1}} title="Histórico">☰</button>
-  <button onClick={()=>setShowGuide(true)} style={navBtn(T)} title="Guia">?</button>
+  {!isMobile && (
+  <>
+    <button onClick={()=>setShowModels(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title="Modelos">◈</button>
+    <button onClick={()=>setShowTP(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title="Tema">{THEMES[theme].emoji}</button>
+    <button onClick={()=>setShowGuide(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title="Guia">?</button>
+  </>
+)}
+
+{/* Modo Foco */}
+<button
+  onClick={()=>setFocusMode(v=>!v)}
+  style={{
+    ...navBtn(T),
+    minWidth:44, minHeight:44,
+    background: focusMode ? `${AC.grok}22` : "transparent",
+    borderColor: focusMode ? `${AC.grok}55` : T.b1,
+    color: focusMode ? AC.grok : T.ts,
+  }}
+  title="Modo Foco"
+>
+  ◎
+</button>
+
+<button
+  onClick={()=>setShowSidebar(v=>!v)}
+  style={{
+    ...navBtn(T),
+    minWidth:44,
+    minHeight:44,
+    background:showSidebar?`${AC.claude}22`:"transparent",
+    borderColor:showSidebar?`${AC.claude}55`:T.b1,
+  }}
+  title="Histórico"
+>
+  ☰
+</button>
 </nav>
+
 
 {/* Progress */}
 {phase && <div style={{height:2,background:T.b2,flexShrink:0}}><div style={{height:"100%",width:cur?.pct||"0%",background:`linear-gradient(90deg,${cur?.color}88,${cur?.color})`,transition:"width 0.8s ease"}}/></div>}
       {/* ── CHAT ───────────────────────────────────────────── */}
       {page==="chat" && (
         <>
-        {showCouncil&&<div style={{position:"fixed",inset:0,zIndex:600,display:"flex",alignItems:"flex-start",justifyContent:"flex-end"}} onClick={()=>setShowCouncil(null)}>
-  <div style={{width:360,height:"100%",background:T.s1,borderLeft:`1px solid ${T.b1}`,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"-4px 0 20px #00000066"}} onClick={e=>e.stopPropagation()}>
-    <div style={{padding:"12px 14px",borderBottom:`1px solid ${T.b1}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-      <span style={{fontSize:11,fontWeight:700,color:T.tx}}>Conselho dos Lobos</span>
-      <button onClick={()=>setShowCouncil(null)} style={{background:"transparent",border:"none",color:T.tf,cursor:"pointer",fontSize:14}}>✕</button>
-    </div>
-    {showCouncil.councilDecision&&<div style={{padding:"8px 14px",background:`${AC.claude}11`,borderBottom:`1px solid ${T.b1}`,fontSize:10,color:AC.claude,flexShrink:0}}>⚖ {showCouncil.councilDecision}</div>}
-    <div style={{flex:1,overflowY:"auto",padding:10,display:"flex",flexDirection:"column",gap:8}}>
-      {showCouncil.lobeResults?.map((src,_i)=>{
-        const modelVersion=MODELS.find(x=>x.id===src.id)?.version||"";
-        const isReal=!src.result?.startsWith("[SIMULADO");
-        return(
-          <div key={src.id} className="lobe-card" style={{background:T.s2,border:`1px solid ${src.color}33`,borderRadius:10,padding:"9px 11px",animationDelay:`${_i*0.06}s`}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-              <span style={{fontSize:10,fontWeight:800,color:src.color}}>{src.icon} {src.label}</span>
-              <span style={{fontSize:8,color:src.color,background:`${src.color}18`,border:`1px solid ${src.color}44`,borderRadius:20,padding:"1px 7px",fontFamily:"monospace"}}>{modelVersion}</span>
-              {!isReal&&<span style={{fontSize:7,color:"#fff",background:"#666",borderRadius:3,padding:"1px 5px"}}>Simulado</span>}
-            </div>
-            {src.isErr
-              ?<div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 8px",background:"#ef444410",borderRadius:6,marginTop:4}}>
-                <span style={{color:"#ef4444",fontSize:12}}>○</span>
-                <span style={{fontSize:10,color:"#ef4444",opacity:0.8}}>Serviço indisponível — resposta omitida da síntese</span>
-               </div>
-              :<div style={{fontSize:10,color:T.tx,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{src.result}</div>}
-          </div>
-        );
-      })}
-    </div>
-  </div>
-</div>}
         <>
-  {showSidebar&&<div style={{position:"fixed",inset:0,zIndex:498,background:"transparent"}} onClick={()=>setShowSidebar(false)}/>}
-  <div style={{position:"fixed",top:50,left:0,bottom:0,zIndex:499,width:260,background:T.s1,borderRight:`1px solid ${T.b1}`,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"4px 0 24px #00000055",transform:showSidebar?"translateX(0)":"translateX(-102%)",transition:"transform 0.25s cubic-bezier(0.4,0,0.2,1)"}}>
+  {showSidebar &&<div style={{position:"fixed",inset:0,zIndex:498,background:"transparent"}} onClick={()=>setShowSidebar(false)}/>}
+  <div style={{position:"fixed",top:50,left:0,bottom:0,zIndex:499,width:260,background:T.s1,borderRight:`1px solid ${T.b1}`,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"4px 0 24px #00000055",transform:showSidebar?"translateX(0)":"translateX(-102%)",opacity:showSidebar?1:0,transition:"transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.28s cubic-bezier(0.4,0,0.2,1)",willChange:"transform, opacity"}}>
     <div style={{padding:"10px 12px",borderBottom:`1px solid ${T.b1}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
       <span style={{fontSize:11,fontWeight:700,color:T.tx}}>Histórico</span>
       <button onClick={newChat} style={{...btn(T,AC.claude),fontSize:9,padding:"3px 9px"}}>+ Nova conversa</button>
@@ -1122,27 +1332,160 @@ try{
     </div>
   </div>
 )}
-{/* ── BARRA MOBILE ── */}
+{/* ── FAB MOBILE ───────────────────────────────────── */}
 {isMobile && (
-  <div style={{
-    position:"fixed",left:0,right:0,bottom:0,zIndex:1200,
-    display:"flex",justifyContent:"space-around",
-    padding:"8px 0 calc(8px + env(safe-area-inset-bottom))",
-    background:T.s1,borderTop:`1px solid ${T.b1}`
-  }}>
-    {[
-      ["chat","💬"],["keys","🔑"],["memory","🧠"],["computer","💻"],["settings","⚙"]
-    ].map(([p,ico])=>(
-      <button key={p} onClick={()=>setPage(p)} style={{
-        minWidth:52,minHeight:52,border:"none",
-        background:page===p?`${AC.claude}22`:"transparent",
-        color:page===p?AC.claude:T.ts,fontSize:20,fontWeight:page===p?700:400,
-        transition:"all 0.18s cubic-bezier(0.4,0,0.2,1)",
-        borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center"
-      }}>{ico}</button>
-    ))}
-  </div>
+  <>
+    <div
+      onClick={() => setFabOpen(false)}
+      style={{
+        position:"fixed",
+        inset:0,
+        zIndex:1190,
+        background:"rgba(0,0,0,0.56)",
+        opacity:fabOpen ? 1 : 0,
+        pointerEvents:fabOpen ? "auto" : "none",
+        transition:"opacity 300ms cubic-bezier(0.4,0,0.2,1)"
+      }}
+    />
+
+    <div
+      style={{
+        position:"fixed",
+        left:0,
+        right:0,
+        bottom:0,
+        zIndex:1200,
+        background:T.s1,
+        borderTop:`1px solid ${T.b1}`,
+        borderRadius:"22px 22px 0 0",
+        boxShadow:"0 -12px 42px #00000066",
+        padding:"10px 14px calc(16px + env(safe-area-inset-bottom))",
+        transform:fabOpen ? "translateY(0)" : "translateY(108%)",
+        opacity:fabOpen ? 1 : 0.98,
+        transition:"transform 300ms cubic-bezier(0.4,0,0.2,1), opacity 300ms cubic-bezier(0.4,0,0.2,1)",
+        willChange:"transform, opacity"
+      }}
+    >
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",position:"relative",padding:"4px 0 10px"}}>
+        <div style={{width:38,height:4,borderRadius:999,background:T.b1}} />
+        <button
+          onClick={()=>setFabOpen(false)}
+          aria-label="Fechar menu"
+          style={{
+            position:"absolute",
+            right:2,
+            top:-2,
+            width:44,
+            height:44,
+            borderRadius:"50%",
+            background:"transparent",
+            border:`1px solid ${T.b1}`,
+            color:T.ts,
+            fontSize:14,
+            cursor:"pointer",
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"center"
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      <div style={{padding:"2px 2px 0"}}>
+        <div style={{fontSize:11,fontWeight:800,color:T.tx,letterSpacing:0.4,marginBottom:10}}>
+          Navegação rápida
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:8}}>
+          {[
+            {
+              key:"memory",
+              icon:"🧠",
+              label:"Mem.",
+              active:page==="memory",
+              onClick:()=>{setPage("memory");setFabOpen(false);}
+            },
+            {
+              key:"models",
+              icon:"◈",
+              label:"Modelos",
+              active:showModels,
+              onClick:()=>{setShowModels(true);setFabOpen(false);}
+            },
+            {
+              key:"theme",
+              icon:THEMES[theme].emoji,
+              label:"Tema",
+              active:showTP,
+              onClick:()=>{setShowTP(true);setFabOpen(false);}
+            },
+            {
+              key:"guide",
+              icon:"?",
+              label:"Guia",
+              active:showGuide,
+              onClick:()=>{setShowGuide(true);setFabOpen(false);}
+            }
+          ].map(item=>(
+            <button
+              key={item.key}
+              onClick={item.onClick}
+              style={{
+                minWidth:44,
+                minHeight:44,
+                padding:"12px 6px",
+                borderRadius:14,
+                border:`1px solid ${item.active ? AC.claude+"55" : T.b1}`,
+                background:item.active ? `${AC.claude}18` : T.s2,
+                color:item.active ? AC.claude : T.tx,
+                display:"flex",
+                flexDirection:"column",
+                alignItems:"center",
+                justifyContent:"center",
+                gap:6,
+                cursor:"pointer",
+                fontFamily:"inherit",
+                transition:"all 300ms cubic-bezier(0.4,0,0.2,1)"
+              }}
+            >
+              <span style={{fontSize:18,lineHeight:1}}>{item.icon}</span>
+              <span style={{fontSize:10,fontWeight:700,letterSpacing:0.2}}>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <button
+      onClick={() => setFabOpen(v => !v)}
+      aria-label={fabOpen ? "Fechar menu" : "Abrir menu"}
+      style={{
+        position:"fixed",
+        right:16,
+        bottom:`calc(16px + env(safe-area-inset-bottom))`,
+        zIndex:1201,
+        width:56,
+        height:56,
+        borderRadius:"50%",
+        background:fabOpen ? `${AC.claude}` : T.s1,
+        border:`1px solid ${fabOpen ? AC.claude+"aa" : T.b1}`,
+        color:fabOpen ? "#ffffff" : T.tx,
+        fontSize:22,
+        cursor:"pointer",
+        boxShadow:fabOpen ? `0 10px 28px ${AC.claude}55` : "0 10px 28px #00000044",
+        display:"flex",
+        alignItems:"center",
+        justifyContent:"center",
+        transform:fabOpen ? "rotate(90deg)" : "rotate(0deg)",
+        transition:"transform 300ms cubic-bezier(0.4,0,0.2,1), background 300ms cubic-bezier(0.4,0,0.2,1), box-shadow 300ms cubic-bezier(0.4,0,0.2,1), color 300ms cubic-bezier(0.4,0,0.2,1), border-color 300ms cubic-bezier(0.4,0,0.2,1)"
+      }}
+    >
+      ⚙
+    </button>
+  </>
 )}
+
           <div ref={chatRef} onScroll={e=>{const el=e.currentTarget;setAtBottom(el.scrollHeight-el.scrollTop-el.clientHeight<60);}} style={{flex:1,overflowY:"auto",padding:"13px 12px 7px",position:"relative"}}>
             {!atBottom&&msgs.length>0&&(
               <button onClick={()=>{botRef.current?.scrollIntoView({behavior:"smooth"});setAtBottom(true);}} style={{position:"sticky",bottom:10,left:"50%",transform:"translateX(-50%)",zIndex:10,display:"flex",alignItems:"center",gap:5,background:T.s1,border:`1px solid ${AC.claude}55`,borderRadius:18,padding:"5px 13px",color:AC.claude,fontSize:10,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${T.b2}88`,marginBottom:4}}>↓ nova mensagem</button>
@@ -1171,9 +1514,7 @@ try{
                     {icon:"◇",text:"O que é RAG e como funciona na prática?",color:AC.perp},
                   ].map((s,i)=>(
                     <button key={i} onClick={()=>send(s.text)}
-                      style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:10,padding:"9px 13px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",fontSize:12,color:T.ts,display:"flex",alignItems:"center",gap:9,transition:"all 0.15s"}}
-                      onMouseEnter={e=>{e.currentTarget.style.borderColor=s.color+"66";e.currentTarget.style.color=T.tx;e.currentTarget.style.background=T.s2;}}
-                      onMouseLeave={e=>{e.currentTarget.style.borderColor=T.b1;e.currentTarget.style.color=T.ts;e.currentTarget.style.background=T.s1;}}>
+                      style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:10,padding:"9px 13px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",fontSize:12,color:T.ts,display:"flex",alignItems:"center",gap:9,transition:"all 0.15s"}}>
                       <span style={{color:s.color,fontSize:14,flexShrink:0}}>{s.icon}</span>
                       <span style={{lineHeight:1.3}}>{s.text}</span>
                       <span style={{marginLeft:"auto",color:T.tf,fontSize:11,flexShrink:0}}>↵</span>
@@ -1191,52 +1532,569 @@ try{
               </div>
             ) : (
               <div style={{display:"flex",flexDirection:"column",gap:12,maxWidth:800,margin:"0 auto"}}>
-                {msgs.map((m,i)=>{
-                  const ts=m.id?new Date(m.id).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"";
-                  return (
-                    <div key={m.id||i} className="msg-in" style={{display:"flex",flexDirection:"column",alignItems:m.role==="user"?"flex-end":"flex-start",gap:2}}>
-                      {m.role==="user" ? (
-                        <div style={{display:"flex",alignItems:"flex-end",gap:8,maxWidth:"70%"}}>
-                          <div style={{background:`linear-gradient(135deg,${AC.claude}33,${AC.claude}18)`,border:`1px solid ${AC.claude}44`,borderRadius:"18px 18px 3px 18px",padding:"10px 14px",flex:1,fontSize:13,lineHeight:1.65,color:T.tx,wordBreak:"break-word",boxShadow:`0 2px 12px ${AC.claude}22`}}>{m.content}</div>
-                          <div style={{width:26,height:26,borderRadius:"50%",background:`linear-gradient(135deg,${AC.claude}88,${AC.claude}44)`,border:`2px solid ${AC.claude}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,flexShrink:0,boxShadow:`0 2px 8px ${AC.claude}33`}}>🧑</div>
+{msgs.map((m,i)=>(
+  <div
+    key={m.id || i}
+    className="msg-in"
+    style={{
+      alignSelf:m.role==="user"?"flex-end":"stretch",
+      maxWidth:m.role==="user"?"82%":"100%",
+      display:"flex",
+      flexDirection:"column",
+      gap:8
+    }}
+  >
+    {m.role==="user" ? (
+      <div style={{
+        alignSelf:"flex-end",
+        background:`linear-gradient(135deg, ${AC.claude}22, ${AC.claude}10)`,
+        border:`1px solid ${AC.claude}44`,
+        color:T.tx,
+        borderRadius:"18px 18px 6px 18px",
+        padding:"12px 14px",
+        fontSize:13,
+        lineHeight:1.65,
+        boxShadow:"0 6px 22px #00000022",
+        whiteSpace:"pre-wrap",
+        wordBreak:"break-word"
+      }}>
+        {m.content}
+      </div>
+    ) : m.systemNote ? (
+      <div style={{
+        alignSelf:"center",
+        fontSize:10,
+        color:AC.claude,
+        background:`${AC.claude}12`,
+        border:`1px solid ${AC.claude}22`,
+        borderRadius:999,
+        padding:"6px 10px",
+        letterSpacing:0.2
+      }}>
+        {m.content}
+      </div>
+    ) : (
+      <div style={{
+        background:T.s1,
+        border:`1px solid ${T.b1}`,
+        borderRadius:18,
+        overflow:"hidden",
+        boxShadow:"0 10px 28px #00000020",
+        animation:"fadeIn 250ms cubic-bezier(0.4,0,0.2,1), lobePop 250ms cubic-bezier(0.4,0,0.2,1)"
+      }}>
+        {/* Header resposta Córtex */}
+<div style={{
+  display:"flex",
+  alignItems:"center",
+  justifyContent:"space-between",
+  gap:10,
+  padding:"12px 14px",
+  background:`linear-gradient(135deg, ${AC.claude}18 0%, ${AC.claude}08 100%)`,
+  borderBottom:`1px solid ${T.b1}`
+}}>
+  <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
+    <div style={{
+      width:28,
+      height:28,
+      borderRadius:10,
+      background:`${AC.claude}22`,
+      border:`1px solid ${AC.claude}44`,
+      display:"flex",
+      alignItems:"center",
+      justifyContent:"center",
+      color:AC.claude,
+      fontSize:13,
+      fontWeight:800,
+      flexShrink:0
+    }}>
+      C
+    </div>
+
+    <div style={{minWidth:0}}>
+      <div style={{fontSize:12,fontWeight:800,color:T.tx,letterSpacing:0.4}}>
+        Córtex
+      </div>
+      <div style={{fontSize:10,color:T.ts}}>
+        Síntese final do conselho
+      </div>
+    </div>
+  </div>
+
+  <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+    <CopyBtn text={(m.structured?.final || m.content || "").trim()} T={T} />
+
+    <button
+      onClick={async () => {
+        const finalText = (m.structured?.final || m.content || "").trim();
+        const consensus = m.structured?.consensus?.length
+          ? "\n\nConsenso:\n- " + m.structured.consensus.join("\n- ")
+          : "";
+        const divergence = m.structured?.divergence?.length
+          ? "\n\nDivergências:\n- " + m.structured.divergence.join("\n- ")
+          : "";
+        const nextActions = m.structured?.nextActions?.length
+          ? "\n\nPróximos passos:\n" + m.structured.nextActions.map(function(s, idx){
+              return (idx + 1) + ". " + s;
+            }).join("\n")
+          : "";
+        const confidence = m.structured?.confidence
+          ? "\n\nConfiança: " + m.structured.confidence
+          : "";
+
+        const question =
+          msgs.slice(0, i).reverse().find(x => x.role === "user")?.content || "";
+
+        const shareText =
+          "Pergunta:\n" + question +
+          "\n\nResposta:\n" + finalText +
+          consensus + divergence + nextActions + confidence;
+
+        if (navigator.share && isMobile) {
+          try {
+            await navigator.share({ text: shareText });
+          } catch {}
+        } else {
+          await navigator.clipboard?.writeText(shareText);
+          toast("Resposta copiada para partilha", "success");
+        }
+      }}
+      title="Partilhar"
+      style={{
+        background:"transparent",
+        border:`1px solid ${T.b1}`,
+        borderRadius:5,
+        padding:"2px 7px",
+        color:T.tf,
+        fontSize:9,
+        cursor:"pointer"
+      }}
+    >
+      📤
+    </button>
+
+    {m.lobeResults?.length > 0 && (
+      <button
+        onClick={() => setShowCouncil(showCouncil === m.id ? null : m.id)}
+        title={showCouncil === m.id ? "Ocultar conselho" : "Ver conselho"}
+        style={{
+          background: showCouncil === m.id ? `${AC.claude}16` : "transparent",
+          border: `1px solid ${showCouncil === m.id ? AC.claude + "44" : T.b1}`,
+          borderRadius:5,
+          padding:"2px 7px",
+          color: showCouncil === m.id ? AC.claude : T.tf,
+          fontSize:9,
+          cursor:"pointer"
+        }}
+      >
+        {showCouncil === m.id ? "Ocultar" : "Ver Conselho"}
+      </button>
+    )}
+  </div>
+</div>
+
+{/* Corpo resposta */}
+<div style={{padding:"14px 14px 8px",display:"flex",flexDirection:"column",gap:12}}>
+  {/* Síntese antiga compatível */}
+  {!m.structured?.final && m.content.includes("⚡ Síntese:") && (
+    <div style={{
+      background:`linear-gradient(135deg, ${AC.claude}14, ${AC.claude}08)`,
+      border:`1px solid ${AC.claude}26`,
+      borderRadius:14,
+      padding:"14px 15px",
+      boxShadow:"inset 0 1px 0 #ffffff08"
+    }}>
+      <div style={{
+        display:"flex",
+        alignItems:"center",
+        gap:8,
+        marginBottom:8,
+        color:AC.claude,
+        fontSize:11,
+        fontWeight:800,
+        letterSpacing:0.3
+      }}>
+        <span style={{fontSize:15}}>⚡</span>
+        <span>Síntese</span>
+      </div>
+      <div style={{
+        fontSize:14,
+        lineHeight:1.7,
+        color:T.tx,
+        fontWeight:600
+      }}>
+        {(m.content.split("⚡ Síntese:")[1] || "").trim()}
+      </div>
+    </div>
+  )}
+        
+  {/* Resposta principal */}
+  <div style={{
+    paddingBottom:4,
+    borderBottom:`1px solid ${T.b1}`
+  }}>
+    <div style={{
+      display:"flex",
+      alignItems:"center",
+      gap:8,
+      marginBottom:8,
+      color:AC.gemini,
+      fontSize:11,
+      fontWeight:800,
+      letterSpacing:0.3
+    }}>
+      <span>Resposta</span>
+    </div>
+    <Markdown
+      text={(m.structured?.final || m.content || "").trim()}
+      color={T.tx}
+      faint={T.ts}
+    />
+  </div>
+
+  {m.structured?.consensus?.length > 0 && (
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      gap:6,
+      paddingBottom:4,
+      borderBottom:`1px solid ${T.b1}`
+    }}>
+      <div style={{
+        color:AC.gemini,
+        fontSize:11,
+        fontWeight:800,
+        letterSpacing:0.3
+      }}>
+        Consenso
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {m.structured.consensus.map((item,idx)=>(
+          <div
+            key={idx}
+            style={{
+              background:T.s2,
+              border:`1px solid ${T.b1}`,
+              borderRadius:10,
+              padding:"8px 10px",
+              fontSize:11,
+              color:T.tx,
+              lineHeight:1.6
+            }}
+          >
+            • {item}
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  {m.structured?.divergence?.length > 0 && (
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      gap:6,
+      paddingBottom:4,
+      borderBottom:`1px solid ${T.b1}`
+    }}>
+      <div style={{
+        color:AC.grok,
+        fontSize:11,
+        fontWeight:800,
+        letterSpacing:0.3
+      }}>
+        Divergências
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {m.structured.divergence.map((item,idx)=>(
+          <div
+            key={idx}
+            style={{
+              background:T.s2,
+              border:`1px solid ${T.b1}`,
+              borderRadius:10,
+              padding:"8px 10px",
+              fontSize:11,
+              color:T.tx,
+              lineHeight:1.6
+            }}
+          >
+            • {item}
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  {m.structured?.nextActions?.length > 0 && (
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      gap:6,
+      paddingBottom:4,
+      borderBottom:`1px solid ${T.b1}`
+    }}>
+      <div style={{
+        color:AC.perp,
+        fontSize:11,
+        fontWeight:800,
+        letterSpacing:0.3
+      }}>
+        Próximos passos
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {m.structured.nextActions.map((item,idx)=>(
+          <div
+            key={idx}
+            style={{
+              background:T.s2,
+              border:`1px solid ${T.b1}`,
+              borderRadius:10,
+              padding:"8px 10px",
+              fontSize:11,
+              color:T.tx,
+              lineHeight:1.6
+            }}
+          >
+            {idx + 1}. {item}
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  {m.structured?.confidence && (
+    <div style={{
+      display:"flex",
+      alignItems:"center",
+      gap:8,
+      fontSize:10,
+      color:T.tf
+    }}>
+      <span>Confiança</span>
+      <span style={{
+        color:AC.claude,
+        fontWeight:800,
+        background:`${AC.claude}12`,
+        border:`1px solid ${AC.claude}22`,
+        borderRadius:999,
+        padding:"3px 8px"
+      }}>
+        {m.structured.confidence}
+      </span>
+    </div>
+  )}
+
+  {/* Decisão do conselho */}
+  {m.councilDecision && (
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      gap:6,
+      paddingBottom:4,
+      borderBottom:`1px solid ${T.b1}`
+    }}>
+      <div style={{
+        color:AC.perp,
+        fontSize:11,
+        fontWeight:800,
+        letterSpacing:0.3
+      }}>
+        Decisão do conselho
+      </div>
+      <div style={{
+        fontSize:12,
+        color:T.ts,
+        lineHeight:1.7
+      }}>
+        {m.councilDecision}
+      </div>
+    </div>
+  )}
+
+  {/* Memória usada */}
+  {m.usedMemory?.length>0 && (
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      gap:6
+    }}>
+      <div style={{
+        color:AC.grok,
+        fontSize:11,
+        fontWeight:800,
+        letterSpacing:0.3
+      }}>
+        Memória utilizada
+      </div>
+      <div style={{
+        display:"flex",
+        flexWrap:"wrap",
+        gap:6
+      }}>
+        {m.usedMemory.map((mem,j)=>(
+          <div
+            key={j}
+            style={{
+              background:T.s2,
+              border:`1px solid ${T.b1}`,
+              color:T.ts,
+              fontSize:10,
+              lineHeight:1.45,
+              padding:"6px 8px",
+              borderRadius:10,
+              maxWidth:"100%"
+            }}
+          >
+            {mem}
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  {/* Conselho expandido */}
+  {showCouncil===m.id && m.lobeResults?.length>0 && (
+    <div style={{
+      display:"grid",
+      gridTemplateColumns:isMobile?"1fr":"repeat(2,minmax(0,1fr))",
+      gap:10,
+      paddingTop:2
+    }}>
+              {m.lobeResults.map((l,idx)=>(
+                <div
+                  key={l._key || l.id || idx}
+                  className="lobe-card"
+                  style={{
+                    position:"relative",
+                    background:T.s2,
+                    border:`1px solid ${l.color}33`,
+                    borderRadius:14,
+                    padding:"12px 12px 10px",
+                    boxShadow:"0 4px 14px #00000016"
+                  }}
+                >
+                  <div style={{
+                    display:"flex",
+                    alignItems:"center",
+                    justifyContent:"space-between",
+                    gap:8,
+                    marginBottom:8
+                  }}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+                      <div style={{
+                        width:10,
+                        height:10,
+                        borderRadius:"50%",
+                        background:l.color,
+                        boxShadow:`0 0 10px ${l.color}66`,
+                        flexShrink:0
+                      }} />
+                      <div style={{minWidth:0}}>
+                        <div style={{
+                          fontSize:11,
+                          fontWeight:800,
+                          color:l.color,
+                          letterSpacing:0.3
+                        }}>
+                          {l.label}
                         </div>
-                      ) : m.systemNote ? (
-                        <div style={{background:T.s2,border:`1px dashed ${T.b2}`,borderRadius:8,padding:"5px 11px",fontSize:10,color:T.ts,fontStyle:"italic",maxWidth:"70%"}}>{m.content}</div>
-                      ) : (
-                        <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:"3px 18px 18px 18px",padding:"12px 14px",maxWidth:"88%",display:"flex",flexDirection:"column",gap:8,boxShadow:`0 2px 10px ${T.b2}66`}}>
-                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                            <div style={{display:"flex",alignItems:"center",gap:5}}>
-                              <div style={{width:6,height:6,borderRadius:"50%",background:AC.claude,boxShadow:`0 0 6px ${AC.claude}`}}/>
-                              <span style={{fontSize:8,fontWeight:800,letterSpacing:3,color:AC.claude}}>CÓRTEX · claude-opus-4-6</span>
-                            </div>
-                            <div style={{display:"flex",alignItems:"center",gap:5}}>
-                              <CopyBtn text={m.content} T={T}/>
-                              {m.council&&<button onClick={()=>setExpanded(expanded===i?null:i)} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:5,padding:"2px 8px",color:T.ts,fontSize:9,cursor:"pointer",fontFamily:"inherit"}}>{expanded===i?"▲ Ocultar":"▼ fontes"}</button>}
-                            </div>
-                          </div>
-                          <Markdown text={m.content} color={T.tx} faint={T.ts}/>
-                          {expanded===i&&m.council&&(
-                            <div style={{borderTop:`1px solid ${T.b2}`,paddingTop:9,display:"flex",flexDirection:"column",gap:6}}>
-                              {m.councilDecision&&<div style={{background:`${AC.claude}11`,border:`1px solid ${AC.claude}22`,borderRadius:7,padding:"4px 9px",fontSize:10,color:AC.claude,fontStyle:"italic"}}>⚖ {m.councilDecision}</div>}
-                              {m.usedMemory?.length>0&&(
-                                <details style={{background:T.s2,borderRadius:7,padding:"5px 9px"}}>
-                                  <summary style={{fontSize:9,color:T.ts,cursor:"pointer"}}>🧠 Memória usada ({m.usedMemory.length})</summary>
-                                  <div style={{marginTop:5,display:"flex",flexDirection:"column",gap:2}}>{m.usedMemory.map((mm,j)=><div key={j} style={{fontSize:10,color:T.ts}}>• {mm}</div>)}</div>
-                                </details>
-                              )}
-                              {m.lobeResults?.length>0&&(
-                                  <button onClick={()=>setShowCouncil(m)} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:8,padding:"3px 10px",fontSize:9,color:T.ts,cursor:"pointer",marginTop:4}}>
-                                     ⚖ Ver Conselho ({m.lobeResults.length} lobos)
-                                  </button>
-                                   )}
-                            </div>
-                          )}
+                        <div style={{
+                          fontSize:9,
+                          color:T.tf,
+                          whiteSpace:"nowrap",
+                          overflow:"hidden",
+                          textOverflow:"ellipsis"
+                        }}>
+                          {l.srcModel}{l.srcReal===false?" · simulado":""}
                         </div>
-                      )}
-                      {!m.systemNote&&ts&&<div style={{fontSize:7,color:T.tf,opacity:0.6,marginTop:1,paddingLeft:2,paddingRight:2}}>{ts}</div>}
+                      </div>
                     </div>
-                  );
-                })}
+
+                    <button
+                      onClick={async()=>{
+                        if(phase) return;
+                        const q = msgs.slice(0,i).reverse().find(x=>x.role==="user")?.content;
+                        if(!q) return;
+                        setPhase("council");
+                        setMsgs(prev=>prev.map(msg=>{
+                          if(msg.id!==m.id) return msg;
+                          return {
+                            ...msg,
+                            lobeResults:(msg.lobeResults||[]).map(item=>
+                              item.id===l.id ? {...item, result:"A regenerar...", isErr:false, regenerating:true} : item
+                            )
+                          };
+                        }));
+                        try{
+                          const mem = buildMem(brain);
+                          const r = await invoke(l.id, P[l.id]?.(mem,q)||`Answer: ${q}`, q);
+                          setMsgs(prev=>prev.map(msg=>{
+                            if(msg.id!==m.id) return msg;
+                            return {
+                              ...msg,
+                              lobeResults:(msg.lobeResults||[]).map(item=>
+                                item.id===l.id ? {
+                                  ...item,
+                                  result:r.result,
+                                  srcModel:r.model,
+                                  srcReal:r.real,
+                                  isErr:!r.result || r.result.startsWith("[") || r.result.startsWith("Tempo"),
+                                  regenerating:false
+                                } : item
+                              )
+                            };
+                          }));
+                        }catch{
+                          setMsgs(prev=>prev.map(msg=>{
+                            if(msg.id!==m.id) return msg;
+                            return {
+                              ...msg,
+                              lobeResults:(msg.lobeResults||[]).map(item=>
+                                item.id===l.id ? {...item, regenerating:false} : item
+                              )
+                            };
+                          }));
+                        }
+                        setPhase(null);
+                      }}
+                      title="Regenerar lobe"
+                      style={{
+                        width:28,
+                        height:28,
+                        borderRadius:9,
+                        border:`1px solid ${T.b1}`,
+                        background:"transparent",
+                        color:l.regenerating?l.color:T.ts,
+                        cursor:"pointer",
+                        display:"flex",
+                        alignItems:"center",
+                        justifyContent:"center",
+                        fontSize:12,
+                        flexShrink:0
+                      }}
+                    >
+                      {l.regenerating ? "◌" : "🔄"}
+                    </button>
+                  </div>
+
+                  <div style={{
+                    minHeight:54,
+                    fontSize:12,
+                    color:l.isErr ? "#fca5a5" : T.tx,
+                    lineHeight:1.65
+                  }}>
+                    <Markdown text={l.result || ""} color={l.isErr ? "#fca5a5" : T.tx} faint={T.ts} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </div>
+))}
+
                 {cur&&(
                   <div style={{display:"flex",justifyContent:"flex-start"}}>
                     <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:"3px 18px 18px 18px",padding:"14px 16px",minWidth:240,maxWidth:"80%",boxShadow:`0 2px 12px ${T.b2}88`}}>
@@ -1271,11 +2129,6 @@ try{
   <div style={{display:"flex",gap:3,alignItems:"flex-end",flexShrink:0}}>
     {msgs.filter(m=>m.role==="user").length>0&&!phase&&
       <button onClick={regenerate} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title="Regenerar">↺</button>}
-    <button onClick={()=>setShowConn(true)} style={{background:"transparent",border:"none",borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:12,color:Object.values(connsOn).some(Boolean)?AC.claude:T.tf,display:"flex",alignItems:"center",justifyContent:"center"}} title="Conectores">
-      {Object.values(connsOn).some(Boolean)
-        ?<span style={{fontSize:9,fontWeight:700,color:AC.claude}}>⚡{Object.values(connsOn).filter(Boolean).length}</span>
-        :"⬡"}
-    </button>
     <button onClick={()=>{
       if(!("webkitSpeechRecognition" in window||"SpeechRecognition" in window)){toast("Voz não suportada neste browser","error");return;}
       const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -1298,79 +2151,6 @@ try{
         </>
       )}
 
-      {/* ── COMPUTER
-
-      {/* ── COMPUTER ───────────────────────────────────────── */}
-      {page==="computer" && (
-        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          {/* Header */}
-          <div style={{padding:"9px 14px",background:T.s1,borderBottom:`1px solid ${T.b1}`,display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <div style={{width:7,height:7,borderRadius:"50%",background:compRunning?AC.computer:"#444",boxShadow:compRunning?`0 0 8px ${AC.computer}`:"none",transition:"all 0.3s"}} className={compRunning?"pulse":""}/>
-            <span style={{fontSize:11,fontWeight:700,color:T.tx}}>Agente Autónomo</span>
-            <span style={{fontSize:8,color:T.ts,fontFamily:"monospace"}}>claude-opus-4-6</span>
-            <button onClick={()=>setShowConn(true)} style={{marginLeft:"auto",...btn(T,AC.perp),fontSize:9,padding:"3px 9px"}}>⬡ {Object.values(connsOn).filter(Boolean).length} conectors</button>
-          </div>
-          {/* Progresso */}
-          {compRunning&&<div style={{height:2,background:T.b2,flexShrink:0}}><div style={{height:"100%",width:"70%",background:AC.computer,animation:"compPulse 1.2s ease-in-out infinite"}}/></div>}
-          {/* Lista tarefas */}
-          <div style={{flex:1,overflowY:"auto",padding:"10px 12px",display:"flex",flexDirection:"column",gap:8}}>
-            {compTasks.length===0&&!compRunning&&(
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"55%",gap:14,color:T.ts}}>
-                <span style={{fontSize:28,opacity:0.4}}>◐</span>
-                <div style={{textAlign:"center"}}>
-                  <div style={{fontSize:13,fontWeight:600,color:T.tx,marginBottom:4}}>Agente Autónomo</div>
-                  <div style={{fontSize:11,color:T.ts,maxWidth:300,lineHeight:1.5}}>Executa tarefas de forma autónoma usando Claude como motor de raciocínio.</div>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:5,width:"100%",maxWidth:380}}>
-                  {[
-                    "Cria um plano de estudo para redes de Petri",
-                    "Pesquisa tendências em automação industrial 2026",
-                    "Resume os conceitos chave de controlo PID",
-                  ].map((s,i)=>(
-                    <button key={i} onClick={()=>setCompInput(s)} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:9,padding:"8px 12px",color:T.ts,cursor:"pointer",fontSize:11,fontFamily:"inherit",textAlign:"left",display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{color:T.tf,fontSize:10}}>◇</span>{s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {compActive&&(
-              <div style={{background:T.s2,border:`1px solid ${AC.computer}33`,borderRadius:10,padding:"10px 12px",animation:"fadeIn 0.2s ease"}}>
-                <div style={{fontSize:9,fontWeight:700,color:AC.computer,letterSpacing:2,marginBottom:4}}>A EXECUTAR</div>
-                <div style={{fontSize:12,color:T.tx,marginBottom:6}}>{compActive.task}</div>
-                <div style={{display:"flex",flexDirection:"column",gap:1}}>{compActive.log?.map((l,i)=><div key={i} style={{fontSize:9,color:T.ts,fontFamily:"monospace",lineHeight:1.4}}>› {l}</div>)}</div>
-              </div>
-            )}
-            {compTasks.map((task,i)=>(
-              <div key={task.id||i} style={{background:T.s1,border:`1px solid ${task.status==="done"?AC.claude+"33":task.status==="error"?"#ef444433":T.b1}`,borderRadius:10,padding:"10px 12px",animation:"fadeIn 0.2s ease"}}>
-                <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                  <span style={{fontSize:11,color:task.status==="done"?AC.claude:task.status==="error"?"#ef4444":"#888",flexShrink:0,marginTop:1}}>{task.status==="done"?"✓":task.status==="error"?"✗":"…"}</span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.tx,marginBottom:2}}>{task.task}</div>
-                    {task.preview&&<div style={{fontSize:10,color:T.ts,lineHeight:1.5,marginBottom:4}}>{task.preview}</div>}
-                    <div style={{display:"flex",alignItems:"center",gap:8,fontSize:8,color:T.tf}}>
-                      {task.completedAt&&<span>{new Date(task.completedAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span>}
-                      {task.estimatedTime&&<span>{task.estimatedTime}</span>}
-                      {task.confidence&&<span style={{color:task.confidence==="high"?AC.claude:task.confidence==="low"?"#ef4444":T.ts}}>{task.confidence}</span>}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          {/* Input */}
-          <div style={{padding:"8px 10px 12px",background:T.s1,borderTop:`1px solid ${T.b2}`,flexShrink:0}}>
-            <div style={{display:"flex",gap:8,maxWidth:820,margin:"0 auto",alignItems:"center"}}>
-              <div style={{flex:1,background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,padding:"8px 12px",display:"flex",alignItems:"center"}}>
-                <input value={compInput} onChange={e=>setCompInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&runComputer()} placeholder="Descreve a tarefa..." disabled={compRunning} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:12,color:T.tx,fontFamily:"inherit"}}/>
-              </div>
-              <button onClick={runComputer} disabled={compRunning||!compInput.trim()} style={{background:compInput.trim()&&!compRunning?AC.computer:"#333",border:"none",borderRadius:14,width:44,height:44,cursor:compInput.trim()&&!compRunning?"pointer":"default",fontSize:15,color:"#fff",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s",opacity:compRunning?0.5:1,boxShadow:compInput.trim()&&!compRunning?`0 0 14px ${AC.computer}44`:"none"}}>{compRunning?"…":"▶"}</button>
-              {compTasks.length>0&&<button onClick={()=>{setCompTasks([]);saveTasks([]);}} title="Limpar histórico" style={{background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,width:44,height:44,cursor:"pointer",fontSize:11,color:T.tf,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>}
-            </div>
-          </div>
-        </div>
-
-      )}
       {/* ── API_KEYS─────────────────────────────────────────── */}
       {page==="keys" && !devUnlocked && (
   <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:18,padding:24}}>
@@ -1461,8 +2241,8 @@ try{
             <button onClick={()=>setPage("keys")} style={btn(T,AC.perp)}>Gerir chaves</button>
           </div>
           <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:12,padding:"10px 14px"}}>
-            <div style={{fontSize:11,fontWeight:700,color:T.tx,marginBottom:8}}>Arquitectura v11</div>
-            {[["◉",AC.grok,"Grok","grok-3"],["◈",AC.gemini,"Gemini","gemini-2.5-flash"],["◇",AC.perp,"Perplexity","sonar-pro (via Groq)"],["◎",AC.genspark,"Genspark","simulado (via Claude)"],["◍",AC.manus,"Manus","simulado (via Claude)"],["○",AC.openai||"#74aa9c","OpenAI","gpt-4o"],["◐",AC.deepseek||"#4d9fff","DeepSeek","deepseek-chat"],["◑",AC.llama||"#e879f9","Llama","llama-4-scout via Groq"],["◒",AC.mistral||"#f97316","Mistral","mistral-large-latest"],["◓",AC.nemotron||"#a3e635","Nemotron","nemotron-4-340b NVIDIA"],["◆",AC.claude,"Claude","claude-opus-4-6 — Juiz final"],["💻",AC.computer,"Computer","MANUS + Conectores"]].map(([ic,c,t,d])=>(
+            <div style={{fontSize:11,fontWeight:700,color:T.tx,marginBottom:8}}>Arquitectura v12</div>
+            {[["◉",AC.grok,"Grok","grok-3"],["◈",AC.gemini,"Gemini","gemini-2.5-flash"],["◇",AC.perp,"Perplexity","sonar-pro (via Groq)"],["◎",AC.genspark,"Genspark","simulado (via Claude)"],["◍",AC.manus,"Manus","simulado (via Claude)"],["○",AC.openai||"#74aa9c","OpenAI","gpt-4o"],["◐",AC.deepseek||"#4d9fff","DeepSeek","deepseek-chat"],["◑",AC.llama||"#e879f9","Llama","llama-4-scout via Groq"],["◒",AC.mistral||"#f97316","Mistral","mistral-large-latest"],["◓",AC.nemotron||"#a3e635","Nemotron","nemotron-4-340b NVIDIA"],["◆",AC.claude,"Claude","claude-opus-4-6 — Juiz final"],].map(([ic,c,t,d])=>(
               <div key={t} style={{display:"flex",gap:7,padding:"5px 0",borderBottom:`1px solid ${T.b2}`}}>
                 <span style={{color:c,fontSize:12,flexShrink:0}}>{ic}</span>
                 <div><div style={{fontSize:10,fontWeight:600,color:T.tx}}>{t}</div><div style={{fontSize:8,color:T.ts,marginTop:1}}>{d}</div></div>
@@ -1471,6 +2251,6 @@ try{
           </div>
         </div>
       )}
-    </div>
-  );
-}
+ </div>
+    );
+  }      
