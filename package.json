@@ -3,14 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@clerk/clerk-js": "^6.8.0",
+    "@sentry/react": "^10.51.0",
     "crypto-js": "^4.2.0",
     "dompurify": "^3.1.6",
+    "posthog-js": "^1.372.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
