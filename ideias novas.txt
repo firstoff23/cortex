@@ -64,3 +64,21 @@ ChromaDB / Supabase — memória persistente real em base de dados
 Webhooks — receber perguntas via Discord/Telegram
 
 API pública — endpoint /api/ask para integrar o Córtex noutros projetos
+
+| Melhoria                                              | Dificuldade | Impacto |
+| ----------------------------------------------------- | ----------- | ------- |
+| Adicionar system prompt por lobo com papel específico | Fácil       | Alto    |
+| Mostrar qual modelo respondeu por cada lobo           | Fácil       | Médio   |
+| Adicionar lobo CRITICO que contradiz os outros        | Médio       | Alto    |
+| Memória de conversa entre turnos                      | Médio       | Alto    |
+| Streaming das respostas em tempo real                 | Difícil     | Alto    |
+
+erros
+Ficheiro 11 — reflect.js ⚠️ Um problema
+A verificação QStash é demasiado fraca:
+
+js
+return sig.startsWith("v1:"); // qualquer string "v1:xxx" passa
+Não é bloqueante agora, mas anota para corrigir na Fase 3 com o SDK oficial.
+
+O resto está bem.
