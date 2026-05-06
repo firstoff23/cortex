@@ -1,9 +1,21 @@
-const express = require("express");
-const cors = require("cors");
+import express from "express";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
+import sanitize from "./middleware/sanitize.js";   // ← .js obrigatório em ESM
 
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: "*" }));
+
+// ── Rate limiter + sanitize nas rotas de IA ──────────────
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: "Demasiados pedidos. Tenta novamente em 1 minuto." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(["/ollama", "/gemini/{*path}"], aiLimiter, sanitize);
 
 // ── Ollama local ──────────────────────────────────────────
 app.post("/ollama", async (req, res) => {
@@ -21,9 +33,8 @@ app.post("/ollama", async (req, res) => {
   }
 });
 
-// ── Gemini proxy (usa GEMINI_API_KEY do servidor como fallback) ───
-// O frontend chama /api/gemini/... quando não tem key própria
-app.post("/gemini/*", async (req, res) => {
+// ── Gemini proxy ──────────────────────────────────────────
+app.post("/gemini/{*path}", async (req, res) => {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return res.status(503).json({ error: { message: "Gemini proxy sem key de servidor. Define GEMINI_API_KEY no .env" } });
 
