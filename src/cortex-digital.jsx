@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 const MV="cortex-v12";
 import { callOpenRouter, OR_MODELS } from "./lib/openrouter.js";
-const MAX_BUF=8,MAX_SEMANTIC=80,MAX_PATTERNS=12,MAX_EPISODIC=15,MAX_STORED=200;
+const MAX_BUF=8, COMPRESS_THRESHOLD = 20, COMPRESS_KEEP_TAIL = 6;MAX_SEMANTIC=80,MAX_PATTERNS=12,MAX_EPISODIC=15,MAX_STORED=200;
 const BUILD = typeof __BUILD_NUM__ !== "undefined" ? __BUILD_NUM__ : "DEV";
 const APP_VERSION = `v12.${BUILD}`;
 
@@ -203,6 +203,7 @@ const P={
   nemotron:(m,q)=>`You are NEMOTRON — scientific rigor. Evidence-based, cite mechanisms. Memory:\n${m}\nQuestion: ${q}\nMax 100w. ${detectLang(q)}`,
   ollama_codigo:(m,q)=>`Local coding assistant. Give clean working code with brief explanation. Memory:\n${m}\nQuestion: ${q}\nMax 100w. ${detectLang(q)}`,
   ollama_debug:(m,q)=>`Local debug expert. Find root cause, give exact fix. Memory:\n${m}\nQuestion: ${q}\nMax 100w. ${detectLang(q)}`,
+  compress: (msgs) => `Summarize this conversation history in 1 compact paragraph (max 80 words). Keep facts, decisions, and key context. No intro.\n\n${msgs.join("\n")}`,
 cortex: (m, q, lobes) => `
 Tu és o Córtex Pré-Frontal — o juiz e sintetizador de um conselho multi-IA.
 Regras obrigatórias:
@@ -600,7 +601,32 @@ function navBtn(T){
     userSelect:"none"
   };
 }
+async function compressContext(buf, claudeKey, perpKey) {
+  if (buf.length <= COMPRESS_THRESHOLD) return { buf, compressed: false };
 
+  const tail = buf.slice(-COMPRESS_KEEP_TAIL);
+  const toCompress = buf.slice(0, buf.length - COMPRESS_KEEP_TAIL);
+
+  try {
+    const summary = await callClaude(
+      "Conversation summarizer. Return only the summary paragraph.",
+      P.compress(toCompress),
+      200,
+      claudeKey,
+      perpKey
+    );
+    if (!summary?.trim()) throw new Error("vazio");
+
+    return {
+      buf: [`SUMMARY: ${summary.trim()}`, ...tail],
+      compressed: true,
+      before: buf.length,
+      after: COMPRESS_KEEP_TAIL + 1
+    };
+  } catch {
+    return { buf, compressed: false }; // falha silenciosa
+  }
+}
 // ── MAIN ─────────────────────────────────────────────────────
 export default function Cortex(){
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -785,7 +811,9 @@ async function invoke(id, sys, msg) {
     setInput("");
     const uMsg={id:Date.now()+Math.random(),role:"user",content:q};
     const nm=[...msgs,uMsg];setMsgs(nm);saveMsgs(nm);
-    const newBuf=[...buf,`USER: ${q}`];
+    const { buf: bufComprimido, compressed, before, after } =
+  await compressContext([...buf, `USER: ${q}`], keys.claude, keys.perp);
+const newBuf = bufComprimido;
     const mem=buildMem(brain);
     const usedMem=selectUsedMem(brain,q);
     const routedIds = routerDecide(q);
@@ -911,9 +939,15 @@ if(buf2.length>=MAX_BUF&&nb.sessions>=1){
 }
 
 setBrain(nb);saveBrain(nb);setPhase(null);
-if(reflexOk){
-  const note={id:Date.now()+Math.random(),role:"assistant",content:"◉ Memória atualizada.",systemNote:true};
-  setMsgs(prev=>{const u=[...prev,note];saveMsgs(u);return u;});
+if (compressed) {
+  const note = {
+    id: Date.now() + Math.random(),
+    role: "assistant",
+    content: `⚡ Contexto comprimido (${before}→${after} msgs)`,
+    systemNote: true,
+    compressNote: true
+  };
+  setMsgs(prev => { const u = [...prev, note]; saveMsgs(u); return u; });
 }
 autoSaveConv(fm, currentConvId);
 setTimeout(()=>taRef.current?.focus(),80);
@@ -1597,19 +1631,19 @@ const normalizeCouncilPayload = (raw, fallbackText = "") => {
       }}>
         {m.content}
       </div>
-    ) : m.systemNote ? (
-      <div style={{
-        alignSelf:"center",
-        fontSize:10,
-        color:AC.claude,
-        background:`${AC.claude}12`,
-        border:`1px solid ${AC.claude}22`,
-        borderRadius:999,
-        padding:"6px 10px",
-        letterSpacing:0.2
-      }}>
-        {m.content}
-      </div>
+) : m.systemNote ? (
+  <div style={{
+    alignSelf:"center",
+    fontSize:10,
+    color: m.compressNote ? AC.perp : AC.claude,
+    background: m.compressNote ? `${AC.perp}12` : `${AC.claude}12`,
+    border: `1px solid ${m.compressNote ? AC.perp : AC.claude}22`,
+    borderRadius:999,
+    padding:"6px 10px",
+    letterSpacing:0.2
+  }}>
+    {m.content}
+  </div>
     ) : (
       <div style={{
         background:T.s1,
