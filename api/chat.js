@@ -9,6 +9,10 @@ const FREE_FALLBACKS = [
   'nvidia/nemotron-3-nano-30b-a3b:free',
 ];
 
+export const config = {
+  maxDuration: 30,
+};
+
 export default async function handler(req, res) {
   const origin = req.headers['origin'] || '';
 
