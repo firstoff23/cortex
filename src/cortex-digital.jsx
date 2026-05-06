@@ -2,7 +2,13 @@ import { useState, useEffect, useRef } from "react";
 
 const MV="cortex-v12";
 import { callOpenRouter, OR_MODELS } from "./lib/openrouter.js";
-const MAX_BUF=8, COMPRESS_THRESHOLD = 20, COMPRESS_KEEP_TAIL = 6;MAX_SEMANTIC=80,MAX_PATTERNS=12,MAX_EPISODIC=15,MAX_STORED=200;
+const MAX_BUF=8;
+const COMPRESS_THRESHOLD = 20; 
+const COMPRESS_KEEP_TAIL = 6;
+const MAX_SEMANTIC=80;
+const MAX_PATTERNS=12;
+const MAX_EPISODIC=15;
+const MAX_STORED=200;
 const BUILD = typeof __BUILD_NUM__ !== "undefined" ? __BUILD_NUM__ : "DEV";
 const APP_VERSION = `v12.${BUILD}`;
 
