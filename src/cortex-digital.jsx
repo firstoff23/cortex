@@ -795,9 +795,28 @@ const councilLobes = LOBES.filter(l =>
   routedIds.includes(l.id) &&
   (!focusMode || focusLobes.has(l.id))
 );
+let qFinal = q;
+try {
+  const refined = await callClaude(
+    "Query optimizer. Return only the rewritten question.",
+    P.refine(q),
+    120,
+    keys.claude
+  );
+  if (
+    refined &&
+    refined.trim().length > 10 &&
+    refined.trim().length < q.length * 3 &&
+    !refined.includes("{") &&
+    !refined.includes("```")
+  )
+    qFinal = refined.trim();
+} catch {
+  // falha silenciosa
+}
 
-    setPhase("council");
-    const results=await Promise.allSettled(councilLobes.map(l=>invoke(l.id,P[l.id]?.(mem,q)||`Answer: ${q}`,q)));
+setPhase("council");
+const results=await Promise.allSettled(councilLobes.map(l=>invoke(l.id,P[l.id]?.(mem,qFinal)||`Answer: ${qFinal}`,qFinal)));
     const lobeResults=councilLobes.map((l,i)=>{
     const r=results[i].status==="fulfilled"?results[i].value:{result:`Tempo esgotado ou serviço indisponível`,model:"?",real:false};
     const isErr=!r.result||r.result.startsWith("[")||r.result.startsWith("Tempo");
