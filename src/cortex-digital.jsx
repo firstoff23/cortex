@@ -235,7 +235,18 @@ RESPOSTAS DOS LOBOS DO CONSELHO:
 ${lobes.map(l => "[ " + l.label + " ]: " + l.result).join("\n\n")}
 `.trim(),
 
-judge: (q, lobeResults) => `You are the judge of an 11-lobe AI council.
+  refine: (q) => `
+You are a query optimizer for a multi-AI council.
+Rewrite the user's question to be clearer, more specific, and better suited for parallel AI analysis.
+Rules:
+- Keep the same language as the input
+- Max 2 sentences
+- Remove ambiguity, add implicit context if obvious
+- Return ONLY the rewritten question, no explanation
+Original: "${q}"
+`.trim(),
+
+  judge: (q, lobeResults) => `You are the judge of an 11-lobe AI council.
 Question: "${q}"
 Lobe responses:
 ${lobeResults.map(l => `[${l.label}]: ${l.result?.slice(0, 120)}`).join("\n")}
