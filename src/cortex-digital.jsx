@@ -301,17 +301,52 @@ async function callOllama(sys, msg, modelKey = "codigo") {
 }
 
 function routerDecide(query) {
+  const COMPLEXITY_SIMPLE_LOBES  = ["gemini"];
+const COMPLEXITY_MEDIUM_LOBES  = ["grok", "gemini", "perp"];
+
+function classifyQuery(q) {
+  try {
+    const words = q.trim().split(/\s+/).length;
+    const s = q.toLowerCase();
+
+    if (words < 8 && /^(olá|oi|bom dia|boa tarde|obrigad|ok|sim|não|certo|fixe|hey|hi|hello)/.test(s))
+      return "SIMPLE";
+
+    const complexPatterns = /porquê|porque\s|como\s|compara|analisa|debate|diferença|vantagens?|desvantagens?|explica|impacto|estratégia|avalia|crítica|pros\s|contras\s|trade.?off/i;
+    if (complexPatterns.test(s) || words > 25) return "COMPLEX";
+
+    return "MEDIUM";
+  } catch {
+    return "COMPLEX"; // falha silenciosa → todos os lobos
+  }
+}
+
+function routerDecide(query) {
   const q = query.toLowerCase();
+  const level = classifyQuery(query);
+
+  if (level === "SIMPLE") return COMPLEXITY_SIMPLE_LOBES;
+
   const isCode    = /código|code|programar|script|bug|erro|implementar|react|js|python|jsx/.test(q);
   const isDebug   = /debug|problema|falha|crash|corrig|fix|não funciona/.test(q);
   const isCurrent = /hoje|atual|recente|2026|notícia|mercado|preço/.test(q);
   const isPlan    = /plano|etapas|passos|estratégia|roadmap|arquitetura/.test(q);
-  if (isCode && isDebug)  return ["ollama_debug", "grok"];
-  if (isCode)             return ["ollama_codigo", "genspark"];
-  if (isDebug)            return ["ollama_debug", "gemini"];
-  if (isCurrent)          return ["perp", "grok"];
-  if (isPlan)             return ["gemini", "genspark"];
-  return ["grok", "gemini", "genspark"];
+
+  if (level === "MEDIUM") {
+    if (isCode && isDebug) return ["ollama_debug", "gemini"];
+    if (isCode)            return ["ollama_codigo", "genspark"];
+    if (isCurrent)         return ["perp", "grok"];
+    if (isPlan)            return ["gemini", "genspark"];
+    return COMPLEXITY_MEDIUM_LOBES;
+  }
+
+  // COMPLEX → routing original mas sem limites
+  if (isCode && isDebug) return ["ollama_debug", "grok", "gemini"];
+  if (isCode)            return ["ollama_codigo", "deepseek", "genspark", "gemini"];
+  if (isCurrent)         return ["perp", "grok", "gemini"];
+  if (isPlan)            return ["gemini", "genspark", "manus", "grok"];
+  return ["grok", "gemini", "perp", "genspark", "llama"]; // geral complexo
+}
 }
 // ── API CALLS ────────────────────────────────────────────────
 async function callClaude(sys, msg, tokens=700, claudeKey="") {
@@ -814,8 +849,10 @@ async function invoke(id, sys, msg) {
 }
   async function send(query){
     const q=(query||input).trim();if(!q||phase)return;
+    const q=u.replace(/\n/g," ").replace(/\s+/g," ");
+    const q=complexityLevel = classifyQuery(q);
     setInput("");
-    const uMsg={id:Date.now()+Math.random(),role:"user",content:q};
+    const uMsg={id:Date.now()+Math.random(),role:"user",content:q, complexity: complexityLevel};
     const nm=[...msgs,uMsg];setMsgs(nm);saveMsgs(nm);
     const { buf: bufComprimido, compressed, before, after } =
   await compressContext([...buf, `USER: ${q}`], keys.claude, keys.perp);
@@ -1636,6 +1673,14 @@ const normalizeCouncilPayload = (raw, fallbackText = "") => {
         wordBreak:"break-word"
       }}>
         {m.content}
+        {m.complexity && (
+          <div style={{
+            fontSize: 9, marginTop: 5, opacity: 0.7, textAlign: "right",
+            color: m.complexity === "SIMPLE" ? AC.perp : m.complexity === "MEDIUM" ? AC.grok : AC.claude
+          }}>
+            {m.complexity === "SIMPLE" ? "⚡ Simples" : m.complexity === "MEDIUM" ? "⚙️ Médio" : "🧠 Complexo"}
+          </div>
+        )}
       </div>
 ) : m.systemNote ? (
   <div style={{
