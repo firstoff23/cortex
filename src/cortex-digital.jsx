@@ -299,9 +299,7 @@ async function callOllama(sys, msg, modelKey = "codigo") {
   const d = await r.json();
   return (d.response || "").trim();
 }
-
-function routerDecide(query) {
-  const COMPLEXITY_SIMPLE_LOBES  = ["gemini"];
+const COMPLEXITY_SIMPLE_LOBES  = ["gemini"];
 const COMPLEXITY_MEDIUM_LOBES  = ["grok", "gemini", "perp"];
 
 function classifyQuery(q) {
@@ -347,7 +345,7 @@ function routerDecide(query) {
   if (isPlan)            return ["gemini", "genspark", "manus", "grok"];
   return ["grok", "gemini", "perp", "genspark", "llama"]; // geral complexo
 }
-}
+
 // ── API CALLS ────────────────────────────────────────────────
 async function callClaude(sys, msg, tokens=700, claudeKey="") {
   if(claudeKey?.trim().length > 10) {
