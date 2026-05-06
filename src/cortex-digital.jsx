@@ -869,7 +869,8 @@ const aMsg = {
   council,
   lobeResults,
   usedMemory: usedMem,
-  councilDecision: cDecision
+  councilDecision: cDecision,
+  refinedQuery: qFinal !== q ? qFinal : null,
 };
 
 const fm = [...nm, aMsg];
@@ -1919,6 +1920,13 @@ const normalizeCouncilPayload = (raw, fallbackText = "") => {
       </span>
     </div>
   )}
+
+{/* Pergunta refinada */}
+{m.refinedQuery && (
+  <div style={{ fontSize: 9, color: T.tf, fontStyle: "italic", marginBottom: 4 }}>
+    ✦ Pergunta refinada: "{m.refinedQuery}"
+  </div>
+)}
 
   {/* Decisão do conselho */}
   {m.councilDecision && (
