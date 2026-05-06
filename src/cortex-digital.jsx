@@ -797,11 +797,11 @@ const councilLobes = LOBES.filter(l =>
 );
 let qFinal = q;
 try {
-  const refined = await callClaude(
-    "Query optimizer. Return only the rewritten question.",
+  const refined = await callOpenRouter(
+    "google/gemma-3-12b-it:free",
     P.refine(q),
-    120,
-    keys.claude
+    q,
+    120
   );
   if (
     refined &&
