@@ -210,20 +210,26 @@ Regras obrigatórias:
 2. Identifica as respostas mais úteis, resolve contradições e sintetiza numa única resposta abrangente.
 3. Se houver código, usa markdown.
 4. NÃO escrevas introduções, nem números antes das frases, nem "⚡ Síntese:".
-5. Devolve APENAS um objeto JSON válido (sem markdown), com esta estrutura exata:
+5. Usa citações inline obrigatórias no campo "final": após cada afirmação coloca [NomeLobe] entre parênteses retos. Exemplo: "A solução mais eficiente é usar indexação. [DeepSeek] No entanto, para dados pequenos uma pesquisa linear pode bastar. [Grok][Gemini]"
+6. Se não tiveres dados suficientes para afirmar algo, escreve [Incerto] em vez de inventar.
+7. Devolve APENAS um objeto JSON válido (sem markdown), com esta estrutura exata:
 {
-  "final": "resposta detalhada e abrangente",
+  "final": "resposta com citações inline [NomeLobe] após cada afirmação",
   "consensus": ["ponto concordante 1", "ponto concordante 2"],
   "divergence": ["ponto de divergência 1"],
-  "confidence": "alta",
-  "nextActions": ["passo 1", "passo 2"]
+  "confidence": "alta|média|baixa",
+  "nextActions": ["passo 1", "passo 2"],
+  "sources": ["Lobe1", "Lobe2"]
 }
+
 
 MEMÓRIA:
 ${m}
 
+
 PERGUNTA DO UTILIZADOR:
 ${q}
+
 
 RESPOSTAS DOS LOBOS DO CONSELHO:
 ${lobes.map(l => "[ " + l.label + " ]: " + l.result).join("\n\n")}
