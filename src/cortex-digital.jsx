@@ -849,8 +849,7 @@ async function invoke(id, sys, msg) {
 }
   async function send(query){
     const q=(query||input).trim();if(!q||phase)return;
-    const q=u.replace(/\n/g," ").replace(/\s+/g," ");
-    const q=complexityLevel = classifyQuery(q);
+    const complexityLevel = classifyQuery(q);
     setInput("");
     const uMsg={id:Date.now()+Math.random(),role:"user",content:q, complexity: complexityLevel};
     const nm=[...msgs,uMsg];setMsgs(nm);saveMsgs(nm);
