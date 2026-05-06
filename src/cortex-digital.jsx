@@ -339,7 +339,7 @@ function routerDecide(query) {
   }
 
   // COMPLEX → routing original mas sem limites
-  if (isCode && isDebug) return ["ollama_debug", "grok", "gemini"];
+  if (isCode && isDebug) return ["grok", "gemini", "perp"];
   if (isCode)            return ["ollama_codigo", "deepseek", "genspark", "gemini"];
   if (isCurrent)         return ["perp", "grok", "gemini"];
   if (isPlan)            return ["gemini", "genspark", "manus", "grok"];
