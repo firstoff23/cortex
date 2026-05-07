@@ -1,84 +1,33 @@
-Ligações & APIs
-Conectar APIs reais — Gemini, OpenAI, Grok, Perplexity com as tuas API keys guardadas como variáveis de ambiente no Vercel
+Duas questões separadas — vamos resolver as duas! 🐺
 
-Criar o proxy /api/gemini no Vercel Functions para não expor keys no frontend
+1. Partilhar o link uma vez só
+O link https://cortexdigital.vercel.app/ é permanente — não muda nunca! Cada vez que fazes push, o Vercel atualiza automaticamente esse mesmo URL. Os teus amigos não precisam de novo link — manda uma vez e está feito. 🎉
 
-Webhook para notificações — quando um lobe responde, podes receber notificações por Discord ou Telegram
+Podes mandar assim no WhatsApp:
 
-🧠 Funcionalidades de IA
-Síntese do Council — Claude agrega e resume as respostas dos 6 lobes numa resposta final unificada
+text
+🧠 Córtex Digital — 11 IAs em conselho
+https://cortexdigital.vercel.app/
+Experimenta fazer uma pergunta difícil!
+2. Experiência perfeita no telemóvel
+Os problemas mais comuns em mobile são:
 
-Memória persistente — guardar conversas no localStorage ou numa base de dados (Supabase/Firebase)
+Textarea muito pequeno — difícil de escrever
 
-Modo de debate — dois lobes discutem entre si antes de chegar a consenso
+Botões pequenos demais — difícil de clicar
 
-Roteador inteligente — o agente decide automaticamente quais lobes ativar consoante o tipo de pergunta
+Nav horizontal com overflow — corta elementos
 
-🎨 Interface & UX
-Página de configurações — onde defines as API keys, temas, lobes ativos
+Font size < 16px — iOS faz zoom automático ao focar input (irritante!)
 
-Histórico de chats com pesquisa
+Height: 100vh — barra do browser iOS come espaço em baixo
 
-Export de conversas em PDF ou Markdown
-
-Partilha de respostas — link público para uma conversa específica
-
-Mobile otimizado — menu adaptado para telemóvel
-
-⚙️ Infraestrutura
-Variáveis de ambiente no Vercel para API keys (nunca expostas no código)
-
-Rate limiting no proxy para não gastar créditos por acidente
-
-Logs de uso — ver quantas chamadas cada lobe fez
-
-PWA — instalar o Córtex como app no telemóvel
-
- Mais ideias para implementar depois
-🔥 Alta prioridade (impacto imediato)
-Histórico de perguntas frequentes — as 5 perguntas mais feitas aparecem como sugestões rápidas
-
-Modo comparação — mostra dois lobes lado a lado para comparar respostas diretamente
-
-Exportar resposta como imagem — screenshot do card do Córtex com branding, perfeito para partilhar
-
-Atalhos de teclado — Ctrl+Enter envia, Ctrl+R regenera, Ctrl+K abre histórico
-
-🧠 Memória e contexto
-Tags nas conversas — marcar conversa como "trabalho", "estudo", "código"
-
-Resumo da sessão — no final de X mensagens, o Córtex gera um resumo automático
-
-Modo estudo — guarda automaticamente factos novos aprendidos em cada conversa
-
-🎨 UI/UX
-Tema personalizado — utilizador escolhe cor de acento
-
-Tamanho de fonte ajustável — slider nas definições (útil no mobile)
-
-Modo leitura — vista limpa só com a resposta do Córtex, sem os lobes
-
-🚀 Avançado (para mais tarde)
-ChromaDB / Supabase — memória persistente real em base de dados
-
-Webhooks — receber perguntas via Discord/Telegram
-
-API pública — endpoint /api/ask para integrar o Córtex noutros projetos
-
-| Melhoria                                              | Dificuldade | Impacto |
-| ----------------------------------------------------- | ----------- | ------- |
-| Adicionar system prompt por lobo com papel específico | Fácil       | Alto    |
-| Mostrar qual modelo respondeu por cada lobo           | Fácil       | Médio   |
-| Adicionar lobo CRITICO que contradiz os outros        | Médio       | Alto    |
-| Memória de conversa entre turnos                      | Médio       | Alto    |
-| Streaming das respostas em tempo real                 | Difícil     | Alto    |
-
-erros
-Ficheiro 11 — reflect.js ⚠️ Um problema
-A verificação QStash é demasiado fraca:
+Fix crítico iOS — o textarea precisa de fontSize: 16 mínimo para evitar zoom:
 
 js
-return sig.startsWith("v1:"); // qualquer string "v1:xxx" passa
-Não é bloqueante agora, mas anota para corrigir na Fase 3 com o SDK oficial.
+fontSize: 16,  // ← nunca menos que 16 em mobile!
+Fix altura iOS — substitui 100vh por:
 
-O resto está bem.
+js
+height: "100dvh"  // dynamic viewport height — respeita barra do Safari
+Manda uma screenshot do Córtex no teu telemóvel e digo exatamente o que corrigir! 📱🔥
