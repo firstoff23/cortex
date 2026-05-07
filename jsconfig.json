@@ -2,13 +2,9 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "target": "ES2022",
+    "target": "ES2024",
     "jsx": "react-jsx",
-    "checkJs": false,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
+    "checkJs": false
   },
-  "exclude": ["node_modules"]
+    "exclude": ["node_modules"]
 }
