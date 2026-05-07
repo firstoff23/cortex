@@ -59,43 +59,59 @@ async function sbDelete(path) {
 // ── BRAIN ────────────────────────────────────────────────────
 
 export async function getBrain(userId) {
-  const rows = await sbGet(`brain_state?user_id=eq.${encodeURIComponent(userId)}&select=*`);
+  const rows = await sbGet(
+    `brain_state?user_id=eq.${encodeURIComponent(userId)}&select=*`,
+  );
   if (!rows?.length) return null;
   const r = rows[0];
   return {
-    semantic:    Array.isArray(r.semantic)  ? r.semantic  : [],
-    episodic:    Array.isArray(r.episodic)  ? r.episodic  : [],
-    patterns:    Array.isArray(r.patterns)  ? r.patterns  : [],
-    procedural:  r.procedural  ?? { format: "conciso", lang: "pt", level: "médio" },
-    sessions:    r.sessions    ?? 0,
+    semantic: Array.isArray(r.semantic) ? r.semantic : [],
+    episodic: Array.isArray(r.episodic) ? r.episodic : [],
+    patterns: Array.isArray(r.patterns) ? r.patterns : [],
+    procedural: r.procedural ?? {
+      format: "conciso",
+      lang: "pt",
+      level: "médio",
+    },
+    sessions: r.sessions ?? 0,
     lastReflect: r.last_reflect ?? null,
   };
 }
 
 export async function saveBrain(userId, brain) {
   const payload = {
-    user_id:      userId,
-    semantic:     (brain.semantic  ?? []).slice(-MAX_SEMANTIC),
-    episodic:     (brain.episodic  ?? []).slice(-MAX_EPISODIC),
-    patterns:     (brain.patterns  ?? []).slice(-MAX_PATTERNS),
-    procedural:   brain.procedural ?? {},
-    sessions:     brain.sessions   ?? 0,
+    user_id: userId,
+    semantic: (brain.semantic ?? []).slice(-MAX_SEMANTIC),
+    episodic: (brain.episodic ?? []).slice(-MAX_EPISODIC),
+    patterns: (brain.patterns ?? []).slice(-MAX_PATTERNS),
+    procedural: brain.procedural ?? {},
+    sessions: brain.sessions ?? 0,
     last_reflect: brain.lastReflect ?? null,
-    updated_at:   new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
   return sbPost("brain_state", payload, "resolution=merge-duplicates");
 }
 
 export async function mergeBrainReflect(userId, ext) {
-  const current = (await getBrain(userId)) ?? { semantic: [], episodic: [], patterns: [], procedural: {}, sessions: 0 };
+  const current = (await getBrain(userId)) ?? {
+    semantic: [],
+    episodic: [],
+    patterns: [],
+    procedural: {},
+    sessions: 0,
+  };
   const updated = {
     ...current,
-    semantic:    [...current.semantic, ...(ext.new_semantic  ?? [])].slice(-MAX_SEMANTIC),
-    patterns:    [...new Set([...current.patterns, ...(ext.new_patterns ?? [])])].slice(-MAX_PATTERNS),
-    episodic:    ext.session_summary
+    semantic: [...current.semantic, ...(ext.new_semantic ?? [])].slice(
+      -MAX_SEMANTIC,
+    ),
+    patterns: [
+      ...new Set([...current.patterns, ...(ext.new_patterns ?? [])]),
+    ].slice(-MAX_PATTERNS),
+    episodic: ext.session_summary
       ? [...current.episodic, ext.session_summary].slice(-MAX_EPISODIC)
       : current.episodic,
-    procedural:  { ...current.procedural, ...(ext.procedural_update ?? {}) },
+    procedural: { ...current.procedural, ...(ext.procedural_update ?? {}) },
     lastReflect: new Date().toISOString(),
   };
   return saveBrain(userId, updated);
@@ -105,7 +121,7 @@ export async function mergeBrainReflect(userId, ext) {
 
 export async function getConversations(userId, limit = 50) {
   return sbGet(
-    `conversations?user_id=eq.${encodeURIComponent(userId)}&order=updated_at.desc&limit=${limit}&select=id,title,created_at,updated_at`
+    `conversations?user_id=eq.${encodeURIComponent(userId)}&order=updated_at.desc&limit=${limit}&select=id,title,created_at,updated_at`,
   );
 }
 
@@ -113,7 +129,7 @@ export async function createConversation(userId, title = "Nova conversa") {
   const rows = await sbPost(
     "conversations",
     { user_id: userId, title },
-    "return=representation"
+    "return=representation",
   );
   return rows?.[0] ?? null;
 }
@@ -130,34 +146,34 @@ export async function deleteConversation(convId) {
 
 export async function getMessages(convId, limit = 200) {
   return sbGet(
-    `messages?conversation_id=eq.${convId}&order=created_at.asc&limit=${limit}`
+    `messages?conversation_id=eq.${convId}&order=created_at.asc&limit=${limit}`,
   );
 }
 
 export async function saveMessage(convId, msg) {
   const payload = {
-    conversation_id:  convId,
-    role:             msg.role,
-    content:          msg.content ?? "",
-    structured:       msg.structured       ?? null,
-    council:          msg.council          ?? null,
-    lobe_results:     msg.lobeResults      ?? null,
-    used_memory:      msg.usedMemory       ?? null,
-    council_decision: msg.councilDecision  ?? null,
+    conversation_id: convId,
+    role: msg.role,
+    content: msg.content ?? "",
+    structured: msg.structured ?? null,
+    council: msg.council ?? null,
+    lobe_results: msg.lobeResults ?? null,
+    used_memory: msg.usedMemory ?? null,
+    council_decision: msg.councilDecision ?? null,
   };
   return sbPost("messages", payload, "return=representation");
 }
 
 export async function saveMessages(convId, msgs) {
-  const payloads = msgs.map(msg => ({
-    conversation_id:  convId,
-    role:             msg.role,
-    content:          msg.content ?? "",
-    structured:       msg.structured       ?? null,
-    council:          msg.council          ?? null,
-    lobe_results:     msg.lobeResults      ?? null,
-    used_memory:      msg.usedMemory       ?? null,
-    council_decision: msg.councilDecision  ?? null,
+  const payloads = msgs.map((msg) => ({
+    conversation_id: convId,
+    role: msg.role,
+    content: msg.content ?? "",
+    structured: msg.structured ?? null,
+    council: msg.council ?? null,
+    lobe_results: msg.lobeResults ?? null,
+    used_memory: msg.usedMemory ?? null,
+    council_decision: msg.councilDecision ?? null,
   }));
   return sbPost("messages", payloads, "return=representation");
 }
@@ -168,7 +184,7 @@ export async function saveMessages(convId, msgs) {
 // Nota: em produção este trigger deve ser feito server-side para não expor o token
 
 export async function triggerReflect(userId, buf, mem) {
-  const qstashUrl   = import.meta.env.VITE_QSTASH_URL;
+  const qstashUrl = import.meta.env.VITE_QSTASH_URL;
   const qstashToken = import.meta.env.VITE_QSTASH_TOKEN;
   if (!qstashUrl || !qstashToken) return;
 

@@ -2,7 +2,7 @@
 // Usado pelos lobos perp/grok quando a query parece factual/actual
 
 const SEARCH_DEPTH = "basic"; // "basic" = mais rápido; "advanced" = mais completo (mais caro)
-const MAX_RESULTS  = 4;
+const MAX_RESULTS = 4;
 
 export async function tavilySearch(query, opts = {}) {
   const res = await fetch("/api/tavily", {
@@ -11,7 +11,7 @@ export async function tavilySearch(query, opts = {}) {
     body: JSON.stringify({
       query,
       search_depth: opts.depth ?? SEARCH_DEPTH,
-      max_results:  opts.maxResults ?? MAX_RESULTS,
+      max_results: opts.maxResults ?? MAX_RESULTS,
       include_answer: true,
     }),
   });
@@ -22,8 +22,8 @@ export async function tavilySearch(query, opts = {}) {
 // Formata resultados para injetar no prompt de um lobo
 export function formatTavilyContext(data) {
   if (!data?.results?.length) return "";
-  const lines = data.results.slice(0, 3).map(r =>
-    `[${r.title}](${r.url})\n${r.content?.slice(0, 200)}`
-  );
+  const lines = data.results
+    .slice(0, 3)
+    .map((r) => `[${r.title}](${r.url})\n${r.content?.slice(0, 200)}`);
   return `WEB CONTEXT:\n${data.answer ?? ""}\n\n${lines.join("\n\n")}`;
 }

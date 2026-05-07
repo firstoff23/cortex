@@ -4,7 +4,7 @@
 export const config = { runtime: "edge" };
 
 const ALLOWED_ORIGIN = "https://cortex-digital.vercel.app";
-const EL_URL         = "https://api.elevenlabs.io/v1/text-to-speech";
+const EL_URL = "https://api.elevenlabs.io/v1/text-to-speech";
 
 // Voz padrão: "Adam" (multilingual v2 suporta PT)
 const DEFAULT_VOICE = "pNInz6obpgDQGcFmaJgB";
@@ -25,7 +25,9 @@ export default async function handler(req) {
   if (!apiKey) return err("ELEVENLABS_API_KEY não configurada", 500, origin);
 
   let body;
-  try { body = await req.json(); } catch {
+  try {
+    body = await req.json();
+  } catch {
     return err("Body inválido", 400, origin);
   }
 
@@ -55,7 +57,11 @@ export default async function handler(req) {
 
   if (!upstream.ok) {
     const detail = await upstream.text();
-    return err("ElevenLabs erro " + upstream.status + ": " + detail.slice(0, 120), 502, origin);
+    return err(
+      "ElevenLabs erro " + upstream.status + ": " + detail.slice(0, 120),
+      502,
+      origin,
+    );
   }
 
   // Devolve o stream de áudio directamente

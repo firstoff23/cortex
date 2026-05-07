@@ -21,19 +21,19 @@ O Córtex usa um padrão **council multi-modelo**:
 
 ## Modelos disponíveis (lobos)
 
-| ID | Modelo | Provedor |
-|---|---|---|
-| claude | Claude 3.5 Sonnet | Anthropic |
-| gpt | GPT-4o | OpenAI |
-| gemini | Gemini 2.0 Flash | Google |
-| grok | Grok-3 | xAI |
-| groq | Llama 3.3 70B | Groq |
-| perp | Sonar Pro | Perplexity |
-| mistral | Mistral Large | Mistral |
-| cohere | Command R+ | Cohere |
-| deepseek | DeepSeek V3 | DeepSeek |
-| qwen | Qwen 2.5 72B | Alibaba |
-| ollama | Llama local | Ollama |
+| ID       | Modelo            | Provedor   |
+| -------- | ----------------- | ---------- |
+| claude   | Claude 3.5 Sonnet | Anthropic  |
+| gpt      | GPT-4o            | OpenAI     |
+| gemini   | Gemini 2.0 Flash  | Google     |
+| grok     | Grok-3            | xAI        |
+| groq     | Llama 3.3 70B     | Groq       |
+| perp     | Sonar Pro         | Perplexity |
+| mistral  | Mistral Large     | Mistral    |
+| cohere   | Command R+        | Cohere     |
+| deepseek | DeepSeek V3       | DeepSeek   |
+| qwen     | Qwen 2.5 72B      | Alibaba    |
+| ollama   | Llama local       | Ollama     |
 
 ## Desenvolvimento local
 

@@ -4,7 +4,7 @@
 export const config = { runtime: "edge" };
 
 const ALLOWED_ORIGIN = "https://cortex-digital.vercel.app";
-const TAVILY_URL     = "https://api.tavily.com/search";
+const TAVILY_URL = "https://api.tavily.com/search";
 
 export default async function handler(req) {
   const origin = req.headers.get("origin") || "";
@@ -18,15 +18,24 @@ export default async function handler(req) {
   }
 
   const apiKey = process.env.TAVILY_API_KEY;
-  if (!apiKey) return json({ error: "TAVILY_API_KEY não configurada" }, 500, origin);
+  if (!apiKey)
+    return json({ error: "TAVILY_API_KEY não configurada" }, 500, origin);
 
   let body;
-  try { body = await req.json(); } catch {
+  try {
+    body = await req.json();
+  } catch {
     return json({ error: "Body inválido" }, 400, origin);
   }
 
-  const { query, search_depth = "basic", max_results = 4, include_answer = true } = body;
-  if (!query?.trim()) return json({ error: "Campo obrigatório: query" }, 400, origin);
+  const {
+    query,
+    search_depth = "basic",
+    max_results = 4,
+    include_answer = true,
+  } = body;
+  if (!query?.trim())
+    return json({ error: "Campo obrigatório: query" }, 400, origin);
 
   let upstream;
   try {
@@ -42,12 +51,20 @@ export default async function handler(req) {
       }),
     });
   } catch (e) {
-    return json({ error: "Falha na ligação ao Tavily: " + e.message }, 502, origin);
+    return json(
+      { error: "Falha na ligação ao Tavily: " + e.message },
+      502,
+      origin,
+    );
   }
 
   if (!upstream.ok) {
     const detail = await upstream.text();
-    return json({ error: "Tavily " + upstream.status + ": " + detail.slice(0, 120) }, 502, origin);
+    return json(
+      { error: "Tavily " + upstream.status + ": " + detail.slice(0, 120) },
+      502,
+      origin,
+    );
   }
 
   const data = await upstream.json();

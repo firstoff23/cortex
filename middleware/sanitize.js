@@ -15,9 +15,7 @@ const MAX_INPUT_LENGTH = 4000;
 
 // ← FIX 2: normalizar unicode antes de testar
 function normalizeText(str) {
-  return typeof str === "string"
-    ? str.normalize("NFKC").trim()
-    : str;
+  return typeof str === "string" ? str.normalize("NFKC").trim() : str;
 }
 
 function checkPatterns(text, res) {
@@ -25,8 +23,12 @@ function checkPatterns(text, res) {
   for (const p of INJECTION_PATTERNS) {
     if (p.test(normalized)) {
       // ← FIX 3: logar tentativas bloqueadas
-      console.warn(`[SECURITY] Input bloqueado | pattern: ${p} | preview: "${normalized.slice(0, 80)}"`);
-      res.status(400).json({ error: "Input bloqueado por política de segurança." });
+      console.warn(
+        `[SECURITY] Input bloqueado | pattern: ${p} | preview: "${normalized.slice(0, 80)}"`,
+      );
+      res
+        .status(400)
+        .json({ error: "Input bloqueado por política de segurança." });
       return false;
     }
   }
@@ -63,7 +65,7 @@ function sanitize(req, res, next) {
           const args = normalizeText(
             typeof tc?.function?.arguments === "string"
               ? tc.function.arguments
-              : JSON.stringify(tc?.function?.arguments || "")
+              : JSON.stringify(tc?.function?.arguments || ""),
           );
           if (!checkPatterns(args, res)) return;
         }

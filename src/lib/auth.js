@@ -53,7 +53,10 @@ export async function getSessionToken() {
 // uso: onAuthChange(({ userId }) => setUserId(userId))
 export async function onAuthChange(callback) {
   const clerk = await getClerk();
-  if (!clerk) { callback({ userId: "anon", user: null }); return () => {}; }
+  if (!clerk) {
+    callback({ userId: "anon", user: null });
+    return () => {};
+  }
   return clerk.addListener(({ user }) => {
     callback({ userId: user?.id ?? "anon", user });
   });

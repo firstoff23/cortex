@@ -1,7 +1,9 @@
-import CryptoJS from 'crypto-js';
+import CryptoJS from "crypto-js";
 
 // Chave derivada do origin — não é segredo, é ofuscação contra leitura direta no browser
-const STORAGE_KEY = CryptoJS.SHA256(window.location.origin).toString().slice(0, 32);
+const STORAGE_KEY = CryptoJS.SHA256(window.location.origin)
+  .toString()
+  .slice(0, 32);
 
 function encrypt(value) {
   return CryptoJS.AES.encrypt(JSON.stringify(value), STORAGE_KEY).toString();
@@ -21,7 +23,7 @@ const safeStorage = {
     try {
       localStorage.setItem(key, encrypt(value));
     } catch (err) {
-      console.error('[safeStorage] set falhou:', err);
+      console.error("[safeStorage] set falhou:", err);
     }
   },
 
@@ -42,7 +44,7 @@ const safeStorage = {
 
   clear() {
     localStorage.clear();
-  }
+  },
 };
 
 export default safeStorage;

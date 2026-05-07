@@ -17,17 +17,27 @@ export default async function handler(req) {
   }
 
   const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret) return json({ success: false, error: "TURNSTILE_SECRET_KEY não configurada" }, 500, origin);
+  if (!secret)
+    return json(
+      { success: false, error: "TURNSTILE_SECRET_KEY não configurada" },
+      500,
+      origin,
+    );
 
   let body;
-  try { body = await req.json(); } catch {
+  try {
+    body = await req.json();
+  } catch {
     return json({ success: false }, 400, origin);
   }
 
   const { token } = body;
   if (!token) return json({ success: false }, 400, origin);
 
-  const ip = req.headers.get("cf-connecting-ip") || req.headers.get("x-forwarded-for") || "";
+  const ip =
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-forwarded-for") ||
+    "";
 
   const form = new URLSearchParams();
   form.append("secret", secret);
@@ -36,10 +46,13 @@ export default async function handler(req) {
 
   let result;
   try {
-    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      body: form,
-    });
+    const res = await fetch(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      {
+        method: "POST",
+        body: form,
+      },
+    );
     result = await res.json();
   } catch (e) {
     return json({ success: false, error: e.message }, 502, origin);
