@@ -12,7 +12,6 @@ export default defineConfig({
     }),
   ],
 
-  // Necessário para source maps funcionarem com Sentry
   build: {
     sourcemap: true,
   },
@@ -26,6 +25,11 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:3000",
         changeOrigin: true,
+      },
+      "/api/gemini": {
+        target: "http://localhost:3333",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/gemini/, "/gemini"),
       },
     },
   },
