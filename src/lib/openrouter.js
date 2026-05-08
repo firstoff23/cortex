@@ -20,7 +20,21 @@ const FREE_FALLBACKS = [
   "qwen/qwen-2-7b-instruct:free",
 ];
 
-export async function callOpenRouter(id, sys, msg, maxTokens = 420) {
+async function fetchWithTimeout(url, opts = {}, ms = 30000) {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    clearTimeout(tid);
+    return res;
+  } catch (e) {
+    clearTimeout(tid);
+    if (e.name === "AbortError") throw new Error(`Timeout após ${ms / 1000}s`);
+    throw e;
+  }
+}
+
+export async function callOpenRouter(id, sys, msg, maxTokens = 420, timeoutMs = 30000) {
   let model = OR_MODELS[id];
   if (!model) throw new Error(`OR_MODELS: id desconhecido "${id}"`);
 
@@ -33,7 +47,7 @@ export async function callOpenRouter(id, sys, msg, maxTokens = 420) {
   let lastErr;
   for (const m of toTry) {
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetchWithTimeout("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -42,7 +56,7 @@ export async function callOpenRouter(id, sys, msg, maxTokens = 420) {
           messages: [{ role: "user", content: msg }],
           max_tokens: maxTokens,
         }),
-      });
+      }, timeoutMs);
       const data = await res.json();
       if (res.ok && !data.error) return data.content ?? "";
       lastErr = data.error || `HTTP ${res.status}`;

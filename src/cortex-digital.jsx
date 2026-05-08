@@ -875,19 +875,28 @@ const newBuf = bufComprimido;
     const mem=buildMem(brain);
     const usedMem=selectUsedMem(brain,q);
     const routedIds = routerDecide(q);
-const councilLobes = LOBES.filter(l =>
+let councilLobes = LOBES.filter(l =>
   l.id !== "claude" &&
   modelsOn[l.id] !== false &&
   routedIds.includes(l.id) &&
   (!focusMode || focusLobes.has(l.id))
 ).slice(0, 5); // ← máximo 5 lobos
+if (!councilLobes.length && focusMode) {
+  councilLobes = LOBES.filter(l =>
+    l.id !== "claude" &&
+    modelsOn[l.id] !== false &&
+    routedIds.includes(l.id)
+  ).slice(0, 5);
+}
 let qFinal = q;
+setPhase("council");
 try {
   const refined = await callOpenRouter(
     "gemini",
     P.refine(q),
     q,
-    120
+    120,
+    3500
   );
   if (
     refined &&
@@ -901,7 +910,6 @@ try {
   // falha silenciosa
 }
 
-setPhase("council");
 const results=await Promise.allSettled(councilLobes.map(l=>invoke(l.id,P[l.id]?.(mem,qFinal)||`Answer: ${qFinal}`,qFinal)));
     const lobeResults=councilLobes.map((l,i)=>{
     const r=results[i].status==="fulfilled"?results[i].value:{result:`Tempo esgotado ou serviço indisponível`,model:"?",real:false};
