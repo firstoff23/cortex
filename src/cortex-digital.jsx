@@ -4979,9 +4979,7 @@ export default function Cortex() {
                     </button>
                   </div>
                 )}
-                <div
-                  style={{ display: "flex", alignItems: "flex-end", gap: 4 }}
-                >
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 4 }}>
                   <textarea
                     ref={taRef}
                     value={input}
@@ -5004,246 +5002,138 @@ export default function Cortex() {
                       background: "transparent",
                       border: "none",
                       outline: "none",
-                      fontSize: 13,
-                      color: T.tx,
-                      fontFamily: "inherit",
-                      lineHeight: 1.55,
+                      fontSize: 14,
+                      color: "#f0f0f0",
+                      fontFamily: "Inter, system-ui, sans-serif",
+                      lineHeight: 1.6,
                       resize: "none",
-                      maxHeight: 200,
+                      maxHeight: 160,
                       overflowY: "auto",
-                      paddingTop: 3,
-                      paddingBottom: 3,
+                      paddingTop: 4,
+                      paddingBottom: 4,
+                      letterSpacing: "0.01em",
                     }}
                   />
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 3,
-                      alignItems: "flex-end",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      title="Anexar imagem"
+                  <div style={{ display:"flex", gap:4, alignItems:"flex-end", flexShrink:0 }}>
+                    <button type="button" onClick={() => fileInputRef.current?.click()} title="Anexar"
                       style={{
-                        background: "transparent",
-                        border: "none",
-                        borderRadius: 8,
-                        width: 30,
-                        height: 30,
-                        cursor: "pointer",
-                        fontSize: 14,
-                        color: pendingImage ? AC.gemini : T.ts,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        background: pendingImage ? "#7c3aed22" : "transparent",
+                        border: pendingImage ? "1px solid #7c3aed55" : "1px solid transparent",
+                        borderRadius: 8, width: 32, height: 32, cursor: "pointer",
+                        fontSize: 14, color: pendingImage ? "#a78bfa" : "#555",
+                        display:"flex", alignItems:"center", justifyContent:"center",
                         transition: "all 0.18s",
-                        opacity: pendingImage ? 1 : 0.75,
                       }}
-                    >
-                      📎
-                    </button>
-                    {msgs.filter((m) => m.role === "user").length > 0 &&
-                      !phase && (
-                        <button
-                          type="button"
-                          onClick={regenerate}
-                          style={{
-                            background: "transparent",
-                            border: "none",
-                            borderRadius: 8,
-                            width: 30,
-                            height: 30,
-                            cursor: "pointer",
-                            fontSize: 13,
-                            color: T.ts,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            transition: "all 0.18s",
-                            opacity: 0.75,
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.opacity = "1";
-                            e.currentTarget.style.color = AC.claude;
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.opacity = "0.75";
-                            e.currentTarget.style.color = T.ts;
-                          }}
-                          title="Regenerar"
-                        >
-                          ↺
-                        </button>
-                      )}
-                    <button
-                      type="button"
+                      onMouseEnter={e => { e.currentTarget.style.color="#a78bfa"; e.currentTarget.style.borderColor="#7c3aed55"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color=pendingImage?"#a78bfa":"#555"; e.currentTarget.style.borderColor=pendingImage?"#7c3aed55":"transparent"; }}
+                    >📎</button>
+
+                    {msgs.filter(m => m.role==="user").length > 0 && !phase && (
+                      <button type="button" onClick={regenerate} title="Regenerar"
+                        style={{
+                          background:"transparent", border:"1px solid transparent",
+                          borderRadius:8, width:32, height:32, cursor:"pointer",
+                          fontSize:14, color:"#555", display:"flex",
+                          alignItems:"center", justifyContent:"center", transition:"all 0.18s",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.color="#10b981"; e.currentTarget.style.borderColor="#10b98133"; }}
+                        onMouseLeave={e => { e.currentTarget.style.color="#555"; e.currentTarget.style.borderColor="transparent"; }}
+                      >↺</button>
+                    )}
+
+                    <button type="button" title="Ditado por voz"
                       onClick={() => {
-                        if (
-                          !(
-                            "webkitSpeechRecognition" in window ||
-                            "SpeechRecognition" in window
-                          )
-                        ) {
-                          toast("Voz não suportada neste browser", "error");
-                          return;
+                        if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
+                          toast("Voz não suportada neste browser","error"); return;
                         }
-                        const SR =
-                          window.SpeechRecognition ||
-                          window.webkitSpeechRecognition;
+                        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                         const sr = new SR();
-                        sr.lang = "pt-PT";
-                        sr.interimResults = false;
-                        sr.maxAlternatives = 1;
-                        sr.onresult = (e) => {
-                          const t = e.results[0][0].transcript;
-                          setInput((p) => (p ? p + " " + t : t));
-                        };
-                        sr.onerror = () => toast("Erro no microfone", "error");
+                        sr.lang="pt-PT"; sr.interimResults=false; sr.maxAlternatives=1;
+                        sr.onresult = e => { const t=e.results[0][0].transcript; setInput(p=>p?p+" "+t:t); };
+                        sr.onerror = () => toast("Erro no microfone","error");
                         sr.start();
                       }}
                       style={{
-                        background: "transparent",
-                        border: "none",
-                        borderRadius: 8,
-                        width: 30,
-                        height: 30,
-                        cursor: "pointer",
-                        fontSize: 13,
-                        color: T.ts,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.18s",
-                        opacity: 0.7,
+                        background:"transparent", border:"1px solid transparent",
+                        borderRadius:8, width:32, height:32, cursor:"pointer",
+                        fontSize:14, color:"#555", display:"flex",
+                        alignItems:"center", justifyContent:"center", transition:"all 0.18s",
                       }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.opacity = "1")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.opacity = "0.7")
-                      }
-                      title="Ditado por voz"
-                    >
-                      🎙
-                    </button>
+                      onMouseEnter={e => { e.currentTarget.style.color="#f59e0b"; e.currentTarget.style.borderColor="#f59e0b33"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color="#555"; e.currentTarget.style.borderColor="transparent"; }}
+                    >🎙</button>
+
                     {msgs.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={exportConv}
+                      <button type="button" onClick={exportConv} title="Exportar"
                         style={{
-                          background: "transparent",
-                          border: "none",
-                          borderRadius: 8,
-                          width: 30,
-                          height: 30,
-                          cursor: "pointer",
-                          fontSize: 13,
-                          color: T.ts,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          transition: "all 0.18s",
-                          opacity: 0.75,
+                          background:"transparent", border:"1px solid transparent",
+                          borderRadius:8, width:32, height:32, cursor:"pointer",
+                          fontSize:14, color:"#555", display:"flex",
+                          alignItems:"center", justifyContent:"center", transition:"all 0.18s",
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = "1";
-                          e.currentTarget.style.color = AC.gemini;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = "0.75";
-                          e.currentTarget.style.color = T.ts;
-                        }}
-                        title="Exportar"
-                      >
-                        ↓
-                      </button>
+                        onMouseEnter={e => { e.currentTarget.style.color="#8b5cf6"; e.currentTarget.style.borderColor="#8b5cf633"; }}
+                        onMouseLeave={e => { e.currentTarget.style.color="#555"; e.currentTarget.style.borderColor="transparent"; }}
+                      >↓</button>
                     )}
                   </div>
                 </div>
               </div>
-              {/* botão enviar */}
-              <button
-                type="button"
-                onClick={() => send()}
-                disabled={!!phase || (!input.trim() && !pendingImage)}
-                style={{
-                  background:
-                    (input.trim() || pendingImage) && !phase
-                      ? AC.claude
-                      : "#333",
-                  border: "none",
-                  borderRadius: 14,
-                  width: 44,
-                  height: 44,
-                  cursor:
-                    (input.trim() || pendingImage) && !phase
-                      ? "pointer"
-                      : "default",
-                  fontSize: 16,
-                  color: "#fff",
-                  transition: "all 0.2s",
-                  opacity: phase ? 0.4 : 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow:
-                    (input.trim() || pendingImage) && !phase
-                      ? `0 0 16px ${AC.claude}55`
-                      : "none",
-                  flexShrink: 0,
-                }}
-              >
-                ▶
-              </button>
-              {/* botão nova conversa */}
-              <button
-                onClick={newChat}
-                title="Nova conversa"
-                style={{
-                  background: T.s2,
-                  border: `1px solid ${T.b1}`,
-                  borderRadius: 14,
-                  width: 44,
-                  height: 44,
-                  cursor: "pointer",
-                  fontSize: 16,
-                  color: T.ts,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = AC.claude + "66";
-                  e.currentTarget.style.color = AC.claude;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = T.b1;
-                  e.currentTarget.style.color = T.ts;
-                }}
-              >
-                +
-              </button>
             </div>
-            {buf.length > 0 && (
-              <div
-                style={{
-                  fontSize: 8,
-                  color: T.tf,
-                  textAlign: "center",
-                  marginTop: 4,
-                }}
-              >
-                Buffer: {buf.length}/{MAX_BUF} — reflexão em{" "}
-                {MAX_BUF - buf.length} trocas
-              </div>
-            )}
+
+            {/* botão enviar */}
+            <button type="button" onClick={() => send()}
+              disabled={!!phase || (!input.trim() && !pendingImage)}
+              style={{
+                background: (input.trim() || pendingImage) && !phase
+                  ? "linear-gradient(135deg, #7c3aed, #2563eb)"
+                  : "#1a1a1a",
+                border: "none",
+                borderRadius: 14,
+                width: 44, height: 44,
+                cursor: (input.trim() || pendingImage) && !phase ? "pointer" : "default",
+                fontSize: 16, color: "#fff",
+                transition: "all 0.2s",
+                opacity: phase ? 0.35 : 1,
+                display:"flex", alignItems:"center", justifyContent:"center",
+                boxShadow: (input.trim() || pendingImage) && !phase
+                  ? "0 0 20px #7c3aed44"
+                  : "none",
+                flexShrink: 0,
+              }}
+            >▶</button>
+
+            {/* botão nova conversa */}
+            <button onClick={newChat} title="Nova conversa"
+              style={{
+                background: "#111",
+                border: "1px solid #222",
+                borderRadius: 14,
+                width: 44, height: 44,
+                cursor: "pointer",
+                fontSize: 18, color: "#444",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                flexShrink: 0,
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor="#7c3aed66"; e.currentTarget.style.color="#a78bfa"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor="#222"; e.currentTarget.style.color="#444"; }}
+            >+</button>
           </div>
-        </>
+          {buf.length > 0 && (
+            <div
+              style={{
+                fontSize: 8,
+                color: T.tf,
+                textAlign: "center",
+                marginTop: 4,
+              }}
+            >
+              Buffer: {buf.length}/{MAX_BUF} — reflexão em{" "}
+              {MAX_BUF - buf.length} trocas
+            </div>
+          )}
+        </div>
+      </>
       )}
 
       {/* ── API_KEYS─────────────────────────────────────────── */}
@@ -5857,5 +5747,6 @@ export default function Cortex() {
         </div>
       )}
     </div>
+    </>
   );
 }

@@ -27,7 +27,7 @@ export default async function handler(req, res) {
   const body = req.body;
   const { model, messages, system, max_tokens } = body || {};
 
-  if (!model || !messages || !Array.isArray(messages)) {
+  if (typeof model !== "string" || !model.trim() || !Array.isArray(messages)) {
     return res
       .status(400)
       .json({ error: "Campos obrigatórios: model, messages" });
