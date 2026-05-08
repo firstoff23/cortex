@@ -1805,7 +1805,9 @@ const normalizeCouncilPayload = (raw, fallbackText = "") => {
           cursor:"pointer"
         }}
       >
-        {showCouncil === m.id ? "Ocultar" : "Ver Conselho"}
+        {showCouncil === m.id
+  ? "Ocultar"
+  : `🐺 ${m.lobeResults.length}`}
       </button>
     )}
   </div>
@@ -2108,13 +2110,14 @@ const normalizeCouncilPayload = (raw, fallbackText = "") => {
                   }}>
                     <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
                       <div style={{
-                        width:10,
-                        height:10,
-                        borderRadius:"50%",
-                        background:l.color,
-                        boxShadow:`0 0 10px ${l.color}66`,
-                        flexShrink:0
-                      }} />
+  width:26, height:26, borderRadius:8,
+  background:`${l.color}20`,
+  border:`1px solid ${l.color}44`,
+  display:"flex", alignItems:"center", justifyContent:"center",
+  fontSize:13, flexShrink:0
+}}>
+  {["🔍","💡","⚙️","🌐","😈"][idx] || "🐺"}
+</div>
                       <div style={{minWidth:0}}>
                         <div style={{
                           fontSize:11,
@@ -2135,7 +2138,20 @@ const normalizeCouncilPayload = (raw, fallbackText = "") => {
                         </div>
                       </div>
                     </div>
-
+  {/* latência */}
+                    {l.latency && (
+                      <span style={{
+                        fontSize:8,
+                        color:T.tf,
+                        background:T.s1,
+                        border:`1px solid ${T.b1}`,
+                        borderRadius:999,
+                        padding:"2px 6px",
+                        flexShrink:0
+                      }}>
+                        ⏱ {l.latency}ms
+                      </span>
+                    )}
                     <button
                       onClick={async()=>{
                         if(phase) return;
