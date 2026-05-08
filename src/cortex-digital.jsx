@@ -773,6 +773,13 @@ export default function Cortex(){
     setLoaded(true);
   }
 const saveConvs = c => safePut(MV+"-convs", c.slice(0,50));
+  const saveBrain  = b  => safePut(MV+"-brain",  b);
+  const saveMsgs   = m  => safePut(MV+"-msgs",   m.slice(-MAX_STORED));
+  const saveKeys   = k  => safePut("cortex-keys-global", k);
+  const saveTheme  = t  => safePut(MV+"-theme",  t);
+  const saveModels = mo => safePut(MV+"-models", mo);
+// const saveTasks  = ct => safePut(MV+"-tasks",  ct.slice(0,20)); // REMOVIDO v12
+
 function newChat() {
   if (msgs.length>0) autoSaveConv(msgs, currentConvId);
   setCurrentConvId(Date.now());
@@ -806,12 +813,6 @@ function autoSaveConv(currentMsgs, convId){
   });
   return cid;
 }
-  const saveBrain  = b  => safePut(MV+"-brain",  b);
-  const saveMsgs   = m  => safePut(MV+"-msgs",   m.slice(-MAX_STORED));
-  const saveKeys   = k  => safePut("cortex-keys-global", k);
-  const saveTheme  = t  => safePut(MV+"-theme",  t);
-  const saveModels = mo => safePut(MV+"-models", mo);
-// const saveTasks  = ct => safePut(MV+"-tasks",  ct.slice(0,20)); // REMOVIDO v12
 
 function lobeConfidenceScore(result, isErr) {
   if (isErr || !result) return 0;
@@ -883,7 +884,7 @@ const councilLobes = LOBES.filter(l =>
 let qFinal = q;
 try {
   const refined = await callOpenRouter(
-    "google/gemma-3-12b-it:free",
+    "gemini",
     P.refine(q),
     q,
     120
@@ -904,8 +905,8 @@ setPhase("council");
 const results=await Promise.allSettled(councilLobes.map(l=>invoke(l.id,P[l.id]?.(mem,qFinal)||`Answer: ${qFinal}`,qFinal)));
     const lobeResults=councilLobes.map((l,i)=>{
     const r=results[i].status==="fulfilled"?results[i].value:{result:`Tempo esgotado ou serviço indisponível`,model:"?",real:false};
-    const confidence = lobeConfidenceScore(r.result, isErr); // ← novo
     const isErr=!r.result||r.result.startsWith("[")||r.result.startsWith("Tempo");
+    const confidence = lobeConfidenceScore(r.result, isErr); // ← novo
     return {...l,_key:l.id+i,result:r.result,srcModel:r.model,srcReal:r.real,isErr, latency:r.latency, confidence};
 });
 setPhase("cortex");
@@ -1113,7 +1114,7 @@ const extractJsonBlock = (text) => {
   return null;
 };
 
-const normalizeCouncilPayload = (raw, fallbackText = "") => {
+function normalizeCouncilPayload(raw, fallbackText = "") {
   if (!raw) {
     return {
       final: fallbackText || "Sem resposta estruturada.",
@@ -1156,7 +1157,7 @@ const normalizeCouncilPayload = (raw, fallbackText = "") => {
       ? raw.next_actions
       : []
   };
-};
+}
 
   if(!loaded)return <Splash/>;
   const cur=phase?phases[phase]:null;
