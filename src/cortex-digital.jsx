@@ -879,7 +879,7 @@ const councilLobes = LOBES.filter(l =>
   modelsOn[l.id] !== false &&
   routedIds.includes(l.id) &&
   (!focusMode || focusLobes.has(l.id))
-);
+).slice(0, 5); // ← máximo 5 lobos
 let qFinal = q;
 try {
   const refined = await callOpenRouter(
