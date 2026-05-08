@@ -886,25 +886,37 @@ async function callGrok(sys, msg, key) {
   if (d.error) throw new Error(JSON.stringify(d.error));
   return d.choices?.[0]?.message?.content || "";
 }
-async function callGemini(sys, msg, key) {
-  async function callGeminiVision(msg, imageBase64, imageMime, key) {
-  const sys = "Descreve esta imagem em detalhe: objetos, texto, contexto, cores e tudo relevante para debate.";
-  const url = key?.trim().length > 10
-    ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`
-    : "/api/gemini/v1beta/models/gemini-2.5-flash:generateContent";
+async function callGeminiVision(msg, imageBase64, imageMime, key) {
+  const sys =
+    "Descreve esta imagem em detalhe: objetos, texto, contexto, cores e tudo relevante para debate.";
+  const url =
+    key?.trim().length > 10
+      ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`
+      : "/api/gemini/v1beta/models/gemini-2.5-flash:generateContent";
   const body = {
-    systemInstruction:{ parts:[{text:sys}] },
-    contents:[{role:"user",parts:[
-      {inline_data:{mime_type:imageMime,data:imageBase64}},
-      {text:msg||"Descreve esta imagem."}
-    ]}],
-    generationConfig:{maxOutputTokens:600}
+    systemInstruction: { parts: [{ text: sys }] },
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { inline_data: { mime_type: imageMime, data: imageBase64 } },
+          { text: msg || "Descreve esta imagem." },
+        ],
+      },
+    ],
+    generationConfig: { maxOutputTokens: 600 },
   };
-  const r = await fetchWithTimeout(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const r = await fetchWithTimeout(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
   const d = await r.json();
-  if(d.error) throw new Error(d.error.message);
-  return d.candidates?.[0]?.content?.parts?.[0]?.text||"";
+  if (d.error) throw new Error(d.error.message);
+  return d.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
+
+async function callGemini(sys, msg, key) {
   // se tem key → direto; senão → proxy local com key de servidor
   const url =
     key?.trim().length > 10
@@ -1812,6 +1824,39 @@ export default function Cortex() {
 
   const taRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  function handleFileSelect(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp|gif)$/i.test(file.type)) {
+      toast("Tipo de ficheiro não suportado.", "error");
+      return;
+    }
+    const maxBytes = 4 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      toast("Imagem demasiado grande (máx. 4 MB).", "error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : "";
+      const m = /^data:([^;]+);base64,(.+)$/i.exec(dataUrl);
+      if (!m) {
+        toast("Não foi possível ler a imagem.", "error");
+        return;
+      }
+      setPendingImage({
+        base64: m[2],
+        mime: m[1],
+        preview: dataUrl,
+        name: file.name || "imagem",
+      });
+    };
+    reader.onerror = () => toast("Erro ao ler o ficheiro.", "error");
+    reader.readAsDataURL(file);
+  }
+
   const botRef = useRef(null);
   const chatRef = useRef(null);
   const T = THEMES[theme];
@@ -2001,13 +2046,14 @@ export default function Cortex() {
     const q = (query || input).trim();
     const imgSnapshot = pendingImage;
     if ((!q && !imgSnapshot) || phase) return;
-    const complexityLevel = classifyQuery(q || "[imagem]");
+    const qText = q || "[imagem]";
+    const complexityLevel = classifyQuery(qText);
     setInput("");
     setPendingImage(null);
     const uMsg = {
       id: Date.now() + Math.random(),
       role: "user",
-      content: q || "[imagem]",
+      content: qText,
       complexity: complexityLevel,
       image: imgSnapshot?.preview || null,
     };
@@ -2019,19 +2065,19 @@ export default function Cortex() {
       compressed,
       before,
       after,
-    } = await compressContext([...buf, `USER: ${q}`], keys.claude, keys.perp);
+    } = await compressContext([...buf, `USER: ${qText}`], keys.claude, keys.perp);
     const newBuf = bufComprimido;
     const mem = buildMem(brain);
     // ── F4-01: análise multimodal da imagem via Gemini ──────
     let imgDesc="";
     if(imgSnapshot){
       try{
-        imgDesc="\n\n[IMAGEM ANALISADA PELO GEMINI:\n"+(await callGeminiVision(q,imgSnapshot.base64,imgSnapshot.mime,keys.gemini))+"]";
+        imgDesc="\n\n[IMAGEM ANALISADA PELO GEMINI:\n"+(await callGeminiVision(qText,imgSnapshot.base64,imgSnapshot.mime,keys.gemini))+"]";
       }catch(e){ toast("Gemini não conseguiu analisar a imagem.","error"); }
     }
-    const qWithImg=(q||"[imagem]")+imgDesc;
-    const usedMem = selectUsedMem(brain, q);
-const routedIds = routerDecide(qWithImg);
+    const qWithImg=qText+imgDesc;
+    const usedMem = selectUsedMem(brain, qText);
+    const routedIds = routerDecide(qWithImg);
     const councilLobes = LOBES.filter(
       (l) =>
         l.id !== "claude" &&
@@ -2039,7 +2085,8 @@ const routedIds = routerDecide(qWithImg);
         routedIds.includes(l.id) &&
         (!focusMode || focusLobes.has(l.id)),
     );
-    let qFinal = q;
+    let qFinal = qWithImg;    
+    const qlenRefineGate = q ? q.length : qText.length;
     try {
       const refined = await callOpenRouter(
         "google/gemma-3-12b-it:free",
@@ -2050,7 +2097,7 @@ const routedIds = routerDecide(qWithImg);
       if (
         refined &&
         refined.trim().length > 10 &&
-        refined.trim().length < q.length * 3 &&
+        refined.trim().length < qlenRefineGate * 3 &&
         !refined.includes("{") &&
         !refined.includes("```")
       )
@@ -2095,7 +2142,7 @@ const routedIds = routerDecide(qWithImg);
       if (hC || hP)
         cR = await callClaude(
           "Executive judge of a multi-AI council brain.",
-          P.cortex(mem, q, validLobes.length ? validLobes : lobeResults),
+          P.cortex(mem, qText, validLobes.length ? validLobes : lobeResults),
           5400,
           keys.claude,
           keys.perp,
@@ -2116,11 +2163,11 @@ const routedIds = routerDecide(qWithImg);
 
     structured = normalizeCouncilPayload(cR, typeof cR === "string" ? cR : "");
 
-    let cDecision = heuristicDecision(q);
+    let cDecision = heuristicDecision(qText);
     try {
       cDecision = await callClaude(
         "Judge of an 11-lobe AI council.",
-        P.judge(q, lobeResults),
+        P.judge(qText, lobeResults),
         80,
         keys.claude,
         keys.perp,
@@ -2141,7 +2188,7 @@ const routedIds = routerDecide(qWithImg);
       lobeResults,
       usedMemory: usedMem,
       councilDecision: cDecision,
-      refinedQuery: qFinal !== q ? qFinal : null,
+      refinedQuery: qFinal !== qWithImg ? qFinal : null,
     };
 
     const fm = [...nm, aMsg];
@@ -2236,6 +2283,7 @@ const routedIds = routerDecide(qWithImg);
     msgs.forEach((m) => {
       if (m.role === "user") lines.push(`## 🧑 Tu`, m.content, "");
       else if (m.systemNote) lines.push(`> ${m.content}`, "");
+      else if (m.image) lines.push(`> [IMAGEM ANALISADA PELO GEMINI: ${m.image}]`, "");
       else {
         lines.push(`## 🧠 Córtex`, m.content, "");
         if (m.councilDecision) lines.push(`> ⚖ ${m.councilDecision}`, "");
@@ -3902,7 +3950,22 @@ const routedIds = routerDecide(qWithImg);
                           wordBreak: "break-word",
                         }}
                       >
-                        {m.content}
+                        {m.image && (
+                          <img
+                            src={m.image}
+                            alt="imagem enviada"
+                            style={{
+                              width: "100%",
+                              maxWidth: 280,
+                              maxHeight: 200,
+                              objectFit: "cover",
+                              borderRadius: 10,
+                              marginBottom: 8,
+                              display: "block",
+                            }}
+                          />
+                        )}
+                        {m.content !== "[imagem]" && m.content}
                         {m.complexity && (
                           <div
                             style={{
@@ -4824,61 +4887,252 @@ const routedIds = routerDecide(qWithImg);
                 alignItems: "flex-end",
               }}
             >
-              {/* caixa de texto */}
+              {/* ── F4-01: input oculto + caixa de texto ── */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                style={{ display: "none" }}
+                onChange={handleFileSelect}
+              />
+
               <div
                 style={{
                   flex: 1,
                   display: "flex",
+                  flexDirection: "column",
                   background: T.s2,
-                  border: `1px solid ${T.b1}`,
+                  border: `1px solid ${pendingImage ? AC.gemini : T.b1}`,
                   borderRadius: 16,
                   padding: "8px 10px 8px 14px",
-                  alignItems: "flex-end",
                   boxShadow: `0 2px 14px ${T.b2}66`,
                   transition: "border-color 0.2s",
                 }}
               >
-                <textarea
-                  ref={taRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      send();
-                    }
-                  }}
-                  placeholder="Pergunta ao conselho..."
-                  disabled={!!phase}
-                  rows={1}
-                  style={{
-                    flex: 1,
-                    background: "transparent",
-                    border: "none",
-                    outline: "none",
-                    fontSize: 13,
-                    color: T.tx,
-                    fontFamily: "inherit",
-                    lineHeight: 1.55,
-                    resize: "none",
-                    maxHeight: 200,
-                    overflowY: "auto",
-                    paddingTop: 3,
-                    paddingBottom: 3,
-                  }}
-                />
+                {pendingImage && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 7,
+                      marginBottom: 7,
+                      padding: "6px 8px",
+                      background: T.s2,
+                      border: `1px solid ${AC.gemini}44`,
+                      borderRadius: 10,
+                    }}
+                  >
+                    <img
+                      src={pendingImage.preview}
+                      alt="preview"
+                      style={{
+                        width: 44,
+                        height: 44,
+                        objectFit: "cover",
+                        borderRadius: 8,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: AC.gemini,
+                        }}
+                      >
+                        Gemini vai analisar
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 9,
+                          color: T.ts,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {pendingImage.name}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPendingImage(null)}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: T.ts,
+                        cursor: "pointer",
+                        fontSize: 14,
+                        padding: 4,
+                        lineHeight: 1,
+                        flexShrink: 0,
+                        minWidth: 28,
+                        minHeight: 28,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                      aria-label="Remover imagem"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
                 <div
-                  style={{
-                    display: "flex",
-                    gap: 3,
-                    alignItems: "flex-end",
-                    flexShrink: 0,
-                  }}
+                  style={{ display: "flex", alignItems: "flex-end", gap: 4 }}
                 >
-                  {msgs.filter((m) => m.role === "user").length > 0 &&
-                    !phase && (
+                  <textarea
+                    ref={taRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        send();
+                      }
+                    }}
+                    placeholder={
+                      pendingImage
+                        ? "Adiciona texto à imagem (opcional)..."
+                        : "Pergunta ao conselho..."
+                    }
+                    disabled={!!phase}
+                    rows={1}
+                    style={{
+                      flex: 1,
+                      background: "transparent",
+                      border: "none",
+                      outline: "none",
+                      fontSize: 13,
+                      color: T.tx,
+                      fontFamily: "inherit",
+                      lineHeight: 1.55,
+                      resize: "none",
+                      maxHeight: 200,
+                      overflowY: "auto",
+                      paddingTop: 3,
+                      paddingBottom: 3,
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 3,
+                      alignItems: "flex-end",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Anexar imagem"
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: 8,
+                        width: 30,
+                        height: 30,
+                        cursor: "pointer",
+                        fontSize: 14,
+                        color: pendingImage ? AC.gemini : T.ts,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.18s",
+                        opacity: pendingImage ? 1 : 0.75,
+                      }}
+                    >
+                      📎
+                    </button>
+                    {msgs.filter((m) => m.role === "user").length > 0 &&
+                      !phase && (
+                        <button
+                          type="button"
+                          onClick={regenerate}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            borderRadius: 8,
+                            width: 30,
+                            height: 30,
+                            cursor: "pointer",
+                            fontSize: 13,
+                            color: T.ts,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "all 0.18s",
+                            opacity: 0.75,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = "1";
+                            e.currentTarget.style.color = AC.claude;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.opacity = "0.75";
+                            e.currentTarget.style.color = T.ts;
+                          }}
+                          title="Regenerar"
+                        >
+                          ↺
+                        </button>
+                      )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          !(
+                            "webkitSpeechRecognition" in window ||
+                            "SpeechRecognition" in window
+                          )
+                        ) {
+                          toast("Voz não suportada neste browser", "error");
+                          return;
+                        }
+                        const SR =
+                          window.SpeechRecognition ||
+                          window.webkitSpeechRecognition;
+                        const sr = new SR();
+                        sr.lang = "pt-PT";
+                        sr.interimResults = false;
+                        sr.maxAlternatives = 1;
+                        sr.onresult = (e) => {
+                          const t = e.results[0][0].transcript;
+                          setInput((p) => (p ? p + " " + t : t));
+                        };
+                        sr.onerror = () => toast("Erro no microfone", "error");
+                        sr.start();
+                      }}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: 8,
+                        width: 30,
+                        height: 30,
+                        cursor: "pointer",
+                        fontSize: 13,
+                        color: T.ts,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.18s",
+                        opacity: 0.7,
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.opacity = "1")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.opacity = "0.7")
+                      }
+                      title="Ditado por voz"
+                    >
+                      🎙
+                    </button>
+                    {msgs.length > 0 && (
                       <button
-                        onClick={regenerate}
+                        type="button"
+                        onClick={exportConv}
                         style={{
                           background: "transparent",
                           border: "none",
@@ -4896,109 +5150,38 @@ const routedIds = routerDecide(qWithImg);
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.opacity = "1";
-                          e.currentTarget.style.color = AC.claude;
+                          e.currentTarget.style.color = AC.gemini;
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.opacity = "0.75";
                           e.currentTarget.style.color = T.ts;
                         }}
-                        title="Regenerar"
+                        title="Exportar"
                       >
-                        ↺
+                        ↓
                       </button>
                     )}
-                  <button
-                    onClick={() => {
-                      if (
-                        !(
-                          "webkitSpeechRecognition" in window ||
-                          "SpeechRecognition" in window
-                        )
-                      ) {
-                        toast("Voz não suportada neste browser", "error");
-                        return;
-                      }
-                      const SR =
-                        window.SpeechRecognition ||
-                        window.webkitSpeechRecognition;
-                      const sr = new SR();
-                      sr.lang = "pt-PT";
-                      sr.interimResults = false;
-                      sr.maxAlternatives = 1;
-                      sr.onresult = (e) => {
-                        const t = e.results[0][0].transcript;
-                        setInput((p) => (p ? p + " " + t : t));
-                      };
-                      sr.onerror = () => toast("Erro no microfone", "error");
-                      sr.start();
-                    }}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      borderRadius: 8,
-                      width: 30,
-                      height: 30,
-                      cursor: "pointer",
-                      fontSize: 13,
-                      color: T.ts,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transition: "all 0.18s",
-                      opacity: 0.7,
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.opacity = "0.7")
-                    }
-                    title="Ditado por voz"
-                  >
-                    🎙
-                  </button>
-                  {msgs.length > 0 && (
-                    <button
-                      onClick={exportConv}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        borderRadius: 8,
-                        width: 30,
-                        height: 30,
-                        cursor: "pointer",
-                        fontSize: 13,
-                        color: T.ts,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.18s",
-                        opacity: 0.75,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.opacity = "1";
-                        e.currentTarget.style.color = AC.gemini;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.opacity = "0.75";
-                        e.currentTarget.style.color = T.ts;
-                      }}
-                      title="Exportar"
-                    >
-                      ↓
-                    </button>
-                  )}
+                  </div>
                 </div>
               </div>
               {/* botão enviar */}
               <button
+                type="button"
                 onClick={() => send()}
-                disabled={!!phase || !input.trim()}
+                disabled={!!phase || (!input.trim() && !pendingImage)}
                 style={{
-                  background: input.trim() && !phase ? AC.claude : "#333",
+                  background:
+                    (input.trim() || pendingImage) && !phase
+                      ? AC.claude
+                      : "#333",
                   border: "none",
                   borderRadius: 14,
                   width: 44,
                   height: 44,
-                  cursor: input.trim() && !phase ? "pointer" : "default",
+                  cursor:
+                    (input.trim() || pendingImage) && !phase
+                      ? "pointer"
+                      : "default",
                   fontSize: 16,
                   color: "#fff",
                   transition: "all 0.2s",
@@ -5007,7 +5190,9 @@ const routedIds = routerDecide(qWithImg);
                   alignItems: "center",
                   justifyContent: "center",
                   boxShadow:
-                    input.trim() && !phase ? `0 0 16px ${AC.claude}55` : "none",
+                    (input.trim() || pendingImage) && !phase
+                      ? `0 0 16px ${AC.claude}55`
+                      : "none",
                   flexShrink: 0,
                 }}
               >
