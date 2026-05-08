@@ -2043,9 +2043,9 @@ const routedIds = routerDecide(qWithImg);
     try {
       const refined = await callOpenRouter(
         "google/gemma-3-12b-it:free",
-        P.refine(q),
-        q,
-        120,
+        P.refine(qWithImg),
+        qWithImg,
+        120
       );
       if (
         refined &&
