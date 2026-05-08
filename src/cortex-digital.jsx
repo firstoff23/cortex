@@ -813,27 +813,44 @@ function autoSaveConv(currentMsgs, convId){
   const saveModels = mo => safePut(MV+"-models", mo);
 // const saveTasks  = ct => safePut(MV+"-tasks",  ct.slice(0,20)); // REMOVIDO v12
 
-
+function lobeConfidenceScore(result, isErr) {
+  if (isErr || !result) return 0;
+  const len = result.length;
+  if (len < 50)  return 20;
+  if (len < 150) return 50;
+  if (len < 400) return 75;
+  return 92;
+}
 async function invoke(id, sys, msg) {
-  const ok = (text, real = true) => ({ result: text, model: OR_MODELS[id] || id, real });
+  const ok = (text, real = true, latency = null) => ({ 
+    result: text, 
+    model: OR_MODELS[id] || id, 
+    real,
+    latency  // ← novo campo
+  });
 
   try {
     const cached = cacheGet(id, msg);
     if (cached) return { ...cached, fromCache: true };
 
-    // Ollama local — mantém lógica original
     if (id === "ollama_codigo") {
-      try { const r = ok(await callOllama(sys, msg, "codigo")); cacheSet(id, msg, r); return r; }
-      catch (e) { return ok("Ollama Código indisponível: " + e.message, false); }
+      try {
+        const t0 = Date.now();                          // ← novo
+        const r = ok(await callOllama(sys, msg, "codigo"), true, Date.now()-t0); // ← novo
+        cacheSet(id, msg, r); return r;
+      } catch (e) { return ok("Ollama Código indisponível: " + e.message, false); }
     }
     if (id === "ollama_debug") {
-      try { const r = ok(await callOllama(sys, msg, "debug")); cacheSet(id, msg, r); return r; }
-      catch (e) { return ok("Ollama Debug indisponível: " + e.message, false); }
+      try {
+        const t0 = Date.now();                          // ← novo
+        const r = ok(await callOllama(sys, msg, "debug"), true, Date.now()-t0);  // ← novo
+        cacheSet(id, msg, r); return r;
+      } catch (e) { return ok("Ollama Debug indisponível: " + e.message, false); }
     }
 
-    // Todos os outros lobos → OpenRouter via /api/chat
+    const t0 = Date.now();                              // ← novo
     const text = await callOpenRouter(id, sys, msg, 420);
-    const r = ok(text);
+    const r = ok(text, true, Date.now()-t0);            // ← novo
     cacheSet(id, msg, r);
     return r;
 
@@ -887,8 +904,9 @@ setPhase("council");
 const results=await Promise.allSettled(councilLobes.map(l=>invoke(l.id,P[l.id]?.(mem,qFinal)||`Answer: ${qFinal}`,qFinal)));
     const lobeResults=councilLobes.map((l,i)=>{
     const r=results[i].status==="fulfilled"?results[i].value:{result:`Tempo esgotado ou serviço indisponível`,model:"?",real:false};
+    const confidence = lobeConfidenceScore(r.result, isErr); // ← novo
     const isErr=!r.result||r.result.startsWith("[")||r.result.startsWith("Tempo");
-    return {...l,_key:l.id+i,result:r.result,srcModel:r.model,srcReal:r.real,isErr};
+    return {...l,_key:l.id+i,result:r.result,srcModel:r.model,srcReal:r.real,isErr, latency:r.latency, confidence};
 });
 setPhase("cortex");
 let cR;
@@ -2118,27 +2136,38 @@ const normalizeCouncilPayload = (raw, fallbackText = "") => {
 }}>
   {["🔍","💡","⚙️","🌐","😈"][idx] || "🐺"}
 </div>
-                      <div style={{minWidth:0}}>
-                        <div style={{
-                          fontSize:11,
-                          fontWeight:800,
-                          color:l.color,
-                          letterSpacing:0.3
-                        }}>
+                                            <div style={{minWidth:0}}>
+                        <div style={{fontSize:11, fontWeight:800, color:l.color, letterSpacing:0.3}}>
                           {l.label}
                         </div>
-                        <div style={{
-                          fontSize:9,
-                          color:T.tf,
-                          whiteSpace:"nowrap",
-                          overflow:"hidden",
-                          textOverflow:"ellipsis"
-                        }}>
+                        <div style={{fontSize:9, color:T.tf, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>
                           {l.srcModel}{l.srcReal===false?" · simulado":""}
                         </div>
+                      </div>  {/* ← fecha minWidth:0 AQUI */}
+
+                    </div>  {/* ← fecha o flex row esquerdo */}
+
+                    {/* ring + latência + botão — todos ao mesmo nível */}
+                    {l.confidence != null && (
+                      <div style={{
+                        width: 28, height: 28,
+                        borderRadius: "50%",
+                        background: `conic-gradient(${l.color} ${l.confidence * 3.6}deg, ${T.s2} 0deg)`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0
+                      }}>
+                        <div style={{
+                          width: 20, height: 20,
+                          borderRadius: "50%",
+                          background: T.s2,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 8, color: l.color, fontWeight: 800
+                        }}>
+                          {l.confidence}
+                        </div>
                       </div>
-                    </div>
-  {/* latência */}
+                    )}
+                     {/* latência */}
                     {l.latency && (
                       <span style={{
                         fontSize:8,
