@@ -5078,7 +5078,6 @@ export default function Cortex() {
                   </div>
                 </div>
               </div>
-            </div>
 
             {/* botão enviar */}
             <button type="button" onClick={() => send()}
@@ -5747,6 +5746,5 @@ export default function Cortex() {
         </div>
       )}
     </div>
-    </>
   );
 }
