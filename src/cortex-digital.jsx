@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import LobeCard from './components/LobeCard';
+import ClaudeCard from './components/ClaudeCard';
+import MessageList from './components/MessageList';
+import useCouncil from './hooks/useCouncil';
 
 const MV="cortex-v12";
-import { callOpenRouter, OR_MODELS } from "./lib/openrouter.js";
 const MAX_BUF=8;
 const COMPRESS_THRESHOLD = 20; 
 const COMPRESS_KEEP_TAIL = 6;
@@ -274,12 +275,6 @@ ${mem}
 CONVERSA:
 ${buf}`.trim(),
 };
-// ── CACHE DE RESPOSTAS (5 min TTL) ──────────────────────────
-const _cache=new Map();
-const CACHE_TTL=5*60*1000;
-function cacheGet(id,q){const k=id+"::"+q;const c=_cache.get(k);if(c&&Date.now()-c.t<CACHE_TTL)return c.v;return null;}
-function cacheSet(id,q,v){_cache.set(id+"::"+q,{v,t:Date.now()});}
-
 const OLLAMA_URL = "http://localhost:3333/ollama";
 const OLLAMA_MODELS = {
   codigo:   "qwen2.5-coder:1.5b",
@@ -288,13 +283,14 @@ const OLLAMA_MODELS = {
   fallback: "qwen2.5-coder:1.5b",
 };
 
-async function callOllama(sys, msg, modelKey = "codigo") {
+async function callOllama(sys, msg, modelKey = "codigo", signal) {
   const model = OLLAMA_MODELS[modelKey] || OLLAMA_MODELS.codigo;
   const prompt = `${sys}\n\nQUESTION: ${msg}\n\nAnswer in the same language. Max 120 words.`;
   const r = await fetch(OLLAMA_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, prompt })
+    body: JSON.stringify({ model, prompt }),
+    signal
   });
   if (!r.ok) throw new Error("Ollama " + r.status);
   const d = await r.json();
@@ -672,8 +668,8 @@ export default function Cortex(){
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
+  const { send: runCouncil, invoke: runInvoke, lobeResults, phase, setPhase } = useCouncil(msgs, setMsgs);
   const [input,setInput]     = useState("");
-  const [phase,setPhase]     = useState(null);
   const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
   const [theme,setTheme]     = useState("cortex");
@@ -824,201 +820,47 @@ function lobeConfidenceScore(result, isErr) {
   return 92;
 }
 async function invoke(id, sys, msg) {
-  const ok = (text, real = true, latency = null) => ({ 
-    result: text, 
-    model: OR_MODELS[id] || id, 
-    real,
-    latency  // ← novo campo
+  return runInvoke(id, sys, msg, { toast, callOllama });
+}
+
+async function send(query) {
+  return runCouncil(query, {
+    input,
+    setInput,
+    classifyQuery,
+    saveMsgs,
+    compressContext,
+    buf,
+    setBuf,
+    keys,
+    buildMem,
+    brain,
+    selectUsedMem,
+    routerDecide,
+    LOBES,
+    modelsOn,
+    focusMode,
+    focusLobes,
+    P,
+    callClaude,
+    hC,
+    hP,
+    normalizeCouncilPayload,
+    heuristicDecision,
+    saveBrain,
+    setBrain,
+    safeParseReflect,
+    MAX_BUF,
+    MAX_SEMANTIC,
+    MAX_PATTERNS,
+    MAX_EPISODIC,
+    toast,
+    autoSaveConv,
+    currentConvId,
+    taRef,
+    lobeConfidenceScore,
+    callOllama,
   });
-
-  try {
-    const cached = cacheGet(id, msg);
-    if (cached) return { ...cached, fromCache: true };
-
-    if (id === "ollama_codigo") {
-      try {
-        const t0 = Date.now();                          // ← novo
-        const r = ok(await callOllama(sys, msg, "codigo"), true, Date.now()-t0); // ← novo
-        cacheSet(id, msg, r); return r;
-      } catch (e) { return ok("Ollama Código indisponível: " + e.message, false); }
-    }
-    if (id === "ollama_debug") {
-      try {
-        const t0 = Date.now();                          // ← novo
-        const r = ok(await callOllama(sys, msg, "debug"), true, Date.now()-t0);  // ← novo
-        cacheSet(id, msg, r); return r;
-      } catch (e) { return ok("Ollama Debug indisponível: " + e.message, false); }
-    }
-
-    const t0 = Date.now();                              // ← novo
-    const text = await callOpenRouter(id, sys, msg, 420);
-    const r = ok(text, true, Date.now()-t0);            // ← novo
-    cacheSet(id, msg, r);
-    return r;
-
-  } catch (e) {
-    const errMsg = e.message || "";
-    const isTimeout = /timeout/i.test(errMsg);
-    if (isTimeout) toast(id + ": tempo esgotado", "error");
-    else toast(id + ": " + errMsg.slice(0, 80));
-    return { result: "[Erro em " + id + "]", model: id, real: false };
-  }
-}
-  async function send(query){
-    const q=(query||input).trim();if(!q||phase)return;
-    const complexityLevel = classifyQuery(q);
-    setInput("");
-    const uMsg={id:Date.now()+Math.random(),role:"user",content:q, complexity: complexityLevel};
-    const nm=[...msgs,uMsg];setMsgs(nm);saveMsgs(nm);
-    const { buf: bufComprimido, compressed, before, after } =
-  await compressContext([...buf, `USER: ${q}`], keys.claude, keys.perp);
-const newBuf = bufComprimido;
-    const mem=buildMem(brain);
-    const usedMem=selectUsedMem(brain,q);
-    const routedIds = routerDecide(q);
-let councilLobes = LOBES.filter(l =>
-  l.id !== "claude" &&
-  modelsOn[l.id] !== false &&
-  routedIds.includes(l.id) &&
-  (!focusMode || focusLobes.has(l.id))
-).slice(0, 5); // ← máximo 5 lobos
-if (!councilLobes.length && focusMode) {
-  councilLobes = LOBES.filter(l =>
-    l.id !== "claude" &&
-    modelsOn[l.id] !== false &&
-    routedIds.includes(l.id)
-  ).slice(0, 5);
-}
-let qFinal = q;
-setPhase("council");
-try {
-  const refined = await callOpenRouter(
-    "gemini",
-    P.refine(q),
-    q,
-    120,
-    3500
-  );
-  if (
-    refined &&
-    refined.trim().length > 10 &&
-    refined.trim().length < q.length * 3 &&
-    !refined.includes("{") &&
-    !refined.includes("```")
-  )
-    qFinal = refined.trim();
-} catch {
-  // falha silenciosa
-}
-
-const results=await Promise.allSettled(councilLobes.map(l=>invoke(l.id,P[l.id]?.(mem,qFinal)||`Answer: ${qFinal}`,qFinal)));
-    const lobeResults=councilLobes.map((l,i)=>{
-    const r=results[i].status==="fulfilled"?results[i].value:{result:`Tempo esgotado ou serviço indisponível`,model:"?",real:false};
-    const isErr=!r.result||r.result.startsWith("[")||r.result.startsWith("Tempo");
-    const confidence = lobeConfidenceScore(r.result, isErr); // ← novo
-    return {...l,_key:l.id+i,result:r.result,srcModel:r.model,srcReal:r.real,isErr, latency:r.latency, confidence};
-});
-setPhase("cortex");
-let cR;
-let structured;
-try{
-  const validLobes=lobeResults.filter(l=>!l.isErr&&l.result?.length>10);
-  if(hC||hP) cR=await callClaude(
-    "Executive judge of a multi-AI council brain.",
-    P.cortex(mem,q,validLobes.length?validLobes:lobeResults),
-    5400,
-    keys.claude,
-    keys.perp
-  );
-  else{
-    const validFb=lobeResults.filter(l=>!l.isErr&&l.result?.length>10);
-    cR=validFb.length>0
-      ? validFb.map(l=>`**${l.label}:** ${l.result}`).join("\n\n")
-      : "Nenhum serviço respondeu. Verifica a ligação.";
-  }
-}catch(e){
-  cR=lobeResults.map(l=>`**${l.label}:** ${l.result}`).join("\n\n");
-  toast(`Córtex: ${e.message}`);
-}
-
-structured = normalizeCouncilPayload(cR, typeof cR === "string" ? cR : "");
-
-let cDecision=heuristicDecision(q);
-try{
-  cDecision=await callClaude(
-    "Judge of an 11-lobe AI council.",
-    P.judge(q,lobeResults),
-    80,
-    keys.claude,
-    keys.perp
-  );
-}catch{}
-
-const council = Object.fromEntries(lobeResults.map(l => [l.id, l.result]));
-
-const aMsg = {
-  id: Date.now() + Math.random(),
-  role: "assistant",
-  // Garante que o content é o final do struct, senão o texto cru de fallback
-  content: (structured?.final || cR || "").trim(),
-  structured, 
-  council,
-  lobeResults,
-  usedMemory: usedMem,
-  councilDecision: cDecision,
-  refinedQuery: qFinal !== q ? qFinal : null,
-};
-
-const fm = [...nm, aMsg];
-setMsgs(fm);
-saveMsgs(fm);
-
-// O buffer também deve usar o mesmo fallback
-const buf2 = [...newBuf, `BRAIN: ${(structured?.final || cR || "").trim()}`];
-setBuf(buf2);
-let nb={...brain,sessions:brain.sessions+1};let reflexOk=false;
-
-if(buf2.length>=MAX_BUF&&nb.sessions>=1){
-  setPhase("reflex");
-  try{
-    const raw=await callClaude(
-      "Return only valid JSON.",
-      P.reflect(buf2.join("\n"),buildMem(nb)),
-      480,
-      keys.claude,
-      keys.perp
-    );
-    const ext=safeParseReflect(raw);
-    nb={
-      ...nb,
-      semantic:[...nb.semantic,...(ext.new_semantic||[])].slice(-MAX_SEMANTIC),
-      patterns:[...new Set([...nb.patterns,...(ext.new_patterns||[])])].slice(-MAX_PATTERNS),
-      episodic:ext.session_summary
-        ? [...nb.episodic,ext.session_summary].slice(-MAX_EPISODIC)
-        : nb.episodic,
-      procedural:{...nb.procedural,...(ext.procedural_update||{})},
-      lastReflect:new Date().toISOString()
-    };
-    reflexOk=!!(ext.new_semantic?.length||ext.new_patterns?.length||ext.session_summary);
-  }catch{
-    toast("Falha na reflexão subconsciente.");
-  }
-  setBuf([]);
-}
-
-setBrain(nb);saveBrain(nb);setPhase(null);
-if (compressed) {
-  const note = {
-    id: Date.now() + Math.random(),
-    role: "assistant",
-    content: `⚡ Contexto comprimido (${before}→${after} msgs)`,
-    systemNote: true,
-    compressNote: true
-  };
-  setMsgs(prev => { const u = [...prev, note]; saveMsgs(u); return u; });
-}
-autoSaveConv(fm, currentConvId);
-setTimeout(()=>taRef.current?.focus(),80);
   }
 
   async function regenerate(){
@@ -1671,477 +1513,25 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               </div>
             ) : (
               <div style={{display:"flex",flexDirection:"column",gap:12,maxWidth:800,margin:"0 auto"}}>
-{msgs.map((m,i)=>(
-  <div
-    key={m.id || i}
-    className="msg-in"
-    style={{
-      alignSelf:m.role==="user"?"flex-end":"stretch",
-      maxWidth:m.role==="user"?"82%":"100%",
-      display:"flex",
-      flexDirection:"column",
-      gap:8
-    }}
-  >
-    {m.role==="user" ? (
-      <div style={{
-        alignSelf:"flex-end",
-        background:`linear-gradient(135deg, ${AC.claude}22, ${AC.claude}10)`,
-        border:`1px solid ${AC.claude}44`,
-        color:T.tx,
-        borderRadius:"18px 18px 6px 18px",
-        padding:"12px 14px",
-        fontSize:13,
-        lineHeight:1.65,
-        boxShadow:"0 6px 22px #00000022",
-        whiteSpace:"pre-wrap",
-        wordBreak:"break-word"
-      }}>
-        {m.content}
-        {m.complexity && (
-          <div style={{
-            fontSize: 9, marginTop: 5, opacity: 0.7, textAlign: "right",
-            color: m.complexity === "SIMPLE" ? AC.perp : m.complexity === "MEDIUM" ? AC.grok : AC.claude
-          }}>
-            {m.complexity === "SIMPLE" ? "⚡ Simples" : m.complexity === "MEDIUM" ? "⚙️ Médio" : "🧠 Complexo"}
-          </div>
-        )}
-      </div>
-) : m.systemNote ? (
-  <div style={{
-    alignSelf:"center",
-    fontSize:10,
-    color: m.compressNote ? AC.perp : AC.claude,
-    background: m.compressNote ? `${AC.perp}12` : `${AC.claude}12`,
-    border: `1px solid ${m.compressNote ? AC.perp : AC.claude}22`,
-    borderRadius:999,
-    padding:"6px 10px",
-    letterSpacing:0.2
-  }}>
-    {m.content}
-  </div>
-    ) : (
-      <div style={{
-        background:T.s1,
-        border:`1px solid ${T.b1}`,
-        borderRadius:18,
-        overflow:"hidden",
-        boxShadow:"0 10px 28px #00000020",
-        animation:"fadeIn 250ms cubic-bezier(0.4,0,0.2,1), lobePop 250ms cubic-bezier(0.4,0,0.2,1)"
-      }}>
-        {/* Header resposta Córtex */}
-<div style={{
-  display:"flex",
-  alignItems:"center",
-  justifyContent:"space-between",
-  gap:10,
-  padding:"12px 14px",
-  background:`linear-gradient(135deg, ${AC.claude}18 0%, ${AC.claude}08 100%)`,
-  borderBottom:`1px solid ${T.b1}`
-}}>
-  <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
-    <div style={{
-      width:28,
-      height:28,
-      borderRadius:10,
-      background:`${AC.claude}22`,
-      border:`1px solid ${AC.claude}44`,
-      display:"flex",
-      alignItems:"center",
-      justifyContent:"center",
-      color:AC.claude,
-      fontSize:13,
-      fontWeight:800,
-      flexShrink:0
-    }}>
-      C
-    </div>
-
-    <div style={{minWidth:0}}>
-      <div style={{fontSize:12,fontWeight:800,color:T.tx,letterSpacing:0.4}}>
-        Córtex
-      </div>
-      <div style={{fontSize:10,color:T.ts}}>
-        Síntese final do conselho
-      </div>
-    </div>
-  </div>
-
-  <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-    <CopyBtn text={(m.structured?.final || m.content || "").trim()} T={T} />
-
-    <button
-      onClick={async () => {
-        const finalText = (m.structured?.final || m.content || "").trim();
-        const consensus = m.structured?.consensus?.length
-          ? "\n\nConsenso:\n- " + m.structured.consensus.join("\n- ")
-          : "";
-        const divergence = m.structured?.divergence?.length
-          ? "\n\nDivergências:\n- " + m.structured.divergence.join("\n- ")
-          : "";
-        const nextActions = m.structured?.nextActions?.length
-          ? "\n\nPróximos passos:\n" + m.structured.nextActions.map(function(s, idx){
-              return (idx + 1) + ". " + s;
-            }).join("\n")
-          : "";
-        const confidence = m.structured?.confidence
-          ? "\n\nConfiança: " + m.structured.confidence
-          : "";
-
-        const question =
-          msgs.slice(0, i).reverse().find(x => x.role === "user")?.content || "";
-
-        const shareText =
-          "Pergunta:\n" + question +
-          "\n\nResposta:\n" + finalText +
-          consensus + divergence + nextActions + confidence;
-
-        if (navigator.share && isMobile) {
-          try {
-            await navigator.share({ text: shareText });
-          } catch {}
-        } else {
-          await navigator.clipboard?.writeText(shareText);
-          toast("Resposta copiada para partilha", "success");
-        }
-      }}
-      title="Partilhar"
-      style={{
-        background:"transparent",
-        border:`1px solid ${T.b1}`,
-        borderRadius:5,
-        padding:"2px 7px",
-        color:T.tf,
-        fontSize:9,
-        cursor:"pointer"
-      }}
-    >
-      📤
-    </button>
-
-    {m.lobeResults?.length > 0 && (
-      <button
-        onClick={() => setShowCouncil(showCouncil === m.id ? null : m.id)}
-        title={showCouncil === m.id ? "Ocultar conselho" : "Ver conselho"}
-        style={{
-          background: showCouncil === m.id ? `${AC.claude}16` : "transparent",
-          border: `1px solid ${showCouncil === m.id ? AC.claude + "44" : T.b1}`,
-          borderRadius:5,
-          padding:"2px 7px",
-          color: showCouncil === m.id ? AC.claude : T.tf,
-          fontSize:9,
-          cursor:"pointer"
-        }}
-      >
-        {showCouncil === m.id
-  ? "Ocultar"
-  : `🐺 ${m.lobeResults.length}`}
-      </button>
-    )}
-  </div>
-</div>
-
-{/* Corpo resposta */}
-<div style={{padding:"14px 14px 8px",display:"flex",flexDirection:"column",gap:12}}>
-  {/* Síntese antiga compatível */}
-  {!m.structured?.final && m.content.includes("⚡ Síntese:") && (
-    <div style={{
-      background:`linear-gradient(135deg, ${AC.claude}14, ${AC.claude}08)`,
-      border:`1px solid ${AC.claude}26`,
-      borderRadius:14,
-      padding:"14px 15px",
-      boxShadow:"inset 0 1px 0 #ffffff08"
-    }}>
-      <div style={{
-        display:"flex",
-        alignItems:"center",
-        gap:8,
-        marginBottom:8,
-        color:AC.claude,
-        fontSize:11,
-        fontWeight:800,
-        letterSpacing:0.3
-      }}>
-        <span style={{fontSize:15}}>⚡</span>
-        <span>Síntese</span>
-      </div>
-      <div style={{
-        fontSize:14,
-        lineHeight:1.7,
-        color:T.tx,
-        fontWeight:600
-      }}>
-        {(m.content.split("⚡ Síntese:")[1] || "").trim()}
-      </div>
-    </div>
-  )}
-        
-  {/* Resposta principal */}
-  <div style={{
-    paddingBottom:4,
-    borderBottom:`1px solid ${T.b1}`
-  }}>
-    <div style={{
-      display:"flex",
-      alignItems:"center",
-      gap:8,
-      marginBottom:8,
-      color:AC.gemini,
-      fontSize:11,
-      fontWeight:800,
-      letterSpacing:0.3
-    }}>
-      <span>Resposta</span>
-    </div>
-    <Markdown
-      text={(m.structured?.final || m.content || "").trim()}
-      color={T.tx}
-      faint={T.ts}
-    />
-  </div>
-
-  {m.structured?.consensus?.length > 0 && (
-    <div style={{
-      display:"flex",
-      flexDirection:"column",
-      gap:6,
-      paddingBottom:4,
-      borderBottom:`1px solid ${T.b1}`
-    }}>
-      <div style={{
-        color:AC.gemini,
-        fontSize:11,
-        fontWeight:800,
-        letterSpacing:0.3
-      }}>
-        Consenso
-      </div>
-      <div style={{display:"flex",flexDirection:"column",gap:6}}>
-        {m.structured.consensus.map((item,idx)=>(
-          <div
-            key={idx}
-            style={{
-              background:T.s2,
-              border:`1px solid ${T.b1}`,
-              borderRadius:10,
-              padding:"8px 10px",
-              fontSize:11,
-              color:T.tx,
-              lineHeight:1.6
-            }}
-          >
-            • {item}
-          </div>
-        ))}
-      </div>
-    </div>
-  )}
-
-  {m.structured?.divergence?.length > 0 && (
-    <div style={{
-      display:"flex",
-      flexDirection:"column",
-      gap:6,
-      paddingBottom:4,
-      borderBottom:`1px solid ${T.b1}`
-    }}>
-      <div style={{
-        color:AC.grok,
-        fontSize:11,
-        fontWeight:800,
-        letterSpacing:0.3
-      }}>
-        Divergências
-      </div>
-      <div style={{display:"flex",flexDirection:"column",gap:6}}>
-        {m.structured.divergence.map((item,idx)=>(
-          <div
-            key={idx}
-            style={{
-              background:T.s2,
-              border:`1px solid ${T.b1}`,
-              borderRadius:10,
-              padding:"8px 10px",
-              fontSize:11,
-              color:T.tx,
-              lineHeight:1.6
-            }}
-          >
-            • {item}
-          </div>
-        ))}
-      </div>
-    </div>
-  )}
-
-  {m.structured?.nextActions?.length > 0 && (
-    <div style={{
-      display:"flex",
-      flexDirection:"column",
-      gap:6,
-      paddingBottom:4,
-      borderBottom:`1px solid ${T.b1}`
-    }}>
-      <div style={{
-        color:AC.perp,
-        fontSize:11,
-        fontWeight:800,
-        letterSpacing:0.3
-      }}>
-        Próximos passos
-      </div>
-      <div style={{display:"flex",flexDirection:"column",gap:6}}>
-        {m.structured.nextActions.map((item,idx)=>(
-          <div
-            key={idx}
-            style={{
-              background:T.s2,
-              border:`1px solid ${T.b1}`,
-              borderRadius:10,
-              padding:"8px 10px",
-              fontSize:11,
-              color:T.tx,
-              lineHeight:1.6
-            }}
-          >
-            {idx + 1}. {item}
-          </div>
-        ))}
-      </div>
-    </div>
-  )}
-
-  {m.structured?.confidence && (
-    <div style={{
-      display:"flex",
-      alignItems:"center",
-      gap:8,
-      fontSize:10,
-      color:T.tf
-    }}>
-      <span>Confiança</span>
-      <span style={{
-        color:AC.claude,
-        fontWeight:800,
-        background:`${AC.claude}12`,
-        border:`1px solid ${AC.claude}22`,
-        borderRadius:999,
-        padding:"3px 8px"
-      }}>
-        {m.structured.confidence}
-      </span>
-    </div>
-  )}
-
-{/* Pergunta refinada */}
-{m.refinedQuery && (
-  <div style={{ fontSize: 9, color: T.tf, fontStyle: "italic", marginBottom: 4 }}>
-    ✦ Pergunta refinada: "{m.refinedQuery}"
-  </div>
-)}
-
-  {/* Decisão do conselho */}
-  {m.councilDecision && (
-    <div style={{
-      display:"flex",
-      flexDirection:"column",
-      gap:6,
-      paddingBottom:4,
-      borderBottom:`1px solid ${T.b1}`
-    }}>
-      <div style={{
-        color:AC.perp,
-        fontSize:11,
-        fontWeight:800,
-        letterSpacing:0.3
-      }}>
-        Decisão do conselho
-      </div>
-      <div style={{
-        fontSize:12,
-        color:T.ts,
-        lineHeight:1.7
-      }}>
-        {m.councilDecision}
-      </div>
-    </div>
-  )}
-
-  {/* Memória usada */}
-  {m.usedMemory?.length>0 && (
-    <div style={{
-      display:"flex",
-      flexDirection:"column",
-      gap:6
-    }}>
-      <div style={{
-        color:AC.grok,
-        fontSize:11,
-        fontWeight:800,
-        letterSpacing:0.3
-      }}>
-        Memória utilizada
-      </div>
-      <div style={{
-        display:"flex",
-        flexWrap:"wrap",
-        gap:6
-      }}>
-        {m.usedMemory.map((mem,j)=>(
-          <div
-            key={j}
-            style={{
-              background:T.s2,
-              border:`1px solid ${T.b1}`,
-              color:T.ts,
-              fontSize:10,
-              lineHeight:1.45,
-              padding:"6px 8px",
-              borderRadius:10,
-              maxWidth:"100%"
-            }}
-          >
-            {mem}
-          </div>
-        ))}
-      </div>
-    </div>
-  )}
-
-  {/* Conselho expandido */}
-  {showCouncil===m.id && m.lobeResults?.length>0 && (
-    <div style={{
-      display:"grid",
-      gridTemplateColumns:isMobile?"1fr":"repeat(2,minmax(0,1fr))",
-      gap:10,
-      paddingTop:2
-    }}>
-              {m.lobeResults.map((l,idx)=>(
-                <LobeCard
-                  key={l._key || l.id || idx}
-                  l={l}
-                  idx={idx}
-                  T={T}
-                  phase={phase}
-                  msgs={msgs}
-                  i={i}
-                  m={m}
-                  setPhase={setPhase}
-                  setMsgs={setMsgs}
-                  buildMem={buildMem}
-                  brain={brain}
-                  invoke={invoke}
-                  P={P}
-                  Markdown={Markdown}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    )}
-  </div>
-))}
+<MessageList
+  msgs={msgs}
+  T={T}
+  AC={AC}
+  CopyBtn={CopyBtn}
+  Markdown={Markdown}
+  showCouncil={showCouncil}
+  setShowCouncil={setShowCouncil}
+  isMobile={isMobile}
+  phase={phase}
+  setPhase={setPhase}
+  setMsgs={setMsgs}
+  buildMem={buildMem}
+  brain={brain}
+  invoke={invoke}
+  P={P}
+  toast={toast}
+  ClaudeCardComponent={ClaudeCard}
+/>
 
                 {cur&&(
                   <div style={{display:"flex",justifyContent:"flex-start"}}>

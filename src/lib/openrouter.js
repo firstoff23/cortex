@@ -20,21 +20,28 @@ const FREE_FALLBACKS = [
   "qwen/qwen-2-7b-instruct:free",
 ];
 
-async function fetchWithTimeout(url, opts = {}, ms = 30000) {
+async function fetchWithTimeout(url, opts = {}, ms = 30000, externalSignal) {
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort(), ms);
+  const abortFromExternal = () => ctrl.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) ctrl.abort();
+    else externalSignal.addEventListener("abort", abortFromExternal, { once: true });
+  }
   try {
     const res = await fetch(url, { ...opts, signal: ctrl.signal });
     clearTimeout(tid);
+    externalSignal?.removeEventListener?.("abort", abortFromExternal);
     return res;
   } catch (e) {
     clearTimeout(tid);
+    externalSignal?.removeEventListener?.("abort", abortFromExternal);
     if (e.name === "AbortError") throw new Error(`Timeout após ${ms / 1000}s`);
     throw e;
   }
 }
 
-export async function callOpenRouter(id, sys, msg, maxTokens = 420, timeoutMs = 30000) {
+export async function callOpenRouter(id, sys, msg, maxTokens = 420, timeoutMs = 30000, options = {}) {
   let model = OR_MODELS[id];
   if (!model) throw new Error(`OR_MODELS: id desconhecido "${id}"`);
 
@@ -56,7 +63,7 @@ export async function callOpenRouter(id, sys, msg, maxTokens = 420, timeoutMs = 
           messages: [{ role: "user", content: msg }],
           max_tokens: maxTokens,
         }),
-      }, timeoutMs);
+      }, timeoutMs, options.signal);
       const data = await res.json();
       if (res.ok && !data.error) return data.content ?? "";
       lastErr = data.error || `HTTP ${res.status}`;
