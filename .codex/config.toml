@@ -1,1 +1,5 @@
+approval_policy = "auto-approve"
 sandbox_mode = "danger-full-access"
+
+[features]
+hooks = true
