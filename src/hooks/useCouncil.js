@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { callOpenRouter, OR_MODELS } from "../lib/openrouter.js";
+import { calcularConsensoMatematico, runJudges } from "../api/judges.js";
+import { runKing } from "../api/king.js";
+import { runGraders } from "../utils/graders.js";
+import { getJuizesParaPergunta } from "../utils/orchestrator.js";
 
 // Cache curta de respostas dos lobos para evitar chamadas repetidas.
 const responseCache = new Map();
@@ -16,9 +20,36 @@ function cacheSet(id, q, v) {
   responseCache.set(id + "::" + q, { v, t: Date.now() });
 }
 
+function upsertJudge(prev, next) {
+  const idx = prev.findIndex((item) => item.juiz === next.juiz);
+  if (idx === -1) return [...prev, next];
+  return prev.map((item, i) => (i === idx ? next : item));
+}
+
+function dedupeJudges(judges) {
+  const vistos = new Set();
+  return judges.filter((judge) => {
+    if (!judge?.juiz || vistos.has(judge.juiz)) return false;
+    vistos.add(judge.juiz);
+    return true;
+  });
+}
+
+function fallbackDosLobos(lobes) {
+  const validos = lobes.filter((l) => !l.isErr && l.result?.length > 10);
+  const origem = validos.length ? validos : lobes;
+  return origem.length
+    ? origem.map((l) => `**${l.label}:** ${l.result}`).join("\n\n")
+    : "Nenhum serviço respondeu. Verifica a ligação.";
+}
+
 export default function useCouncil(msgs, setMsgs) {
   const [phase, setPhase] = useState(null);
   const [lobeResults, setLobeResults] = useState([]);
+  const [judgeResults, setJudgeResults] = useState([]);
+  const [kingResult, setKingResult] = useState(null);
+  const [gradersResult, setGradersResult] = useState(null);
+  const [consensusScore, setConsensusScore] = useState(0);
   const controllersRef = useRef(new Map());
 
   useEffect(() => {
@@ -124,6 +155,11 @@ export default function useCouncil(msgs, setMsgs) {
     const q = (query || input).trim();
     if (!q || phase) return;
 
+    setJudgeResults([]);
+    setKingResult(null);
+    setGradersResult(null);
+    setConsensusScore(0);
+
     const complexityLevel = classifyQuery(q);
     setInput("");
     const uMsg = { id: Date.now() + Math.random(), role: "user", content: q, complexity: complexityLevel };
@@ -196,10 +232,61 @@ export default function useCouncil(msgs, setMsgs) {
     });
     setLobeResults(nextLobeResults);
 
-    setPhase("cortex");
+    const consenso = calcularConsensoMatematico(nextLobeResults);
+    const juizesActivos = getJuizesParaPergunta(q);
+    setConsensusScore(consenso);
+
+    setPhase("judges");
+    let veredictoJuizes = [];
+    const ctrlJuizes = new AbortController();
+    controllersRef.current.set("judges", ctrlJuizes);
+    try {
+      veredictoJuizes = await runJudges(
+        q,
+        nextLobeResults,
+        juizesActivos,
+        ctrlJuizes.signal,
+        (juiz) => setJudgeResults((prev) => upsertJudge(prev, juiz))
+      );
+      veredictoJuizes = dedupeJudges(veredictoJuizes);
+      setJudgeResults(veredictoJuizes);
+    } catch (e) {
+      toast(`Juízes: ${e.message}`);
+    } finally {
+      if (controllersRef.current.get("judges") === ctrlJuizes) controllersRef.current.delete("judges");
+    }
+
+    setPhase("rei");
+    let resultadoRei = null;
+    const ctrlRei = new AbortController();
+    controllersRef.current.set("rei", ctrlRei);
+    try {
+      resultadoRei = await runKing(q, nextLobeResults, veredictoJuizes, consenso, ctrlRei.signal);
+      setKingResult(resultadoRei);
+    } catch (e) {
+      toast(`Rei: ${e.message}`);
+    } finally {
+      if (controllersRef.current.get("rei") === ctrlRei) controllersRef.current.delete("rei");
+    }
+
+    const graders = runGraders(resultadoRei || {});
+    setGradersResult(graders);
+
     let cR;
     let structured;
-    try {
+    if (resultadoRei) {
+      cR = resultadoRei.veredicto || fallbackDosLobos(nextLobeResults);
+      structured = {
+        final: cR,
+        consensus: veredictoJuizes.flatMap((j) => j.resultado?.validados || []).slice(0, 5),
+        divergence: veredictoJuizes.flatMap((j) => j.resultado?.problemas || []).slice(0, 5),
+        nextActions: resultadoRei.suggestions || [],
+        confidence: `${resultadoRei.confianca_final}%`,
+        king: resultadoRei,
+      };
+    } else {
+      setPhase("cortex");
+      try {
       const validLobes = nextLobeResults.filter((l) => !l.isErr && l.result?.length > 10);
       if (hC || hP)
         cR = await callClaude(
@@ -221,18 +308,23 @@ export default function useCouncil(msgs, setMsgs) {
       toast(`Córtex: ${e.message}`);
     }
 
-    structured = normalizeCouncilPayload(cR, typeof cR === "string" ? cR : "");
+      structured = normalizeCouncilPayload(cR, typeof cR === "string" ? cR : "");
+    }
 
     let cDecision = heuristicDecision(q);
-    try {
-      cDecision = await callClaude(
-        "Judge of an 11-lobe AI council.",
-        P.judge(q, nextLobeResults),
-        80,
-        keys.claude,
-        keys.perp
-      );
-    } catch {}
+    if (resultadoRei) {
+      cDecision = `Rei: confiança final ${resultadoRei.confianca_final}%`;
+    } else {
+      try {
+        cDecision = await callClaude(
+          "Judge of an 11-lobe AI council.",
+          P.judge(q, nextLobeResults),
+          80,
+          keys.claude,
+          keys.perp
+        );
+      } catch {}
+    }
 
     const council = Object.fromEntries(nextLobeResults.map((l) => [l.id, l.result]));
 
@@ -244,6 +336,10 @@ export default function useCouncil(msgs, setMsgs) {
       structured,
       council,
       lobeResults: nextLobeResults,
+      judges: veredictoJuizes,
+      king: resultadoRei,
+      graders,
+      consensoMatematico: consenso,
       usedMemory: usedMem,
       councilDecision: cDecision,
       refinedQuery: qFinal !== q ? qFinal : null,
@@ -309,5 +405,15 @@ export default function useCouncil(msgs, setMsgs) {
     setTimeout(() => taRef.current?.focus(), 80);
   }
 
-  return { send, invoke, lobeResults, phase, setPhase };
+  return {
+    send,
+    invoke,
+    lobeResults,
+    judgeResults,
+    kingResult,
+    gradersResult,
+    consensusScore,
+    phase,
+    setPhase,
+  };
 }

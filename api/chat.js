@@ -13,87 +13,124 @@ export const config = {
   maxDuration: 30,
 };
 
-export default async function handler(req, res) {
-  const origin = req.headers["origin"] || "";
-
+function aplicarCors(req, res) {
+  const origin = req.headers?.origin || "";
   res.setHeader("Access-Control-Allow-Origin", origin || "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
 
-  if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "POST")
-    return res.status(405).json({ error: "Método não permitido" });
+function erroCamposObrigatorios(res) {
+  return res.status(400).json({ error: "Campos obrigatórios: model, messages" });
+}
 
-  const body = req.body;
-  const { model, messages, system, max_tokens } = body || {};
+function lerOpenRouterKey() {
+  return process.env.OPENROUTER_KEY || process.env.OPENROUTER_API_KEY;
+}
 
-  if (typeof model !== "string" || !model.trim() || !Array.isArray(messages)) {
-    return res
-      .status(400)
-      .json({ error: "Campos obrigatórios: model, messages" });
+async function lerJsonSeguro(upstream) {
+  try {
+    return await upstream.json();
+  } catch {
+    return {};
+  }
+}
+
+async function chamarOpenRouterUmaVez(model, payload, apiKey) {
+  const upstream = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "HTTP-Referer": PROD_ORIGIN,
+      "X-Title": "Córtex Digital",
+    },
+    body: JSON.stringify({ ...payload, model }),
+  });
+
+  return {
+    status: upstream.status,
+    ok: upstream.ok,
+    dados: await lerJsonSeguro(upstream),
+  };
+}
+
+async function chamarOpenRouter({ model, system, messages, max_tokens }) {
+  const apiKey = lerOpenRouterKey();
+  if (!apiKey) {
+    return {
+      status: 500,
+      body: { error: "OPENROUTER_KEY/OPENROUTER_API_KEY não configurada" },
+    };
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey)
-    return res
-      .status(500)
-      .json({ error: "OPENROUTER_API_KEY não configurada" });
-
   const payload = {
-    max_tokens: max_tokens ?? 420,
-    messages: system
-      ? [{ role: "system", content: system }, ...messages]
-      : messages,
+    max_tokens: max_tokens || 420,
+    messages: system ? [{ role: "system", content: system }, ...messages] : messages,
   };
 
-  const isFree = model.endsWith(":free");
-  const toTry = isFree
+  // Modelos gratuitos costumam desaparecer; o proxy tenta alternativas no servidor.
+  const modelos = model.endsWith(":free")
     ? [model, ...FREE_FALLBACKS.filter((m) => m !== model)]
     : [model];
 
-  let data, lastStatus;
-  for (const m of toTry) {
-    let upstream;
-    try {
-      upstream = await fetch(OPENROUTER_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": PROD_ORIGIN,
-          "X-Title": "Córtex Digital",
+  let ultimoErro = null;
+  let ultimoStatus = 502;
+  for (const modeloAtual of modelos) {
+    const { status, ok, dados } = await chamarOpenRouterUmaVez(modeloAtual, payload, apiKey);
+    ultimoStatus = status;
+    ultimoErro = dados;
+    if (ok && !dados.error && dados.choices?.[0]) {
+      const choice = dados.choices[0];
+      return {
+        status: 200,
+        body: {
+          content: choice.message?.content || "",
+          model: dados.model || modeloAtual,
+          provider: "openrouter",
+          usage: dados.usage || {
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+          },
         },
-        body: JSON.stringify({ ...payload, model: m }),
-      });
-    } catch (err) {
-      return res
-        .status(502)
-        .json({ error: "Falha na ligação ao OpenRouter", detail: err.message });
+      };
     }
-    data = await upstream.json();
-    lastStatus = upstream.status;
-    if (upstream.ok && !data.error) break;
   }
 
-  const choice = data?.choices?.[0];
-  if (!choice) {
-    return res
-      .status(502)
-      .json({
-        error: "OpenRouter devolveu erro",
-        status: lastStatus,
-        detail: JSON.stringify(data),
-      });
-  }
-
-  return res.status(200).json({
-    content: choice.message?.content ?? "",
-    model: data.model ?? model,
-    provider: "openrouter",
-    usage: data.usage ?? {
-      prompt_tokens: 0,
-      completion_tokens: 0,
-      total_tokens: 0,
+  return {
+    status: 502,
+    body: {
+      error: "OpenRouter devolveu erro",
+      status: ultimoStatus,
+      detail: JSON.stringify(ultimoErro),
     },
-  });
+  };
+}
+
+export default async function handler(req, res) {
+  aplicarCors(req, res);
+
+  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Método não permitido" });
+  }
+
+  const { model, messages, system, max_tokens } = req.body || {};
+  if (typeof model !== "string" || !model.trim() || !Array.isArray(messages)) {
+    return erroCamposObrigatorios(res);
+  }
+
+  try {
+    const resultado = await chamarOpenRouter({
+      model: model.trim(),
+      system,
+      messages,
+      max_tokens,
+    });
+
+    return res.status(resultado.status).json(resultado.body);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
 }

@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import ClaudeCard from './components/ClaudeCard';
+import KingCard from './components/KingCard';
 import MessageList from './components/MessageList';
+import EvalsPanel from './components/EvalsPanel'
 import useCouncil from './hooks/useCouncil';
+import { useI18n } from "./hooks/useI18n.js";
 
 const MV="cortex-v12";
 const MAX_BUF=8;
@@ -344,26 +346,24 @@ function routerDecide(query) {
 }
 
 // ── API CALLS ────────────────────────────────────────────────
-async function callClaude(sys, msg, tokens=700, claudeKey="") {
-  if(claudeKey?.trim().length > 10) {
-    const r = await fetchWithTimeout("/api/claude/v1/messages", {
-      method:"POST",
-      headers:{"Content-Type":"application/json","x-api-key": claudeKey},
-      body:JSON.stringify({model:"claude-opus-4-6",max_tokens:tokens,system:sys,messages:[{role:"user",content:msg}]})
-    });
-    const d = await r.json();
-    if(d.error) throw new Error(d.error.message);
-    return d.content?.[0]?.text||"";
-  }
-  // fallback Groq: usa key de utilizador ou proxy do servidor
+async function callProxyChat(model, sys, msg, tokens=420) {
   const r = await fetchWithTimeout("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model:"meta-llama/llama-3.3-70b-instruct:free", system:sys, messages:[{role:"user",content:msg}], max_tokens:tokens })
+    body: JSON.stringify({ model, system: sys, messages: [{ role: "user", content: msg }], max_tokens: tokens })
   });
   const d = await r.json();
   if(d.error) throw new Error(d.error);
   return d.content||"";
+}
+
+async function callClaude(sys, msg, tokens=700) {
+  // Chaves ficam sempre no servidor; este fallback usa apenas modelos gratuitos via OpenRouter.
+  try {
+    return await callProxyChat("google/gemini-2.5-pro-exp-03-25:free", sys, msg, tokens);
+  } catch {
+    return callProxyChat("meta-llama/llama-3.3-70b-instruct:free", sys, msg, tokens);
+  }
 }
 
 // ── FETCH COM TIMEOUT ─────────────────────────────────────
@@ -382,50 +382,28 @@ async function fetchWithTimeout(url, opts={}, ms=30000){
 }
 
 async function callGrok(sys,msg,key){
-  const r=await fetchWithTimeout("/api/grok/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"grok-3",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
-  const d=await r.json();if(d.error)throw new Error(JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
+  return callProxyChat("x-ai/grok-3", sys, msg, 420);
 }
 async function callGemini(sys,msg,key){
-  // se tem key → direto; senão → proxy local com key de servidor
-  const url=key?.trim().length>10
-    ?`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`
-    :"/api/gemini/v1beta/models/gemini-2.5-flash:generateContent";
-  const opts={method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:[{role:"user",parts:[{text:msg}]}],generationConfig:{maxOutputTokens:420}})};
-  const r=await fetchWithTimeout(url,opts);
-  const d=await r.json();if(d.error)throw new Error(d.error.message);return d.candidates?.[0]?.content?.parts?.[0]?.text||"";
+  return callProxyChat("google/gemini-2.5-flash", sys, msg, 420);
 }
 async function callPerp(sys,msg,key){
-  // sem key → usa proxy do servidor (GROQ_API_KEY no Vercel)
-  const url=key?.trim().length>10?"https://api.groq.com/openai/v1/chat/completions":"/api/chat";
-  const headers=key?.trim().length>10?{"Content-Type":"application/json","Authorization":`Bearer ${key}`}:{"Content-Type":"application/json"};
-  const body=key?.trim().length>10?{model:"llama-3.3-70b-versatile",messages:[{role:"system",content:sys},{role:"user",content:msg}],max_tokens:420}:{model:"meta-llama/llama-3.3-70b-instruct:free",system:sys,messages:[{role:"user",content:msg}],max_tokens:420};
-  const r=await fetchWithTimeout(url,{method:"POST",headers,body:JSON.stringify(body)});
-  const d=await r.json();if(d.error)throw new Error(JSON.stringify(d.error));
-  return key?.trim().length>10?d.choices?.[0]?.message?.content||"":d.content||"";
+  return callProxyChat("perplexity/sonar", sys, msg, 420);
 }
 async function callOpenAI(sys,msg,key){
-  const r=await fetchWithTimeout("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"gpt-4o",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
-  const d=await r.json();if(d.error)throw new Error(d.error.message);return d.choices?.[0]?.message?.content||"";
+  return callProxyChat("openai/gpt-4o", sys, msg, 420);
 }
 async function callDeepSeek(sys,msg,key){
-  const r=await fetchWithTimeout("https://api.deepseek.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"deepseek-chat",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
-  const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
+  return callProxyChat("deepseek/deepseek-chat", sys, msg, 420);
 }
 async function callGroq(sys,msg,key){
-  const url=key?.trim().length>10?"https://api.groq.com/openai/v1/chat/completions":"/api/chat";
-  const headers=key?.trim().length>10?{"Content-Type":"application/json","Authorization":`Bearer ${key}`}:{"Content-Type":"application/json"};
-  const body=key?.trim().length>10?{model:"llama-4-scout-17b-16e-instruct",messages:[{role:"system",content:sys},{role:"user",content:msg}],max_tokens:420}:{model:"meta-llama/llama-3.3-70b-instruct:free",system:sys,messages:[{role:"user",content:msg}],max_tokens:420};
-  const r=await fetchWithTimeout(url,{method:"POST",headers,body:JSON.stringify(body)});
-  const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));
-  return key?.trim().length>10?d.choices?.[0]?.message?.content||"":d.content||"";
+  return callProxyChat("meta-llama/llama-3.3-70b-instruct:free", sys, msg, 420);
 }
 async function callMistral(sys,msg,key){
-  const r=await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"mistral-large-latest",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
-  const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
+  return callProxyChat("mistralai/mistral-large-latest", sys, msg, 420);
 }
 async function callNemotron(sys,msg,key){
-  const r=await fetchWithTimeout("https://integrate.api.nvidia.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"nvidia/nemotron-4-340b-instruct",max_tokens:420,messages:[{role:"system",content:sys},{role:"user",content:msg}]})});
-  const d=await r.json();if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));return d.choices?.[0]?.message?.content||"";
+  return callProxyChat("nvidia/nemotron-4-340b-instruct", sys, msg, 420);
 }
 
 // ── MARKDOWN ─────────────────────────────────────────────────
@@ -466,9 +444,9 @@ function iFmt(text){
   return parts.length?parts:text;
 }
 
-function CopyBtn({text,T}){
+function CopyBtn({text,T,t}){
   const [copied,setCopied]=useState(false);
-  return <button onClick={()=>{navigator.clipboard?.writeText(text).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1800);});}} title="Copiar" style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:5,padding:"2px 7px",color:copied?"#10b981":T.tf,fontSize:9,cursor:"pointer",transition:"color 0.2s"}}>{copied?"✓ copiado":"⎘ copiar"}</button>;
+  return <button onClick={()=>{navigator.clipboard?.writeText(text).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1800);});}} title={t?.answer?.copy || "Copiar"} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:5,padding:"2px 7px",color:copied?"#10b981":T.tf,fontSize:9,cursor:"pointer",transition:"color 0.2s"}}>{copied?(t?.answer?.copied || "✓ copiado"):(t?.answer?.copy || "⎘ copiar")}</button>;
 }
 
 function Toggle({on,onChange,color}){
@@ -528,7 +506,7 @@ function Modal({T,title,onClose,children}){
   );
 }
 
-function KeyRow({ api, T, value, onChange }) {
+function KeyRow({ api, T, value, onChange, t }) {
   const [draft, setDraft] = useState(value);
   const [show, setShow] = useState(false);
   const [status, setStatus] = useState(null);
@@ -544,23 +522,24 @@ function KeyRow({ api, T, value, onChange }) {
     if (draft.trim().length < 10) return;
     setStatus("testing");
     try {
-      let ok = false;
-      if (api.id === "gemini") {
-        const r = await fetchWithTimeout(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${draft}`,
-          { method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hi" }] }], generationConfig: { maxOutputTokens: 5 } }) }
-        );
-        const d = await r.json(); ok = !!d.candidates;
-      } else {
-        const url = api.id === "grok" ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.groq.com/openai/v1/chat/completions";
-        const model = api.id === "grok" ? "grok-3" : "llama-3.3-70b-versatile";
-        const r = await fetchWithTimeout(url,
-          { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${draft}` },
-            body: JSON.stringify({ model, max_tokens: 5, messages: [{ role: "user", content: "hi" }] }) }
-        );
-        const d = await r.json(); ok = !!d.choices;
-      }
+      const modelByApi = {
+        gemini: "google/gemini-2.5-flash",
+        grok: "x-ai/grok-3",
+        perp: "perplexity/sonar",
+        openai: "openai/gpt-4o",
+        deepseek: "deepseek/deepseek-chat",
+      };
+      const r = await fetchWithTimeout("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: modelByApi[api.id] || "meta-llama/llama-3.3-70b-instruct:free",
+          messages: [{ role: "user", content: "hi" }],
+          max_tokens: 5,
+        }),
+      });
+      const d = await r.json();
+      const ok = r.ok && !d.error && typeof d.content === "string";
       setStatus(ok ? "ok" : "err");
     } catch { setStatus("err"); }
     setTimeout(() => setStatus(null), 3000);
@@ -578,7 +557,7 @@ function KeyRow({ api, T, value, onChange }) {
         <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 20,
           background: active ? `${api.color}22` : T.s1, border: `1px solid ${active ? `${api.color}44` : T.b1}`,
           color: active ? api.color : T.tf }}>
-          {active ? "Activo" : "Simulado"}
+          {active ? t.keys.active : t.keys.simulated}
         </span>
       </div>
       <div style={{ display: "flex", gap: 5 }}>
@@ -603,14 +582,14 @@ function KeyRow({ api, T, value, onChange }) {
           style={{ flex: 1, background: T.s1, border: `1px solid ${T.b1}`, borderRadius: 8, padding: "5px 0",
             cursor: "pointer", fontSize: 10, fontFamily: "inherit", fontWeight: status ? 700 : 400,
             color: status === "ok" ? "#10b981" : status === "err" ? "#ef4444" : T.ts }}>
-          {status === "testing" ? "A testar..." : status === "ok" ? "✓ Válida!" : status === "err" ? "✗ Inválida" : "Testar"}
+          {status === "testing" ? t.keys.testing : status === "ok" ? t.keys.valid : status === "err" ? t.keys.invalid : t.keys.test}
         </button>
         <button onClick={() => onChange(draft)} disabled={!dirty}
           style={{ flex: 1, background: dirty ? `${api.color}22` : T.s1,
             border: `1px solid ${dirty ? `${api.color}66` : T.b1}`, borderRadius: 8, padding: "5px 0",
             cursor: dirty ? "pointer" : "default", fontSize: 10, fontFamily: "inherit", fontWeight: dirty ? 700 : 400,
             color: dirty ? api.color : T.tf, transition: "all 0.2s" }}>
-          {dirty ? "Guardar" : "✓ Guardado"}
+          {dirty ? t.keys.save : t.keys.saved}
         </button>
       </div>
       <a href={`https://${api.link}`} target="_blank" rel="noreferrer"
@@ -665,6 +644,7 @@ async function compressContext(buf, claudeKey, perpKey) {
 }
 // ── MAIN ─────────────────────────────────────────────────────
 export default function Cortex(){
+  const { t, lang, toggleLang, speechLang } = useI18n();
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
@@ -696,6 +676,7 @@ export default function Cortex(){
   const [seedO,setSeedO] = useState("");
   const [showTP,setShowTP]         = useState(false);
   const [showModels,setShowModels] = useState(false);
+  const [showEvals, setShowEvals] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false);
   const [showCouncil, setShowCouncil] = useState(null);
   const [conversations, setConversations] = useState([]);
@@ -766,7 +747,7 @@ export default function Cortex(){
       setTheme(typeof t==="string"&&THEMES[t]?t:"cortex");
       setModelsOn(mo&&typeof mo==="object"?mo:Object.fromEntries(MODELS.map(x=>[x.id,true])));
       // setCompTasks(Array.isArray(ct)?ct:[]); // REMOVIDO v12
-    }catch(e){toast("Falha ao carregar dados — reset para defaults");}
+    }catch(e){toast(t.toasts.loadError);}
     setLoaded(true);
   }
 const saveConvs = c => safePut(MV+"-convs", c.slice(0,50));
@@ -870,12 +851,12 @@ async function send(query) {
     const idx=msgs.lastIndexOf(lastUser);
     const trimmed=msgs.slice(0,idx);
     setMsgs(trimmed);saveMsgs(trimmed);setBuf(buf.slice(0,-2));
-    toast("A regenerar...","info");
+    toast(t.toasts.regenerating,"info");
     await send(lastUser.content);
   }
 
   function exportConv(){
-    const lines=["# Conversa — Córtex Digital",`> ${new Date().toLocaleString()}`,""];
+    const lines=[`# Conversa — ${t.home.title}`,`> ${new Date().toLocaleString()}`,""];
     msgs.forEach(m=>{
       if(m.role==="user")lines.push(`## 🧑 Tu`,m.content,"");
       else if(m.systemNote)lines.push(`> ${m.content}`,"");
@@ -884,7 +865,7 @@ async function send(query) {
     const md=lines.join("\n");
     navigator.clipboard?.writeText(md);
     const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([md],{type:"text/markdown"}));a.download=`cortex-${Date.now()}.md`;a.click();
-    toast("Conversa exportada como .md","success");
+    toast(t.toasts.exportDone,"success");
   }
 
   //async function runComputer(){
@@ -912,7 +893,7 @@ async function send(query) {
     if(!entries.length)return;
     const nb={...brain,semantic:[...brain.semantic,...entries].slice(-MAX_SEMANTIC),episodic:[...brain.episodic,"Configuração inicial (seed manual)."].slice(-MAX_EPISODIC)};
     setBrain(nb);saveBrain(nb);setShowSeed(false);setSeedP("");setSeedC("");setSeedO("");
-    toast("Cérebro configurado com sucesso!","success");
+    toast(t.toasts.seedDone,"success");
   }
 
   function doImport(){
@@ -921,14 +902,16 @@ async function send(query) {
       const raw=JSON.parse(importTxt);
       if(!Array.isArray(raw.semantic)||!Array.isArray(raw.episodic))throw new Error("Formato inválido.");
       setBrain(normBrain(raw));saveBrain(normBrain(raw));setBuf([]);setShowImport(false);setImportTxt("");
-      toast("Memória importada!","success");
+      toast(t.toasts.importDone,"success");
     }catch(e){setImportErr(`Erro: ${e.message}`);}
   }
 
   const phases={
-    council:{label:`${LOBES.filter(l=>l.id!=="claude"&&modelsOn[l.id]!==false).length} lobos a analisar...`,color:"#a78bfa",pct:"50%"},
-    cortex: {label:"Claude Opus 4.6 a sintetizar...", color:AC.claude, pct:"88%"},
-    reflex: {label:"Reflexão subconsciente...",       color:AC.reflex, pct:"100%"},
+    council:{label:t.phases.council(LOBES.filter(l=>l.id!=="claude"&&modelsOn[l.id]!==false).length),color:"#a78bfa",pct:"50%"},
+    judges:{label:t.phases.judges, color:AC.perp, pct:"68%"},
+    rei:{label:t.phases.rei, color:AC.claude, pct:"88%"},
+    cortex: {label:t.phases.cortex, color:AC.claude, pct:"88%"},
+    reflex: {label:t.phases.reflex, color:AC.reflex, pct:"100%"},
   };
   
 const safeParseJson = (value, fallback = null) => {
@@ -1082,57 +1065,57 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
 
       {/* ── MODALS ─────────────────────────────────────────── */}
       {showGuide && (
-        <Modal T={T} title="Guia de Utilização" onClose={()=>setShowGuide(false)}>
+        <Modal T={T} title={t.guide.title} onClose={()=>setShowGuide(false)}>
           <div style={{fontSize:12,lineHeight:1.8,color:T.ts,display:"flex",flexDirection:"column",gap:10}}>
-            <p><b style={{color:T.tx}}>Conselho de 11 Lobos</b><br/>Cada pergunta é analisada em paralelo por até 11 modelos. Claude Opus 4.6 age como juiz e sintetiza a melhor resposta final.</p>
+            <p><b style={{color:T.tx}}>{t.guide.council.title}</b><br/>{t.guide.council.body}</p>
             <div style={{display:"grid",gridTemplateColumns:"auto 1fr auto",gap:"3px 10px",background:T.s2,borderRadius:10,padding:11,fontSize:11}}>
               {[["◉ Grok","Factos empíricos","grok-3"],["◈ Gemini","Contexto amplo","gemini-2.5-flash"],["◇ Perplexity","Web atual","sonar-pro"],["◎ Genspark","Síntese multi-AI","simulado"],["◍ Manus","Agente autónomo","via Claude"],["○ OpenAI","Raciocínio","gpt-4o"],["◐ DeepSeek","Código/Lógica","deepseek-chat"],["◑ Llama","Open source","llama-4-scout"],["◒ Mistral","Velocidade","mistral-large"],["◓ Nemotron","Ciência","nemotron-4-340b"],["◆ Claude","Juiz final","claude-opus-4-6"]].map(([l,d,v],i)=>(
-                <><span key={i+"a"} style={{fontWeight:700,color:T.tx}}>{l}</span><span key={i+"b"}>{d}</span><span key={i+"c"} style={{color:T.tf,fontFamily:"monospace",fontSize:8}}>{v}</span></>
+                <span key={`model-info-${i}-${l}`} style={{display:"contents"}}><span style={{fontWeight:700,color:T.tx}}>{l}</span><span>{d}</span><span style={{color:T.tf,fontFamily:"monospace",fontSize:8}}>{v}</span></span>
               ))}
             </div>
-            <p><b style={{color:T.tx}}>Córtex</b><br/>O Claude Opus 4.6 atua como juiz do conselho e sintetiza a resposta final com base nos lobes ativos.</p>
-            <p><b style={{color:T.tx}}>Memória</b><br/>Usa "Seed" para dar contexto inicial. A cada {MAX_BUF} trocas o sistema consolida memórias automaticamente.</p>
-            <p style={{color:T.tf,fontSize:10}}>Shift+Enter = nova linha · 21 temas · Histórico sem limite · ↺ regenerar · ↓ exportar · 📤 partilhar</p>
+            <p><b style={{color:T.tx}}>{t.guide.cortex.title}</b><br/>{t.guide.cortex.body}</p>
+            <p><b style={{color:T.tx}}>{t.guide.memory.title}</b><br/>{t.guide.memory.body(MAX_BUF)}</p>
+            <p style={{color:T.tf,fontSize:10}}>{t.guide.tip}</p>
           </div>
         </Modal>
       )}
 
       {showExport && (
-        <Modal T={T} title="Exportar Memória" onClose={()=>setShowExport(false)}>
-          <p style={{fontSize:11,color:T.ts,marginBottom:7}}>JSON do teu cérebro:</p>
+        <Modal T={T} title={t.exportModal.title} onClose={()=>setShowExport(false)}>
+          <p style={{fontSize:11,color:T.ts,marginBottom:7}}>{t.exportModal.hint}</p>
           <textarea readOnly value={JSON.stringify(normBrain(brain),null,2)} onClick={e=>e.target.select()} style={{width:"100%",height:180,background:T.s2,border:`1px solid ${T.b1}`,borderRadius:8,padding:9,color:T.tx,fontSize:10,fontFamily:"monospace",resize:"vertical",outline:"none",boxSizing:"border-box"}}/>
-          <button onClick={()=>navigator.clipboard?.writeText(JSON.stringify(normBrain(brain),null,2)).then(()=>toast("Copiado!","success"))} style={{...btn(T,AC.claude),marginTop:7,width:"100%"}}>📋 Copiar</button>
+          <button onClick={()=>navigator.clipboard?.writeText(JSON.stringify(normBrain(brain),null,2)).then(()=>toast(t.toasts.copied,"success"))} style={{...btn(T,AC.claude),marginTop:7,width:"100%"}}>{t.exportModal.copy}</button>
         </Modal>
       )}
 
       {showImport && (
-        <Modal T={T} title="Importar Memória" onClose={()=>{setShowImport(false);setImportErr("");setImportTxt("");}}>
-          <textarea value={importTxt} onChange={e=>setImportTxt(e.target.value)} placeholder='{"episodic":[],"semantic":[],...}' style={{width:"100%",height:180,background:T.s2,border:`1px solid ${T.b1}`,borderRadius:8,padding:9,color:T.tx,fontSize:10,fontFamily:"monospace",resize:"vertical",outline:"none",boxSizing:"border-box"}}/>
+        <Modal T={T} title={t.importModal.title} onClose={()=>{setShowImport(false);setImportErr("");setImportTxt("");}}>
+          <textarea value={importTxt} onChange={e=>setImportTxt(e.target.value)} placeholder={t.importModal.placeholder} style={{width:"100%",height:180,background:T.s2,border:`1px solid ${T.b1}`,borderRadius:8,padding:9,color:T.tx,fontSize:10,fontFamily:"monospace",resize:"vertical",outline:"none",boxSizing:"border-box"}}/>
           {importErr && <div style={{color:"#fca5a5",fontSize:11,marginTop:4}}>{importErr}</div>}
-          <button onClick={doImport} style={{...btn(T,AC.claude),marginTop:7,width:"100%"}}>✓ Importar e substituir</button>
+          <button onClick={doImport} style={{...btn(T,AC.claude),marginTop:7,width:"100%"}}>{t.importModal.submit}</button>
         </Modal>
       )}
 
       {showSeed && (
-        <Modal T={T} title="Configurar Cérebro" onClose={()=>setShowSeed(false)}>
+        <Modal T={T} title={t.seed.title} onClose={()=>setShowSeed(false)}>
           <div style={{display:"flex",flexDirection:"column",gap:11}}>
-            {[["Quem sou eu / contexto pessoal","Ex: estudante de Automação na ESTCB, gaming, IA...",seedP,setSeedP],
-              ["Contexto atual","Ex: 2º ano, projeto de automação de linha de produção...",seedC,setSeedC],
-              ["Objetivos principais","Ex: terminar curso, estágio em automação, melhorar Python...",seedO,setSeedO]
+            {[[t.seed.fields[0].label,t.seed.fields[0].ph,seedP,setSeedP],
+              [t.seed.fields[1].label,t.seed.fields[1].ph,seedC,setSeedC],
+              [t.seed.fields[2].label,t.seed.fields[2].ph,seedO,setSeedO]
             ].map(([lbl,ph,val,set])=>(
               <div key={lbl} style={{display:"flex",flexDirection:"column",gap:4}}>
                 <label style={{fontSize:11,fontWeight:600,color:T.ts}}>{lbl}</label>
                 <textarea value={val} onChange={e=>set(e.target.value)} placeholder={ph} rows={3} style={{background:T.s2,border:`1px solid ${T.b1}`,borderRadius:8,padding:"7px 9px",color:T.tx,fontSize:11,fontFamily:"inherit",resize:"vertical",outline:"none",lineHeight:1.5}}/>
               </div>
             ))}
-            <button onClick={applySeed} style={{...btn(T,AC.claude),width:"100%"}}>💾 Guardar seed de memória</button>
-            <p style={{fontSize:9,color:T.tf,margin:0}}>Frases com menos de 20 chars são ignoradas. Regista em Episódica.</p>
+            <button onClick={applySeed} style={{...btn(T,AC.claude),width:"100%"}}>{t.seed.save}</button>
+            <p style={{fontSize:9,color:T.tf,margin:0}}>{t.seed.hint}</p>
           </div>
         </Modal>
       )}
 
       {showTP && (
-        <Modal T={T} title="Tema" onClose={()=>setShowTP(false)}>
+        <Modal T={T} title={t.nav.theme} onClose={()=>setShowTP(false)}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
             {Object.entries(THEMES).map(([key,th])=>(
               <button key={key} onClick={()=>{setTheme(key);saveTheme(key);setShowTP(false);}} style={{background:theme===key?th.s2:"transparent",border:`2px solid ${theme===key?AC.claude:th.b1}`,borderRadius:13,padding:"9px 11px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:9,transition:"all 0.15s",boxShadow:theme===key?`0 0 12px ${AC.claude}44`:"none"}}>
@@ -1149,8 +1132,8 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       )}
 
       {showModels && (
-        <Modal T={T} title="Modelos Activos" onClose={()=>setShowModels(false)}>
-          <p style={{fontSize:11,color:T.ts,marginBottom:8}}>Desactiva modelos que não precisas. Os desactivados são simulados por Claude.</p>
+        <Modal T={T} title={t.models.title} onClose={()=>setShowModels(false)}>
+          <p style={{fontSize:11,color:T.ts,marginBottom:8}}>{t.models.hint}</p>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {MODELS.filter(m=>m.id!=="claude").map(m=>(
               <div key={m.id} style={{display:"flex",alignItems:"center",gap:9,background:T.s2,borderRadius:9,padding:"8px 11px"}}>
@@ -1170,17 +1153,17 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
   <div style={{display:"flex",alignItems:"center",gap:7,marginRight:"auto",flexShrink:0}}>
     <div style={{width:28,height:28,borderRadius:8,background:`${AC.claude}22`,border:`1px solid ${AC.claude}33`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:AC.claude}}>C</div>
     <div>
-      <div style={{fontSize:11,fontWeight:800,letterSpacing:3,color:T.tx}}>CÓRTEX <span style={{opacity:0.4,fontSize:8}}>{MV.split("-")[1]}</span></div>
-      <div style={{fontSize:7,color:T.tf,letterSpacing:1}}>11 Lobos · Council · Claude Opus 4.6</div>
+      <div style={{fontSize:11,fontWeight:800,letterSpacing:3,color:T.tx}}>{t.nav.title} <span style={{opacity:0.4,fontSize:8}}>{MV.split("-")[1]}</span></div>
+      <div style={{fontSize:7,color:T.tf,letterSpacing:1}}>{t.nav.subtitle}</div>
     </div>
   </div>
 
   {/* Pontinhos — só DEV_MODE */}
   {DEV_MODE && (
     <div style={{display:"flex",gap:3,marginRight:4}}>
-      {LOBES.slice(0,10).filter((_,i)=>i%2===0).map(l=>{
+      {LOBES.slice(0,10).filter((_,i)=>i%2===0).map((l,index)=>{
         const hasKey=l.id==="grok"?hG:l.id==="gemini"?hGm:l.id==="perp"?hP:l.id==="openai"?hO:l.id==="deepseek"?hD:l.id==="llama"?hL:true;
-        return <div key={l.id} title={`${l.label}: ${hasKey?"Real":"Simulado"}`} style={{padding:"2px 5px",borderRadius:16,border:`1px solid ${hasKey?l.color+"44":T.b1}`,background:hasKey?l.color+"12":"transparent",display:"flex",alignItems:"center",gap:2}}>
+        return <div key={`lobe-${l.id}-${index}`} title={`${l.label}: ${hasKey?"Real":"Simulado"}`} style={{padding:"2px 5px",borderRadius:16,border:`1px solid ${hasKey?l.color+"44":T.b1}`,background:hasKey?l.color+"12":"transparent",display:"flex",alignItems:"center",gap:2}}>
           <div style={{width:4,height:4,borderRadius:"50%",background:hasKey?l.color:T.tf}}/>
           <span style={{fontSize:6,fontWeight:700,color:hasKey?l.color:T.tf}}>{l.label.slice(0,3)}</span>
         </div>;
@@ -1188,7 +1171,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
     </div>
   )}
 
-  {!isMobile && [["chat","💬","Chat"],...(DEV_MODE?[["keys","🔑","Keys"]]:[]),["memory","🧠","Mem."],["settings","⚙","Defs"]].map(([p,ico,lbl])=>(
+  {!isMobile && [["chat","💬",t.nav.chat],...(DEV_MODE?[["keys","🔑",t.nav.keys]]:[]),["memory","🧠",t.nav.memory],["settings","⚙",t.nav.settings]].map(([p,ico,lbl])=>(
   <button
     key={p}
     onClick={()=>setPage(p)}
@@ -1223,11 +1206,19 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
 
   {!isMobile && (
   <>
-    <button onClick={()=>setShowModels(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title="Modelos">◈</button>
-    <button onClick={()=>setShowTP(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title="Tema">{THEMES[theme].emoji}</button>
-    <button onClick={()=>setShowGuide(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title="Guia">?</button>
+    <button onClick={()=>setShowModels(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title={t.nav.models}>◈</button>
+    <button onClick={()=>setShowTP(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title={t.nav.theme}>{THEMES[theme].emoji}</button>
+    <button onClick={()=>setShowGuide(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title={t.nav.guide}>?</button>
   </>
 )}
+
+<button
+  onClick={toggleLang}
+  style={{...navBtn(T),minWidth:44,minHeight:44,fontWeight:700,color:T.tx}}
+  title={lang === "pt" ? "Switch to English" : "Mudar para Português"}
+>
+  {lang === "pt" ? "EN" : "PT"}
+</button>
 
 {/* Modo Foco */}
 <button
@@ -1239,7 +1230,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
     borderColor: focusMode ? `${AC.grok}55` : T.b1,
     color: focusMode ? AC.grok : T.ts,
   }}
-  title="Modo Foco"
+  title={t.focus.title}
 >
   ◎
 </button>
@@ -1253,7 +1244,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
     background:showSidebar?`${AC.claude}22`:"transparent",
     borderColor:showSidebar?`${AC.claude}55`:T.b1,
   }}
-  title="Histórico"
+  title={t.sidebar.title}
 >
   ☰
 </button>
@@ -1269,17 +1260,17 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
   {showSidebar &&<div style={{position:"fixed",inset:0,zIndex:498,background:"transparent"}} onClick={()=>setShowSidebar(false)}/>}
   <div style={{position:"fixed",top:50,left:0,bottom:0,zIndex:499,width:260,background:T.s1,borderRight:`1px solid ${T.b1}`,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"4px 0 24px #00000055",transform:showSidebar?"translateX(0)":"translateX(-102%)",opacity:showSidebar?1:0,transition:"transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.28s cubic-bezier(0.4,0,0.2,1)",willChange:"transform, opacity"}}>
     <div style={{padding:"10px 12px",borderBottom:`1px solid ${T.b1}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-      <span style={{fontSize:11,fontWeight:700,color:T.tx}}>Histórico</span>
-      <button onClick={newChat} style={{...btn(T,AC.claude),fontSize:9,padding:"3px 9px"}}>+ Nova conversa</button>
+      <span style={{fontSize:11,fontWeight:700,color:T.tx}}>{t.sidebar.title}</span>
+      <button onClick={newChat} style={{...btn(T,AC.claude),fontSize:9,padding:"3px 9px"}}>{t.nav.newChat}</button>
     </div>
     <div style={{flex:1,overflowY:"auto",padding:6,display:"flex",flexDirection:"column",gap:4}}>
       {conversations.length===0
-        ?<div style={{fontSize:10,color:T.tf,textAlign:"center",marginTop:24,lineHeight:1.8}}>Sem conversas guardadas.<br/>Começa a escrever!</div>
+        ?<div style={{fontSize:10,color:T.tf,textAlign:"center",marginTop:24,lineHeight:1.8}}>{t.sidebar.empty.split("\n")[0]}<br/>{t.sidebar.empty.split("\n")[1]}</div>
         :conversations.map(conv=>(
           <div key={conv.id} onClick={()=>switchConv(conv)} style={{background:conv.id===currentConvId?`${AC.claude}18`:T.s2,border:`1px solid ${conv.id===currentConvId?AC.claude+"44":T.b1}`,borderRadius:8,padding:"7px 9px",cursor:"pointer",display:"flex",alignItems:"flex-start",gap:6,transition:"all 0.12s"}}>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:10,fontWeight:600,color:T.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{conv.title}</div>
-              <div style={{fontSize:8,color:T.ts,marginTop:1}}>{conv.msgs?.filter(m=>m.role==="user").length} msg · {new Date(conv.updatedAt).toLocaleDateString("pt-PT")}</div>
+              <div style={{fontSize:8,color:T.ts,marginTop:1}}>{t.sidebar.msgs(conv.msgs?.filter(m=>m.role==="user").length)} · {new Date(conv.updatedAt).toLocaleDateString(lang==="pt"?"pt-PT":"en-US")}</div>
             </div>
             <button onClick={e=>deleteConv(conv.id,e)} style={{background:"transparent",border:"none",color:T.tf,cursor:"pointer",fontSize:10,flexShrink:0,opacity:0.5,padding:2,lineHeight:1}}>✕</button>
           </div>
@@ -1287,16 +1278,16 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       }
     </div>
     <div style={{padding:"6px 12px",borderTop:`1px solid ${T.b1}`,fontSize:8,color:T.tf,flexShrink:0}}>
-      Memória partilhada entre conversas
+      {t.sidebar.memNote}
     </div>
   </div>
 </>
           {DEV_MODE && (
   <div style={{display:"flex",alignItems:"center",gap:7,padding:"3px 12px",background:T.s2,borderBottom:`1px solid ${T.b2}`,fontSize:8,flexShrink:0,overflowX:"auto"}}>
     {LOBES.map((l,i)=>{
-      const active=phase==="council"||(l.id==="claude"&&(phase==="cortex"||phase==="reflex"));
-      const done=phase==="cortex"&&l.id!=="claude";
-      return <div key={l.id} style={{display:"flex",alignItems:"center",gap:i<LOBES.length-1?6:0}}>
+      const active=phase==="council"||(l.id==="claude"&&["judges","rei","cortex","reflex"].includes(phase));
+      const done=["judges","rei","cortex","reflex"].includes(phase)&&l.id!=="claude";
+      return <div key={`lobe-${l.id}-${i}`} style={{display:"flex",alignItems:"center",gap:i<LOBES.length-1?6:0}}>
         <div style={{display:"flex",alignItems:"center",gap:2}}>
           <div style={{width:5,height:5,borderRadius:"50%",background:(active||done)?l.color:"#444",boxShadow:active?`0 0 6px ${l.color}`:"none",transition:"all 0.3s"}} className={active?"pulse":""}/>
           <span style={{color:(active||done)?l.color:T.ts,fontWeight:active?700:400,letterSpacing:1,opacity:(active||done)?1:0.7}}>{l.label}</span>
@@ -1351,7 +1342,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
         <div style={{width:38,height:4,borderRadius:999,background:T.b1}} />
         <button
           onClick={()=>setFabOpen(false)}
-          aria-label="Fechar menu"
+          aria-label={t.fab.close}
           style={{
             position:"absolute",
             right:2,
@@ -1375,7 +1366,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
 
       <div style={{padding:"2px 2px 0"}}>
         <div style={{fontSize:11,fontWeight:800,color:T.tx,letterSpacing:0.4,marginBottom:10}}>
-          Navegação rápida
+          {t.fab.title}
         </div>
 
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:8}}>
@@ -1383,28 +1374,28 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
             {
               key:"memory",
               icon:"🧠",
-              label:"Mem.",
+              label:t.fab.items.memory,
               active:page==="memory",
               onClick:()=>{setPage("memory");setFabOpen(false);}
             },
             {
               key:"models",
               icon:"◈",
-              label:"Modelos",
+              label:t.fab.items.models,
               active:showModels,
               onClick:()=>{setShowModels(true);setFabOpen(false);}
             },
             {
               key:"theme",
               icon:THEMES[theme].emoji,
-              label:"Tema",
+              label:t.fab.items.theme,
               active:showTP,
               onClick:()=>{setShowTP(true);setFabOpen(false);}
             },
             {
               key:"guide",
               icon:"?",
-              label:"Guia",
+              label:t.fab.items.guide,
               active:showGuide,
               onClick:()=>{setShowGuide(true);setFabOpen(false);}
             }
@@ -1440,7 +1431,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
 
     <button
       onClick={() => setFabOpen(v => !v)}
-      aria-label={fabOpen ? "Fechar menu" : "Abrir menu"}
+      aria-label={fabOpen ? t.fab.close : t.fab.open}
       style={{
         position:"fixed",
         right:16,
@@ -1469,7 +1460,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
 
           <div ref={chatRef} onScroll={e=>{const el=e.currentTarget;setAtBottom(el.scrollHeight-el.scrollTop-el.clientHeight<60);}} style={{flex:1,overflowY:"auto",padding:"13px 12px 7px",position:"relative"}}>
             {!atBottom&&msgs.length>0&&(
-              <button onClick={()=>{botRef.current?.scrollIntoView({behavior:"smooth"});setAtBottom(true);}} style={{position:"sticky",bottom:10,left:"50%",transform:"translateX(-50%)",zIndex:10,display:"flex",alignItems:"center",gap:5,background:T.s1,border:`1px solid ${AC.claude}55`,borderRadius:18,padding:"5px 13px",color:AC.claude,fontSize:10,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${T.b2}88`,marginBottom:4}}>↓ nova mensagem</button>
+              <button onClick={()=>{botRef.current?.scrollIntoView({behavior:"smooth"});setAtBottom(true);}} style={{position:"sticky",bottom:10,left:"50%",transform:"translateX(-50%)",zIndex:10,display:"flex",alignItems:"center",gap:5,background:T.s1,border:`1px solid ${AC.claude}55`,borderRadius:18,padding:"5px 13px",color:AC.claude,fontSize:10,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${T.b2}88`,marginBottom:4}}>{t.chat.scrollDown}</button>
             )}
             {msgs.length===0 ? (
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"80%",gap:0,padding:"20px 14px"}}>
@@ -1482,19 +1473,19 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                   ))}
                 </div>
                 {/* Título */}
-                <h2 style={{margin:"0 0 6px",fontSize:isMobile?22:28,fontWeight:800,color:T.tx,letterSpacing:-1,textAlign:"center"}}>Córtex Digital</h2>
+                <h2 style={{margin:"0 0 6px",fontSize:isMobile?22:28,fontWeight:800,color:T.tx,letterSpacing:-1,textAlign:"center"}}>{t.home.title}</h2>
                 <p style={{margin:"0 0 28px",fontSize:12,color:T.ts,textAlign:"center",maxWidth:320,lineHeight:1.5}}>
-                  Conselho de <span style={{color:AC.claude,fontWeight:600}}>11 lobos</span> · Juiz <span style={{color:AC.claude,fontWeight:600}}>Claude Opus 4.6</span>
+                  {t.home.subtitle} <span style={{color:AC.claude,fontWeight:600}}>{t.home.lobes}</span> · {t.home.judge} <span style={{color:AC.claude,fontWeight:600}}>Claude Opus 4.6</span>
                 </p>
                 {/* Sugestões — pills horizontais simples */}
                 <div style={{display:"flex",flexDirection:"column",gap:6,width:"100%",maxWidth:480,marginBottom:20}}>
                   {[
-                    {icon:"◉",text:"Explica memória vetorial em sistemas de IA",color:AC.grok},
-                    {icon:"◈",text:"Como criar um agente IA com LangChain?",color:AC.gemini},
-                    {icon:"◐",text:"Diferenças práticas entre os principais LLMs",color:AC.deepseek},
-                    {icon:"◇",text:"O que é RAG e como funciona na prática?",color:AC.perp},
+                    {icon:"◉",text:t.home.suggestions[0],color:AC.grok},
+                    {icon:"◈",text:t.home.suggestions[5],color:AC.gemini},
+                    {icon:"◐",text:t.home.suggestions[3],color:AC.deepseek},
+                    {icon:"◇",text:t.home.suggestions[4],color:AC.perp},
                   ].map((s,i)=>(
-                    <button key={i} onClick={()=>send(s.text)}
+                    <button key={`suggestion-${i}-${s.text.slice(0,10)}`} onClick={()=>send(s.text)}
                       style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:10,padding:"9px 13px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",fontSize:12,color:T.ts,display:"flex",alignItems:"center",gap:9,transition:"all 0.15s"}}>
                       <span style={{color:s.color,fontSize:14,flexShrink:0}}>{s.icon}</span>
                       <span style={{lineHeight:1.3}}>{s.text}</span>
@@ -1505,10 +1496,10 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                 {/* Stats rápidas + seed */}
                 <div style={{display:"flex",alignItems:"center",gap:12,fontSize:10,color:T.ts}}>
                   {brain.semantic.length>0
-                    ?<span>🧠 {brain.semantic.length} factos · {brain.sessions} sessões</span>
-                    :<button onClick={()=>setShowSeed(true)} style={{...btn(T,AC.genspark),fontSize:10,padding:"4px 10px"}}>🌱 Configurar cérebro</button>
+                    ?<span>🧠 {brain.semantic.length} {t.memory.stats.facts.toLowerCase()} · {brain.sessions} {t.memory.stats.sessions.toLowerCase()}</span>
+                    :<button onClick={()=>setShowSeed(true)} style={{...btn(T,AC.genspark),fontSize:10,padding:"4px 10px"}}>{t.home.configBrain}</button>
                   }
-                  {conversations.length>0&&<span style={{color:T.tf}}>· {conversations.length} conversas</span>}
+                  {conversations.length>0&&<span style={{color:T.tf}}>· {conversations.length} {t.sidebar.conversations}</span>}
                 </div>
               </div>
             ) : (
@@ -1530,7 +1521,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
   invoke={invoke}
   P={P}
   toast={toast}
-  ClaudeCardComponent={ClaudeCard}
+  ClaudeCardComponent={KingCard}
 />
 
                 {cur&&(
@@ -1538,7 +1529,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                     <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:"3px 18px 18px 18px",padding:"14px 16px",minWidth:240,maxWidth:"80%",boxShadow:`0 2px 12px ${T.b2}88`}}>
                       {/* Label fase */}
                       <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:10}}>
-                        <div style={{display:"flex",gap:2}}>{LOBES.slice(0,8).map(l=><div key={l.id} style={{width:5,height:5,borderRadius:"50%",background:l.color,opacity:phase==="council"?1:l.id==="claude"?1:0.08,transition:"opacity 0.5s"}} className={phase==="council"?"pulse":""}/>)}</div>
+                        <div style={{display:"flex",gap:2}}>{LOBES.slice(0,8).map((l,index)=><div key={`lobe-${l.id}-${index}`} style={{width:5,height:5,borderRadius:"50%",background:l.color,opacity:phase==="council"?1:l.id==="claude"?1:0.08,transition:"opacity 0.5s"}} className={phase==="council"?"pulse":""}/>)}</div>
                         <span style={{fontSize:10,color:cur.color,fontWeight:600,letterSpacing:1}}>{cur.label}</span>
                       </div>
                       {/* Skeleton lines */}
@@ -1563,28 +1554,28 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
             <div style={{display:"flex",gap:8,maxWidth:820,margin:"0 auto",alignItems:"flex-end"}}>
               {/* caixa de texto */}
               <div style={{flex:1,display:"flex",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:16,padding:"8px 10px 8px 14px",alignItems:"flex-end",boxShadow:`0 2px 14px ${T.b2}66`,transition:"border-color 0.2s"}}>
-  <textarea ref={taRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Pergunta ao conselho..." disabled={!!phase} rows={1} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:13,color:T.tx,fontFamily:"inherit",lineHeight:1.55,resize:"none",maxHeight:200,overflowY:"auto",paddingTop:3,paddingBottom:3}}/>
+  <textarea ref={taRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder={t.chat.placeholder} disabled={!!phase} rows={1} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:13,color:T.tx,fontFamily:"inherit",lineHeight:1.55,resize:"none",maxHeight:200,overflowY:"auto",paddingTop:3,paddingBottom:3}}/>
   <div style={{display:"flex",gap:3,alignItems:"flex-end",flexShrink:0}}>
     {msgs.filter(m=>m.role==="user").length>0&&!phase&&
-      <button onClick={regenerate} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title="Regenerar">↺</button>}
+      <button onClick={regenerate} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title={t.chat.regenerate}>↺</button>}
     <button onClick={()=>{
-      if(!("webkitSpeechRecognition" in window||"SpeechRecognition" in window)){toast("Voz não suportada neste browser","error");return;}
+      if(!("webkitSpeechRecognition" in window||"SpeechRecognition" in window)){toast(t.toasts.voiceUnsupported,"error");return;}
       const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-      const sr=new SR();sr.lang="pt-PT";sr.interimResults=false;sr.maxAlternatives=1;
+      const sr=new SR();sr.lang=speechLang;sr.interimResults=false;sr.maxAlternatives=1;
       sr.onresult=e=>{const t=e.results[0][0].transcript;setInput(p=>p?p+" "+t:t);};
-      sr.onerror=()=>toast("Erro no microfone","error");
+      sr.onerror=()=>toast(t.toasts.voiceError,"error");
       sr.start();
-    }} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.7}} onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0.7"} title="Ditado por voz">🎙</button>
+    }} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.7}} onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0.7"} title={t.chat.voice}>🎙</button>
         {msgs.length>0&&
-      <button onClick={exportConv} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.gemini;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title="Exportar">↓</button>}
+      <button onClick={exportConv} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.gemini;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title={t.chat.export}>↓</button>}
   </div>
 </div>
               {/* botão enviar */}
               <button onClick={()=>send()} disabled={!!phase||!input.trim()} style={{background:input.trim()&&!phase?AC.claude:"#333",border:"none",borderRadius:14,width:44,height:44,cursor:input.trim()&&!phase?"pointer":"default",fontSize:16,color:"#fff",transition:"all 0.2s",opacity:phase?0.4:1,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:input.trim()&&!phase?`0 0 16px ${AC.claude}55`:"none",flexShrink:0}}>▶</button>
               {/* botão nova conversa */}
-              <button onClick={newChat} title="Nova conversa" style={{background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,width:44,height:44,cursor:"pointer",fontSize:16,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=AC.claude+"66";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.b1;e.currentTarget.style.color=T.ts;}}>+</button>
+              <button onClick={newChat} title={t.chat.newChat} style={{background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,width:44,height:44,cursor:"pointer",fontSize:16,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=AC.claude+"66";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.b1;e.currentTarget.style.color=T.ts;}}>+</button>
             </div>
-            {buf.length>0&&<div style={{fontSize:8,color:T.tf,textAlign:"center",marginTop:4}}>Buffer: {buf.length}/{MAX_BUF} — reflexão em {MAX_BUF-buf.length} trocas</div>}
+            {buf.length>0&&<div style={{fontSize:8,color:T.tf,textAlign:"center",marginTop:4}}>{t.chat.bufferHint(buf.length, MAX_BUF)}</div>}
           </div>
         </>
       )}
@@ -1594,25 +1585,25 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
   <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:18,padding:24}}>
     <div style={{fontSize:36,fontWeight:900,color:AC.claude}}>◆</div>
     <div style={{textAlign:"center"}}>
-      <div style={{fontSize:15,fontWeight:800,color:T.tx,marginBottom:4}}>Área de Desenvolvimento</div>
-      <div style={{fontSize:11,color:T.ts}}>Insere o PIN para aceder às API Keys</div>
+      <div style={{fontSize:15,fontWeight:800,color:T.tx,marginBottom:4}}>{t.keys.pin.title}</div>
+      <div style={{fontSize:11,color:T.ts}}>{t.keys.pin.sub}</div>
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%",maxWidth:280}}>
-      <input type="password" value={pinInput} onChange={e=>{setPinInput(e.target.value);setPinErr(false);}} onKeyDown={e=>{if(e.key==="Enter"){if(pinInput===getDevPin()){setDevUnlocked(true);setPinInput("");}else{setPinErr(true);setPinInput("");}}} } placeholder="PIN de acesso..." maxLength={12} style={{background:T.s2,border:`1px solid ${pinErr?"#ef4444":T.b1}`,borderRadius:12,padding:"10px 14px",color:T.tx,fontSize:14,fontFamily:"monospace",outline:"none",textAlign:"center",letterSpacing:4}} autoFocus/>
-      {pinErr&&<div style={{fontSize:10,color:"#ef4444",textAlign:"center"}}>PIN incorreto</div>}
-      <button onClick={()=>{if(pinInput===getDevPin()){setDevUnlocked(true);setPinInput("");setPinErr(false);}else{setPinErr(true);setPinInput("");}}} style={{background:`${AC.claude}22`,border:`1px solid ${AC.claude}44`,borderRadius:10,padding:"8px 0",color:AC.claude,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Entrar</button>
+      <input type="password" value={pinInput} onChange={e=>{setPinInput(e.target.value);setPinErr(false);}} onKeyDown={e=>{if(e.key==="Enter"){if(pinInput===getDevPin()){setDevUnlocked(true);setPinInput("");}else{setPinErr(true);setPinInput("");}}} } placeholder={t.keys.pin.placeholder} maxLength={12} style={{background:T.s2,border:`1px solid ${pinErr?"#ef4444":T.b1}`,borderRadius:12,padding:"10px 14px",color:T.tx,fontSize:14,fontFamily:"monospace",outline:"none",textAlign:"center",letterSpacing:4}} autoFocus/>
+      {pinErr&&<div style={{fontSize:10,color:"#ef4444",textAlign:"center"}}>{t.keys.pin.wrong}</div>}
+      <button onClick={()=>{if(pinInput===getDevPin()){setDevUnlocked(true);setPinInput("");setPinErr(false);}else{setPinErr(true);setPinInput("");}}} style={{background:`${AC.claude}22`,border:`1px solid ${AC.claude}44`,borderRadius:10,padding:"8px 0",color:AC.claude,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{t.keys.pin.enter}</button>
     </div>
-    <div style={{fontSize:9,color:T.tf,textAlign:"center",maxWidth:240}}>PIN predefinido: 3004. Muda em localStorage("cortex-dev-pin").</div>
+    <div style={{fontSize:9,color:T.tf,textAlign:"center",maxWidth:240}}>{t.keys.pin.hint}</div>
   </div>
 )}
 
 {page==="keys" && devUnlocked && (
   <div style={{flex:1,overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:10,maxWidth:580,width:"100%",margin:"0 auto"}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-      <h2 style={{margin:0,fontSize:14,fontWeight:800,color:T.tx}}>Chaves API</h2>
-      <button onClick={()=>{setDevUnlocked(false);setPinInput("");}} style={{fontSize:9,color:T.ts,background:"transparent",border:`1px solid ${T.b1}`,borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit"}}>🔒 Bloquear</button>
+      <h2 style={{margin:0,fontSize:14,fontWeight:800,color:T.tx}}>{t.keys.title}</h2>
+      <button onClick={()=>{setDevUnlocked(false);setPinInput("");}} style={{fontSize:9,color:T.ts,background:"transparent",border:`1px solid ${T.b1}`,borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit"}}>{t.keys.lock}</button>
     </div>
-    <p style={{margin:0,fontSize:11,color:T.ts}}>Sem key o lobe usa Groq para simular.</p>
+    <p style={{margin:0,fontSize:11,color:T.ts}}>{t.keys.hint}</p>
     {[
       {id:"grok",    label:"Grok",           color:AC.grok,             link:"console.x.ai",               ph:"xai-...",     desc:"Grátis · grok-3"},
       {id:"gemini",  label:"Gemini",         color:AC.gemini,           link:"aistudio.google.com/apikey",  ph:"AIza...",     desc:"Grátis · gemini-2.5-flash"},
@@ -1625,7 +1616,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       {id:"manus",    label:"Manus",     color:AC.manus,    link:"manus.im",                       ph:"manus-...",  desc:"Agente autónomo"},
       {id:"claude",  label:"Claude",         color:AC.claude,           link:"console.anthropic.com",       ph:"sk-ant-...",  desc:"Pago · claude-sonnet"},
     ].map(api=>(
-      <KeyRow key={api.id} api={api} T={T} value={keys[api.id]||""} onChange={v=>{
+      <KeyRow key={api.id} api={api} T={T} t={t} value={keys[api.id]||""} onChange={v=>{
         const nk={...keys,[api.id]:v};setKeys(nk);saveKeys(nk);
       }}/>
     ))}
@@ -1635,13 +1626,13 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       {page==="memory" && (
         <div style={{flex:1,overflowY:"auto",padding:13,display:"flex",flexDirection:"column",gap:11,maxWidth:700,width:"100%",margin:"0 auto",boxSizing:"border-box"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:7}}>
-            <div><h2 style={{margin:0,fontSize:14,fontWeight:800,color:T.tx}}>Memória</h2><p style={{margin:"2px 0 0",fontSize:10,color:T.ts}}>Conhecimento acumulado do sistema</p></div>
+            <div><h2 style={{margin:0,fontSize:14,fontWeight:800,color:T.tx}}>{t.memory.title}</h2><p style={{margin:"2px 0 0",fontSize:10,color:T.ts}}>{t.memory.subtitle}</p></div>
             <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-              {[[()=>setShowSeed(true),AC.genspark,"Seed"],[()=>setShowExport(true),AC.perp,"Export"],[()=>setShowImport(true),AC.gemini,"Import"],[()=>{if(confirm("Apagar toda a memória?")){setBrain(defaultBrain);saveBrain(defaultBrain);setBuf([]);}},  "#ef4444","⟳"]].map(([fn,c,lbl],i)=><button key={i} onClick={fn} style={{...btn(T,c),padding:"4px 8px"}}>{lbl}</button>)}
+              {[[()=>setShowSeed(true),AC.genspark,t.memory.seed],[()=>setShowExport(true),AC.perp,t.memory.export],[()=>setShowImport(true),AC.gemini,t.memory.import],[()=>{if(confirm(t.memory.confirmReset)){setBrain(defaultBrain);saveBrain(defaultBrain);setBuf([]);}},  "#ef4444",t.memory.reset]].map(([fn,c,lbl],i)=><button key={`memory-action-${i}-${lbl}`} onClick={fn} style={{...btn(T,c),padding:"4px 8px"}}>{lbl}</button>)}
             </div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
-            {[[brain.semantic.length,"Factos",AC.claude,"◆"],[brain.episodic.length,"Sessões",AC.gemini,"◈"],[brain.patterns.length,"Padrões",AC.grok,"◉"],[brain.sessions,"Total",AC.genspark,"◎"]].map(([n,l,c,ic])=>(
+            {[[brain.semantic.length,t.memory.stats.facts,AC.claude,"◆"],[brain.episodic.length,t.memory.stats.sessions,AC.gemini,"◈"],[brain.patterns.length,t.memory.stats.patterns,AC.grok,"◉"],[brain.sessions,t.memory.stats.total,AC.genspark,"◎"]].map(([n,l,c,ic])=>(
               <div key={l} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:13,padding:"11px 7px",textAlign:"center"}}>
                 <div style={{fontSize:10,color:c,marginBottom:2}}>{ic}</div>
                 <div style={{fontSize:21,fontWeight:800,color:T.tx,lineHeight:1}}>{n}</div>
@@ -1649,37 +1640,37 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               </div>
             ))}
           </div>
-          {[{title:"Semântica",sub:"Factos e preferências",color:AC.claude,icon:"◆",items:brain.semantic.slice().reverse().map(x=>`[${x.tipo}] ${x.descricao}`)},{title:"Episódica",sub:"Resumos",color:AC.gemini,icon:"◈",items:brain.episodic.slice().reverse()},{title:"Padrões",sub:"Comportamentos",color:AC.grok,icon:"◉",items:brain.patterns}].map(sec=>(
+          {[{title:t.memory.sections.semantic.title,sub:t.memory.sections.semantic.sub,color:AC.claude,icon:"◆",items:brain.semantic.slice().reverse().map(x=>`[${x.tipo}] ${x.descricao}`)},{title:t.memory.sections.episodic.title,sub:t.memory.sections.episodic.sub,color:AC.gemini,icon:"◈",items:brain.episodic.slice().reverse()},{title:t.memory.sections.patterns.title,sub:t.memory.sections.patterns.sub,color:AC.grok,icon:"◉",items:brain.patterns}].map(sec=>(
             <div key={sec.title} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:13,overflow:"hidden"}}>
               <div style={{padding:"9px 13px",borderBottom:sec.items.length>0?`1px solid ${T.b2}`:"none",display:"flex",alignItems:"center",gap:6}}>
                 <span style={{color:sec.color,fontSize:12}}>{sec.icon}</span>
                 <div><div style={{fontSize:11,fontWeight:600,color:T.tx}}>{sec.title}</div><div style={{fontSize:9,color:T.ts}}>{sec.sub}</div></div>
                 <span style={{marginLeft:"auto",fontSize:9,color:T.tf,background:T.s2,border:`1px solid ${T.b1}`,borderRadius:20,padding:"1px 6px"}}>{sec.items.length}</span>
               </div>
-              {sec.items.length===0?<div style={{padding:"11px 13px",fontSize:10,color:T.tf,fontStyle:"italic"}}>Vazio.</div>:sec.items.map((it,i)=><div key={i} style={{padding:"6px 13px",fontSize:10,color:T.ts,borderBottom:i<sec.items.length-1?`1px solid ${T.b2}`:"none",lineHeight:1.5}}>• {it}</div>)}
+              {sec.items.length===0?<div style={{padding:"11px 13px",fontSize:10,color:T.tf,fontStyle:"italic"}}>{t.memory.empty}</div>:sec.items.map((it,i)=><div key={`memory-item-${i}-${String(it).slice(0,10)}`} style={{padding:"6px 13px",fontSize:10,color:T.ts,borderBottom:i<sec.items.length-1?`1px solid ${T.b2}`:"none",lineHeight:1.5}}>• {it}</div>)}
             </div>
           ))}
-          {brain.lastReflect&&<div style={{fontSize:8,color:T.tf,textAlign:"center"}}>Última reflexão: {new Date(brain.lastReflect).toLocaleString()}</div>}
+          {brain.lastReflect&&<div style={{fontSize:8,color:T.tf,textAlign:"center"}}>{t.memory.lastReflect} {new Date(brain.lastReflect).toLocaleString(lang==="pt"?"pt-PT":"en-US")}</div>}
         </div>
       )}
 
       {/* ── SETTINGS ───────────────────────────────────────── */}
       {page==="settings" && (
         <div style={{flex:1,overflowY:"auto",padding:13,display:"flex",flexDirection:"column",gap:11,maxWidth:580,width:"100%",margin:"0 auto",boxSizing:"border-box"}}>
-          <h2 style={{margin:0,fontSize:14,fontWeight:800,color:T.tx}}>Definições</h2>
+          <h2 style={{margin:0,fontSize:14,fontWeight:800,color:T.tx}}>{t.settings.title}</h2>
           <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div><div style={{fontSize:11,fontWeight:700,color:T.tx}}>Tema</div><div style={{fontSize:10,color:T.ts,marginTop:1}}>{THEMES[theme].emoji} {THEMES[theme].name} — {Object.keys(THEMES).length} temas</div></div>
-            <button onClick={()=>setShowTP(true)} style={btn(T,AC.claude)}>Mudar</button>
+            <div><div style={{fontSize:11,fontWeight:700,color:T.tx}}>{t.settings.theme.label}</div><div style={{fontSize:10,color:T.ts,marginTop:1}}>{THEMES[theme].emoji} {THEMES[theme].name} — {t.settings.theme.sub(Object.keys(THEMES).length)}</div></div>
+            <button onClick={()=>setShowTP(true)} style={btn(T,AC.claude)}>{t.settings.theme.action}</button>
           </div>
           <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div>
-              <div style={{fontSize:11,fontWeight:700,color:T.tx}}>Chaves API</div>
-              <div style={{fontSize:9,color:T.ts,marginTop:1}}>{Object.values(keys).filter(k=>k?.trim().length>10).length} de {Object.keys(keys).length} activas</div>
+              <div style={{fontSize:11,fontWeight:700,color:T.tx}}>{t.settings.keys.label}</div>
+              <div style={{fontSize:9,color:T.ts,marginTop:1}}>{t.settings.keys.sub(Object.values(keys).filter(k=>k?.trim().length>10).length, Object.keys(keys).length)}</div>
             </div>
-            <button onClick={()=>setPage("keys")} style={btn(T,AC.perp)}>Gerir chaves</button>
+            <button onClick={()=>setPage("keys")} style={btn(T,AC.perp)}>{t.settings.keys.action}</button>
           </div>
           <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:12,padding:"10px 14px"}}>
-            <div style={{fontSize:11,fontWeight:700,color:T.tx,marginBottom:8}}>Arquitectura v12</div>
+            <div style={{fontSize:11,fontWeight:700,color:T.tx,marginBottom:8}}>{t.settings.arch}</div>
             {[["◉",AC.grok,"Grok","grok-3"],["◈",AC.gemini,"Gemini","gemini-2.5-flash"],["◇",AC.perp,"Perplexity","sonar-pro (via Groq)"],["◎",AC.genspark,"Genspark","simulado (via Claude)"],["◍",AC.manus,"Manus","simulado (via Claude)"],["○",AC.openai||"#74aa9c","OpenAI","gpt-4o"],["◐",AC.deepseek||"#4d9fff","DeepSeek","deepseek-chat"],["◑",AC.llama||"#e879f9","Llama","llama-4-scout via Groq"],["◒",AC.mistral||"#f97316","Mistral","mistral-large-latest"],["◓",AC.nemotron||"#a3e635","Nemotron","nemotron-4-340b NVIDIA"],["◆",AC.claude,"Claude","claude-opus-4-6 — Juiz final"],].map(([ic,c,t,d])=>(
               <div key={t} style={{display:"flex",gap:7,padding:"5px 0",borderBottom:`1px solid ${T.b2}`}}>
                 <span style={{color:c,fontSize:12,flexShrink:0}}>{ic}</span>
@@ -1688,6 +1679,21 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               ))}
           </div>
         </div>
+      )}
+      {import.meta.env.DEV && (
+        <>
+          <button
+            onClick={() => setShowEvals(true)}
+            style={{
+              position: 'fixed', bottom: '1rem', right: '1rem',
+              background: 'var(--cor-fundo-2)',
+              border: '1px solid var(--cor-borda)',
+              borderRadius: '8px', padding: '0.4rem 0.8rem',
+              cursor: 'pointer', fontSize: '0.85rem', zIndex: 999
+            }}
+          >🧪 Evals</button>
+          {showEvals && <EvalsPanel onClose={() => setShowEvals(false)} />}
+        </>
       )}
  </div>
     );

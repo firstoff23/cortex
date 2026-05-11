@@ -118,7 +118,7 @@ const MessageList = React.memo(function MessageList({
                 >
                   {m.lobeResults.map((l, idx) => (
                     <LobeCard
-                      key={l._key || l.id || idx}
+                      key={`lobe-${l.id}-${idx}`}
                       l={l}
                       idx={idx}
                       T={T}
