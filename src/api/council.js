@@ -218,6 +218,75 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
   return normalizarValorLobe(lobe, { resposta: texto }, contextoDebate);
 }
 
+export async function chamarLobeStream(lobe, pergunta, contextoDebate = null, options = {}) {
+  const apiKey = getAPIKey(lobe.provider);
+  if (!apiKey) throw new Error(`API key ausente para ${lobe.provider}`);
+
+  const resposta = await fetch(`${getBaseURL(lobe.provider)}/chat/completions`, {
+    method: 'POST',
+    signal: options.signal,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://cortex-digital.vercel.app',
+      'X-Title': 'Córtex Digital',
+    },
+    body: JSON.stringify({
+      model: lobe.modelo,
+      stream: true,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPTS[lobe.id] },
+        { role: 'user', content: mensagemUtilizador(pergunta, contextoDebate) },
+      ],
+      max_tokens:
+        options.max_tokens ||
+        (lobe.modelo.includes('deepseek') ? 1200 : lobe.modelo.includes('llama-4') ? 800 : 420),
+    }),
+  });
+
+  if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+  if (!resposta.body?.getReader) throw new Error('Stream SSE indisponível');
+
+  const reader = resposta.body.getReader();
+  const decoder = new TextDecoder();
+  let textoCompleto = '';
+  let buffer = '';
+  let terminado = false;
+
+  while (!terminado) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const linhas = buffer.split('\n');
+    buffer = linhas.pop() || '';
+
+    for (const linha of linhas) {
+      const limpa = linha.trim();
+      if (!limpa.startsWith('data: ')) continue;
+
+      const dados = limpa.slice(6).trim();
+      if (dados === '[DONE]') {
+        terminado = true;
+        break;
+      }
+
+      try {
+        const json = JSON.parse(dados);
+        const delta = json.choices?.[0]?.delta?.content || '';
+        if (delta) {
+          textoCompleto += delta;
+          options.onToken?.(delta, textoCompleto, lobe);
+        }
+      } catch {
+        // Linhas SSE malformadas não devem quebrar a UX.
+      }
+    }
+  }
+
+  return normalizarValorLobe(lobe, { resposta: textoCompleto }, contextoDebate);
+}
+
 async function chamarComMapa(lobe, pergunta, contextoDebate, mapa, chamar) {
   const ctrl = new AbortController();
   mapa.set(lobe.id, ctrl);
@@ -248,6 +317,58 @@ export async function runDebate(pergunta, modo = 'paralelo', options = {}) {
   const ronda2Map = new Map();
   const ronda2 = await Promise.allSettled(
     lobos.map((lobe) => chamarComMapa(lobe, pergunta, contextoDebate, ronda2Map, chamar))
+  );
+
+  return { ronda1, ronda2 };
+}
+
+async function chamarStreamComFallback(lobe, pergunta, contextoDebate, chamarStream, chamarFallback, onToken) {
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 8000);
+
+  try {
+    return await chamarStream(lobe, pergunta, contextoDebate, {
+      signal: ctrl.signal,
+      onToken,
+    }).catch(() =>
+      chamarFallback(lobe, pergunta, contextoDebate, {
+        signal: ctrl.signal,
+      }),
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function runDebateStream(pergunta, modo = 'paralelo', options = {}) {
+  const lobos = options.lobos || LOBOS;
+  const chamarStream = options.chamarLobeStream || chamarLobeStream;
+  const chamarFallback = options.chamarLobe || chamarLobe;
+
+  const ronda1 = await Promise.allSettled(
+    lobos.map((lobe) =>
+      chamarStreamComFallback(lobe, pergunta, null, chamarStream, chamarFallback, options.onToken)
+    )
+  );
+
+  if (modo === 'paralelo') return { ronda1 };
+
+  const contextoDebate = ronda1
+    .filter((r) => r.status === 'fulfilled')
+    .map((r) => `[${r.value.nome}]: ${r.value.resposta}`)
+    .join('\n\n');
+
+  const ronda2 = await Promise.allSettled(
+    lobos.map((lobe) =>
+      chamarStreamComFallback(
+        lobe,
+        pergunta,
+        contextoDebate,
+        chamarStream,
+        chamarFallback,
+        options.onToken
+      )
+    )
   );
 
   return { ronda1, ronda2 };

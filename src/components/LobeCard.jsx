@@ -15,7 +15,14 @@ const LobeCard = React.memo(function LobeCard({
   invoke,
   P,
   Markdown,
+  textosParciais,
+  aStreaming,
 }) {
+  const streamKey = l.streamId ?? l.id;
+  const textoParcial = textosParciais?.[streamKey] || textosParciais?.[l.id] || "";
+  const respostaVisivel = textoParcial || l.result || "";
+  const corLobe = l.color || l.cor || "#10b981";
+
   return (
     <div
       className="lobe-card"
@@ -210,7 +217,20 @@ const LobeCard = React.memo(function LobeCard({
           lineHeight: 1.65,
         }}
       >
-        <Markdown text={l.result || ""} color={l.isErr ? "#fca5a5" : T.tx} faint={T.ts} />
+        <Markdown text={respostaVisivel} color={l.isErr ? "#fca5a5" : T.tx} faint={T.ts} />
+        {aStreaming && textoParcial && (
+          <span
+            style={{
+              display: "inline-block",
+              width: "2px",
+              height: "1em",
+              background: corLobe,
+              marginLeft: "2px",
+              animation: "piscar 1s step-end infinite",
+              verticalAlign: "-0.12em",
+            }}
+          />
+        )}
       </div>
     </div>
   );

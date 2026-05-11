@@ -2,11 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import KingCard from './components/KingCard';
 import MessageList from './components/MessageList';
 import DebateTimeline from './components/DebateTimeline';
+import BlueprintsPanel from './components/BlueprintsPanel';
 import EvalsPanel from './components/EvalsPanel'
 import FileUploadButton from './components/FileUploadButton.jsx';
 import useCouncil from './hooks/useCouncil';
 import { useFileUpload } from './hooks/useFileUpload.js';
+import { useAutoResize } from "./hooks/useAutoResize.js";
 import { useI18n } from "./hooks/useI18n.js";
+import { useStreaming } from "./hooks/useStreaming.js";
+import { LOBOS as LOBOS_DEBATE, runDebateStream as runDebateStreamApi } from "./api/council.js";
 
 const MV="cortex-v12";
 const MAX_BUF=8;
@@ -655,6 +659,7 @@ export default function Cortex(){
   const [input,setInput]     = useState("");
   const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
+  const [pagina, setPagina] = useState('chat'); // 'chat' | 'blueprints'
   const [theme,setTheme]     = useState("cortex");
   const [keys,setKeys]       = useState(defaultKeys);
   const [toasts,setToasts]   = useState([]);
@@ -692,8 +697,12 @@ export default function Cortex(){
   const [fabOpen, setFabOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [focusLobes, setFocusLobes] = useState(new Set(LOBES.map(l=>l.id)));
+  const { textosParciais, aStreaming, onToken, iniciar, terminar } = useStreaming();
+  const { ref: inputRef, ajustar } = useAutoResize({
+    minHeight: 52,
+    maxHeight: 200
+  });
 
-  const taRef   = useRef(null);
   const botRef  = useRef(null);
   const chatRef = useRef(null);
   const { carregar, ficheiro: ficheiroAnexado, erro: erroUpload, limpar: limparUpload } = useFileUpload();
@@ -714,10 +723,8 @@ export default function Cortex(){
   useEffect(()=>{load();},[]);
   useEffect(()=>{if(atBottom)botRef.current?.scrollIntoView({behavior:"smooth"});},[msgs,phase]);
   useEffect(()=>{
-    if(!taRef.current)return;
-    const el=taRef.current;el.style.height="auto";
-    el.style.height=Math.min(el.scrollHeight,200)+"px";
-  },[input]);
+    ajustar();
+  },[input, ajustar]);
 
   // Auto-lock keys ao navegar para outra página
   useEffect(()=>{if(page!=="keys"&&!DEV_MODE)setDevUnlocked(false);},[page]);
@@ -850,11 +857,22 @@ async function send(query) {
     toast,
     autoSaveConv,
     currentConvId,
-    taRef,
+    taRef: inputRef,
     lobeConfidenceScore,
     callOllama,
     modoDebate: modoDebate ? "debate" : "paralelo",
+    runDebateStream: runDebateStreamApi,
+    streaming: { textosParciais, aStreaming, onToken, iniciar, terminar },
   });
+  ajustar(true);
+  }
+
+  function aplicarSugestaoRei(sugestao) {
+    setInput(sugestao);
+    requestAnimationFrame(() => {
+      ajustar();
+      inputRef.current?.focus();
+    });
   }
 
   async function regenerate(){
@@ -1008,6 +1026,9 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
 
   if(!loaded)return <Splash/>;
   const cur=phase?phases[phase]:null;
+  if (pagina === 'blueprints') return (
+    <BlueprintsPanel onVoltar={() => setPagina('chat')} />
+  );
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100dvh",background:T.bg,color:T.tx,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",overflow:"hidden"}}>
       <style>{`
@@ -1023,6 +1044,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
   @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
   @keyframes lobePop{0%{opacity:0;transform:scale(0.94) translateY(5px)}100%{opacity:1;transform:scale(1) translateY(0)}}
   @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes piscar{0%,100%{opacity:1}50%{opacity:0}}
   @keyframes modalFadeIn{from{opacity:0}to{opacity:1}}
   @keyframes modalSlideIn{from{opacity:0;transform:translateY(-8px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
   @keyframes sidebarSlideIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
@@ -1218,6 +1240,33 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
 ))}
 
   {!isMobile && (
+  <button
+    onClick={() => setPagina(p => p === 'blueprints' ? 'chat' : 'blueprints')}
+    style={{
+      background:pagina==="blueprints"?`${AC.claude}18`:"transparent",
+      border:`1px solid ${pagina==="blueprints"?AC.claude+"44":T.b1}`,
+      borderRadius:10,
+      minHeight:44,
+      padding:"8px 12px",
+      transition:"all 220ms cubic-bezier(0.4,0,0.2,1)",
+      boxShadow:pagina==="blueprints"?`0 0 10px ${AC.claude}22`:"none",
+      color:pagina==="blueprints"?AC.claude:T.ts,
+      cursor:"pointer",
+      fontSize:11,
+      fontFamily:"inherit",
+      fontWeight:pagina==="blueprints"?700:500,
+      display:"flex",
+      alignItems:"center",
+      gap:5,
+      flexShrink:0
+    }}
+  >
+    <span>🗺️</span>
+    <span>Mapas</span>
+  </button>
+)}
+
+  {!isMobile && (
   <>
     <button onClick={()=>setShowModels(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title={t.nav.models}>◈</button>
     <button onClick={()=>setShowTP(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title={t.nav.theme}>{THEMES[theme].emoji}</button>
@@ -1411,6 +1460,13 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               label:t.fab.items.guide,
               active:showGuide,
               onClick:()=>{setShowGuide(true);setFabOpen(false);}
+            },
+            {
+              key:"blueprints",
+              icon:"🗺️",
+              label:"Mapas",
+              active:pagina==="blueprints",
+              onClick:()=>{setPagina("blueprints");setFabOpen(false);}
             }
           ].map((item,idx)=>(
             <button
@@ -1536,6 +1592,9 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
   toast={toast}
   ClaudeCardComponent={KingCard}
   BeforeVerdictComponent={DebateTimeline}
+  textosParciais={textosParciais}
+  aStreaming={aStreaming}
+  onSuggestionClick={aplicarSugestaoRei}
 />
 
                 {cur&&(
@@ -1546,12 +1605,34 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                         <div style={{display:"flex",gap:2}}>{LOBES.slice(0,8).map((l,index)=><div key={`lobe-${l.id}-${index}`} style={{width:5,height:5,borderRadius:"50%",background:l.color,opacity:phase==="council"?1:l.id==="claude"?1:0.08,transition:"opacity 0.5s"}} className={phase==="council"?"pulse":""}/>)}</div>
                         <span style={{fontSize:10,color:cur.color,fontWeight:600,letterSpacing:1}}>{cur.label}</span>
                       </div>
-                      {/* Skeleton lines */}
-                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                        <div className="skeleton" style={{height:10,width:"90%"}}/>
-                        <div className="skeleton" style={{height:10,width:"75%"}}/>
-                        <div className="skeleton" style={{height:10,width:"60%"}}/>
-                      </div>
+                      {/* Streaming parcial ou skeleton */}
+                      {aStreaming && Object.keys(textosParciais).length>0 ? (
+                        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                          {LOBOS_DEBATE.filter(l=>textosParciais[l.id]).map(l=>(
+                            <div key={`stream-${l.id}`} style={{border:`1px solid ${l.cor}33`,background:`${l.cor}10`,borderRadius:10,padding:"8px 10px"}}>
+                              <div style={{fontSize:9,fontWeight:800,color:l.cor,letterSpacing:0.3,marginBottom:4}}>{l.nome}</div>
+                              <div style={{fontSize:11,lineHeight:1.55,color:T.tx,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
+                                {textosParciais[l.id]}
+                                <span style={{
+                                  display:"inline-block",
+                                  width:"2px",
+                                  height:"1em",
+                                  background:l.cor,
+                                  marginLeft:"2px",
+                                  animation:"piscar 1s step-end infinite",
+                                  verticalAlign:"-0.12em",
+                                }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                          <div className="skeleton" style={{height:10,width:"90%"}}/>
+                          <div className="skeleton" style={{height:10,width:"75%"}}/>
+                          <div className="skeleton" style={{height:10,width:"60%"}}/>
+                        </div>
+                      )}
                       {/* Barra de progresso */}
                       <div style={{height:2,background:T.b2,borderRadius:2,overflow:"hidden",marginTop:10}}>
                         <div style={{height:"100%",width:cur.pct,background:`linear-gradient(90deg,${cur.color}66,${cur.color})`,transition:"width 1s ease"}}/>
@@ -1578,8 +1659,23 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
             </label>
             <div style={{display:"flex",gap:8,maxWidth:820,margin:"0 auto",alignItems:"flex-end"}}>
               {/* caixa de texto */}
-              <div style={{flex:1,display:"flex",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:16,padding:"8px 10px 8px 14px",alignItems:"flex-end",boxShadow:`0 2px 14px ${T.b2}66`,transition:"border-color 0.2s"}}>
-  <textarea ref={taRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder={t.chat.placeholder} disabled={!!phase} rows={1} style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:13,color:T.tx,fontFamily:"inherit",lineHeight:1.55,resize:"none",maxHeight:200,overflowY:"auto",paddingTop:3,paddingBottom:3}}/>
+              <div style={{flex:1,display:"flex",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:16,padding:"8px 10px",alignItems:"flex-end",boxShadow:`0 2px 14px ${T.b2}66`,transition:"border-color 0.2s",gap:8}}>
+  <FileUploadButton
+      onFicheiro={carregar}
+      ficheiro={ficheiroAnexado}
+      erro={erroUpload}
+      onLimpar={limparUpload}
+    />
+  <textarea
+    ref={inputRef}
+    value={input}
+    onChange={e=>{setInput(e.target.value);requestAnimationFrame(() => ajustar());}}
+    onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();ajustar(true);}}}
+    placeholder="Pergunta ao council..."
+    disabled={!!phase}
+    rows={1}
+    style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:13,color:T.tx,fontFamily:"inherit",resize:"none",overflow:"hidden",transition:"height 0.15s ease",minHeight:"52px",height:"52px",maxHeight:200,padding:"0.75rem 1rem",lineHeight:"1.5"}}
+  />
   <div style={{display:"flex",gap:3,alignItems:"flex-end",flexShrink:0}}>
     {msgs.filter(m=>m.role==="user").length>0&&!phase&&
       <button onClick={regenerate} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title={t.chat.regenerate}>↺</button>}
@@ -1591,18 +1687,18 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       sr.onerror=()=>toast(t.toasts.voiceError,"error");
       sr.start();
     }} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.7}} onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0.7"} title={t.chat.voice}>🎙</button>
-    <FileUploadButton
-      onFicheiro={carregar}
-      ficheiro={ficheiroAnexado}
-      erro={erroUpload}
-      onLimpar={limparUpload}
-    />
         {msgs.length>0&&
       <button onClick={exportConv} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.gemini;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title={t.chat.export}>↓</button>}
   </div>
 </div>
               {/* botão enviar */}
-              <button onClick={()=>send()} disabled={!!phase||!input.trim()} style={{background:input.trim()&&!phase?AC.claude:"#333",border:"none",borderRadius:14,width:44,height:44,cursor:input.trim()&&!phase?"pointer":"default",fontSize:16,color:"#fff",transition:"all 0.2s",opacity:phase?0.4:1,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:input.trim()&&!phase?`0 0 16px ${AC.claude}55`:"none",flexShrink:0}}>▶</button>
+              <button
+                onClick={()=>{send();ajustar(true);}}
+                disabled={!!phase||!input.trim()}
+                style={{background:input.trim()&&!phase?"var(--accent)":"#333",border:"none",borderRadius:14,width:44,height:44,cursor:input.trim()&&!phase?"pointer":"not-allowed",fontSize:16,color:"#fff",transition:"background 0.2s, box-shadow 0.2s, opacity 0.2s",opacity:phase?0.4:1,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:input.trim()&&!phase?"0 0 16px rgba(168,85,247,0.45)":"none",flexShrink:0}}
+                onMouseEnter={e=>{if(input.trim()&&!phase)e.currentTarget.style.background="#7e22ce";}}
+                onMouseLeave={e=>{if(input.trim()&&!phase)e.currentTarget.style.background="var(--accent)";}}
+              >▶</button>
               {/* botão nova conversa */}
               <button onClick={newChat} title={t.chat.newChat} style={{background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,width:44,height:44,cursor:"pointer",fontSize:16,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=AC.claude+"66";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.b1;e.currentTarget.style.color=T.ts;}}>+</button>
             </div>

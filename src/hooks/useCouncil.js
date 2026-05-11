@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { callOpenRouter, OR_MODELS } from "../lib/openrouter.js";
 import { calcularConsensoMatematico, runJudges } from "../api/judges.js";
 import { runKing } from "../api/king.js";
-import { LOBOS as LOBOS_DEBATE, runDebate as runDebateApi } from "../api/council.js";
+import {
+  LOBOS as LOBOS_DEBATE,
+  runDebate as runDebateApi,
+  runDebateStream as runDebateStreamApi,
+} from "../api/council.js";
 import { runGraders } from "../utils/graders.js";
 import { getJuizesParaPergunta } from "../utils/orchestrator.js";
 
@@ -61,6 +65,7 @@ function lobeDebateParaUI(lobe, index, ronda1, ronda2, lobeConfidenceScore) {
 
   return {
     id: `debate-${lobe.id}`,
+    streamId: lobe.id,
     label: lobe.nome,
     sub: lobe.provider,
     color: lobe.cor,
@@ -79,6 +84,10 @@ function lobeDebateParaUI(lobe, index, ronda1, ronda2, lobeConfidenceScore) {
 
 export async function runDebate(pergunta, modo = "paralelo", options = {}) {
   return runDebateApi(pergunta, modo, options);
+}
+
+export async function runDebateStream(pergunta, modo = "paralelo", options = {}) {
+  return runDebateStreamApi(pergunta, modo, options);
 }
 
 export default function useCouncil(msgs, setMsgs) {
@@ -190,6 +199,8 @@ export default function useCouncil(msgs, setMsgs) {
       lobeConfidenceScore,
       callOllama,
       modoDebate = "paralelo",
+      runDebateStream = runDebateStreamApi,
+      streaming,
     } = ctx;
 
     const q = (query || input).trim();
@@ -252,7 +263,14 @@ export default function useCouncil(msgs, setMsgs) {
     let nextLobeResults = [];
 
     if (modoDebate === "debate") {
-      debateResultado = await runDebate(qFinal, "debate");
+      streaming?.iniciar?.();
+      try {
+        debateResultado = await runDebateStream(qFinal, "debate", {
+          onToken: streaming?.onToken,
+        });
+      } finally {
+        streaming?.terminar?.();
+      }
       setDebateResult(debateResultado);
       nextLobeResults = LOBOS_DEBATE.map((l, i) =>
         lobeDebateParaUI(l, i, debateResultado.ronda1, debateResultado.ronda2, lobeConfidenceScore)

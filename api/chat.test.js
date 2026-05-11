@@ -167,3 +167,129 @@ describe('getAPIKey', () => {
     }
   });
 });
+
+// ── Teste 9: streaming SSE acumula tokens ───────────────────
+describe('chamarLobeStream — SSE', () => {
+  it('lê eventos data: e chama onToken com texto parcial por lobe', async () => {
+    const { chamarLobeStream } = await import('../src/api/council.js');
+    const fetchAnterior = global.fetch;
+    const keyAnterior = process.env.VITE_OPENROUTER_KEY;
+    const encoder = new TextEncoder();
+    const tokens = [];
+
+    process.env.VITE_OPENROUTER_KEY = 'sk-or-stream-teste';
+    global.fetch = async (url, init) => {
+      assert.equal(url, 'https://openrouter.ai/api/v1/chat/completions');
+      const body = JSON.parse(init.body);
+      assert.equal(body.stream, true);
+
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode('data: {"choices":[{"delta":{"content":"Olá "}}]}\n\n'),
+            );
+            controller.enqueue(
+              encoder.encode('data: {"choices":[{"delta":{"content":"mundo"}}]}\n\n'),
+            );
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            controller.close();
+          },
+        }),
+        { status: 200 },
+      );
+    };
+
+    try {
+      const lobe = {
+        id: 1,
+        nome: 'Analista Crítico',
+        modelo: 'deepseek/deepseek-r1',
+        provider: 'openrouter',
+      };
+      const resultado = await chamarLobeStream(lobe, 'Pergunta', null, {
+        onToken: (delta, textoTotal, lobeRecebido) =>
+          tokens.push({ delta, textoTotal, lobeId: lobeRecebido.id }),
+      });
+
+      assert.equal(resultado.resposta, 'Olá mundo');
+      assert.deepEqual(tokens, [
+        { delta: 'Olá ', textoTotal: 'Olá ', lobeId: 1 },
+        { delta: 'mundo', textoTotal: 'Olá mundo', lobeId: 1 },
+      ]);
+    } finally {
+      global.fetch = fetchAnterior;
+      if (keyAnterior === undefined) delete process.env.VITE_OPENROUTER_KEY;
+      else process.env.VITE_OPENROUTER_KEY = keyAnterior;
+    }
+  });
+});
+
+// ── Teste 10: runDebateStream degrada para chamada normal ────
+describe('runDebateStream — fallback', () => {
+  it('usa chamarLobe normal quando o provider falha em stream', async () => {
+    const { runDebateStream } = await import('../src/api/council.js');
+    const lobos = [
+      { id: 1, nome: 'Analista Crítico', modelo: 'deepseek/deepseek-r1', provider: 'openrouter' },
+    ];
+    const chamadas = [];
+
+    const resultado = await runDebateStream('Pergunta teste', 'paralelo', {
+      lobos,
+      chamarLobeStream: async () => {
+        throw new Error('stream indisponível');
+      },
+      chamarLobe: async (lobe) => {
+        chamadas.push(lobe.id);
+        return { id: lobe.id, nome: lobe.nome, resposta: 'fallback normal' };
+      },
+    });
+
+    assert.deepEqual(chamadas, [1]);
+    assert.equal(resultado.ronda1[0].status, 'fulfilled');
+    assert.equal(resultado.ronda1[0].value.resposta, 'fallback normal');
+  });
+});
+
+// ── Teste 11: hook dedicado ao auto-resize do input ──────────
+describe('useAutoResize', () => {
+  it('existe e expõe ref + ajustar com limites de altura', () => {
+    const fonte = readFileSync(new URL('../src/hooks/useAutoResize.js', import.meta.url), 'utf8');
+
+    assert.match(fonte, /export function useAutoResize/);
+    assert.match(fonte, /minHeight = 52/);
+    assert.match(fonte, /maxHeight = 200/);
+    assert.match(fonte, /return \{ ref, ajustar \}/);
+    assert.match(fonte, /window\.addEventListener\('resize', ajustar\)/);
+  });
+});
+
+// ── Teste 12: input principal usa auto-resize e botão reativo ─
+describe('Cortex input — auto-resize', () => {
+  it('usa useAutoResize, placeholder do council e reset após envio', () => {
+    const fonte = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+
+    assert.match(fonte, /useAutoResize/);
+    assert.match(fonte, /const \{ ref: inputRef, ajustar \} = useAutoResize\(\{\s*minHeight: 52,\s*maxHeight: 200\s*\}\)/);
+    assert.match(fonte, /placeholder="Pergunta ao council\.\.\."/);
+    assert.match(fonte, /requestAnimationFrame\(\(\) => ajustar\(\)\)/);
+    assert.match(fonte, /ajustar\(true\)/);
+    assert.match(fonte, /cursor:input\.trim\(\)&&!phase\?"pointer":"not-allowed"/);
+    assert.match(fonte, /var\(--accent\)/);
+  });
+});
+
+// ── Teste 13: sugestões rápidas do Rei como chips ────────────
+describe('Sugestões rápidas do Rei', () => {
+  it('renderiza chips clicáveis e foca o input', () => {
+    const fonteCortex = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+    const fonteMessageList = readFileSync(new URL('../src/components/MessageList.jsx', import.meta.url), 'utf8');
+
+    assert.match(fonteCortex, /onSuggestionClick=\{aplicarSugestaoRei\}/);
+    assert.match(fonteCortex, /inputRef\.current\?\.focus\(\)/);
+    assert.match(fonteMessageList, /const sugestoesRei =/);
+    assert.match(fonteMessageList, /m\.king\?\.suggestions/);
+    assert.match(fonteMessageList, /onSuggestionClick\(sugestao\)/);
+    assert.match(fonteMessageList, /border: "1px solid var\(--accent\)"/);
+  });
+});

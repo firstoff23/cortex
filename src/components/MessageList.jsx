@@ -21,13 +21,23 @@ const MessageList = React.memo(function MessageList({
   toast,
   ClaudeCardComponent = ClaudeCard,
   BeforeVerdictComponent,
+  textosParciais,
+  aStreaming,
+  onSuggestionClick = () => {},
 }) {
   const ClaudeCardView = ClaudeCardComponent;
 
   return (
     <>
-      {msgs.map((m, i) => (
-        <div
+      {msgs.map((m, i) => {
+        const sugestoesRei = [
+          ...(m.king?.suggestions || []),
+          ...(m.sugestoes || []),
+          ...(m.structured?.nextActions || []),
+        ].filter(Boolean).slice(0, 3);
+
+        return (
+          <div
           key={`msg-${i}-${m.id || m.role || "sem-id"}`}
           className="msg-in"
           style={{
@@ -143,14 +153,54 @@ const MessageList = React.memo(function MessageList({
                       invoke={invoke}
                       P={P}
                       Markdown={Markdown}
+                      textosParciais={textosParciais}
+                      aStreaming={aStreaming}
                     />
+                  ))}
+                </div>
+              )}
+              {sugestoesRei.length > 0 && (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    gap: "8px",
+                    flexWrap: "wrap",
+                    marginTop: "8px",
+                  }}
+                >
+                  {sugestoesRei.map((sugestao, idx) => (
+                    <button
+                      key={`sugestao-rei-${m.id || i}-${idx}`}
+                      type="button"
+                      onClick={() => onSuggestionClick(sugestao)}
+                      style={{
+                        border: "1px solid var(--accent)",
+                        borderRadius: "20px",
+                        padding: "4px 12px",
+                        fontSize: "13px",
+                        cursor: "pointer",
+                        background: "transparent",
+                        color: "var(--accent)",
+                        transition: "background 0.2s",
+                        fontFamily: "inherit",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(168,85,247,0.1)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      {sugestao}
+                    </button>
                   ))}
                 </div>
               )}
             </ClaudeCardView>
           )}
         </div>
-      ))}
+        );
+      })}
     </>
   );
 });
