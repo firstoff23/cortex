@@ -65,6 +65,34 @@ const MessageList = React.memo(function MessageList({
               }}
             >
               {m.content}
+              {m.anexo?.previewUrl && (
+                <img
+                  src={m.anexo.previewUrl}
+                  alt={m.anexo.nome || "Imagem anexada"}
+                  style={{
+                    display: "block",
+                    marginTop: 10,
+                    maxWidth: "100%",
+                    maxHeight: 180,
+                    borderRadius: 10,
+                    objectFit: "cover",
+                  }}
+                />
+              )}
+              {m.anexo && !m.anexo.previewUrl && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    border: `1px solid ${AC.claude}33`,
+                    borderRadius: 10,
+                    padding: "6px 9px",
+                    fontSize: 11,
+                    color: T.ts,
+                  }}
+                >
+                  📎 {m.anexo.nome}
+                </div>
+              )}
               {m.complexity && (
                 <div
                   style={{

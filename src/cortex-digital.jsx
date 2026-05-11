@@ -4,13 +4,12 @@ import MessageList from './components/MessageList';
 import DebateTimeline from './components/DebateTimeline';
 import BlueprintsPanel from './components/BlueprintsPanel';
 import EvalsPanel from './components/EvalsPanel'
-import FileUploadButton from './components/FileUploadButton.jsx';
+import FileUpload from './components/FileUpload.jsx';
 import useCouncil from './hooks/useCouncil';
-import { useFileUpload } from './hooks/useFileUpload.js';
 import { useAutoResize } from "./hooks/useAutoResize.js";
 import { useI18n } from "./hooks/useI18n.js";
 import { useStreaming } from "./hooks/useStreaming.js";
-import { LOBOS as LOBOS_DEBATE, runDebateStream as runDebateStreamApi } from "./api/council.js";
+import { LOBOS, runDebate, chamarRei, runDebateStream as runDebateStreamApi } from "./api/council.js";
 
 const MV="cortex-v12";
 const MAX_BUF=8;
@@ -72,37 +71,16 @@ const KEY_URLS={
 // Para revogar: localStorage.removeItem("cortex-dev-bypass")  → recarrega
 const DEV_MODE = localStorage.getItem("cortex-dev-bypass") === "1";
 
-const LOBES=[
-  {id:"grok",    label:"GROK",      sub:"Factos",    color:AC.grok,    icon:"◉"},
-  {id:"gemini",  label:"GEMINI",    sub:"Contexto",  color:AC.gemini,  icon:"◈"},
-  {id:"perp",    label:"PERPLEXITY",sub:"Web",       color:AC.perp,    icon:"◇"},
-  {id:"genspark",label:"GENSPARK",  sub:"Multi-AI",  color:AC.genspark,icon:"◎"},
-  {id:"manus",   label:"MANUS",     sub:"Agente",    color:AC.manus,   icon:"◍"},
-  {id:"openai",  label:"OPENAI",    sub:"Reasoning", color:AC.openai,  icon:"○"},
-  {id:"deepseek",label:"DEEPSEEK",  sub:"Código",    color:AC.deepseek,icon:"◐"},
-  {id:"llama",   label:"LLAMA",     sub:"Open",      color:AC.llama,   icon:"◑"},
-  {id:"mistral", label:"MISTRAL",   sub:"Speed",     color:AC.mistral, icon:"◒"},
-  {id:"nemotron",label:"NEMOTRON",  sub:"Ciência",   color:AC.nemotron,icon:"◓"},
-  {id:"ollama_codigo",label:"CÓDIGO",sub:"Local",color:AC.ollama_codigo,icon:"◌"},
-  {id:"ollama_debug",label:"DEBUG",sub: "Local",color: AC.ollama_debug,icon:"⬡"},
-  {id:"claude",  label:"CLAUDE",    sub:"Juiz",      color:AC.claude,  icon:"◆"},
-];
-
-const MODELS=[
-  {id:"grok",    name:"Grok",       version:"grok-3",              color:AC.grok},
-  {id:"gemini",  name:"Gemini",     version:"gemini-2.5-flash",    color:AC.gemini},
-  {id:"perp",    name:"Perplexity", version:"sonar-pro",           color:AC.perp},
-  {id:"genspark",name:"Genspark",   version:"genspark",            color:AC.genspark},
-  {id:"manus",   name:"Manus",      version:"via Claude (sim.)",   color:AC.manus},
-  {id:"openai",  name:"OpenAI",     version:"o3",                  color:AC.openai},
-  {id:"deepseek",name:"DeepSeek",   version:"deepseek-chat",       color:AC.deepseek},
-  {id:"llama",   name:"Llama",      version:"llama-4-scout (Groq)",color:AC.llama},
-  {id:"mistral", name:"Mistral",    version:"mistral-large-latest",color:AC.mistral},
-  {id:"nemotron",name:"Nemotron",   version:"nemotron-4-340b",     color:AC.nemotron},
-  {id:"claude",  name:"Claude",     version:"claude-opus-4-6",     color:AC.claude},
-  {id:"ollama_codigo",name:"Código",version:"qwen2.5-coder:1.5b",color:AC.ollama_codigo,free:true},
-  {id:"ollama_debug",name:"Debug",version:"qwen2.5-coder:1.5b",color:AC.ollama_debug,free:true},
-];
+const LOBE_ICONS = ["◉", "◈", "◐", "◑", "◒"];
+const lobeLabel = (l) => l.label || l.nome || String(l.id);
+const lobeColor = (l) => l.color || l.cor || AC.claude;
+const lobeIcon = (l, index) => l.icon || LOBE_ICONS[index] || "◌";
+const MODELS = LOBOS.map((l) => ({
+  id: l.id,
+  name: l.nome,
+  version: l.modelo,
+  color: l.cor,
+}));
 
 const ALL_SUGGESTIONS = [
   "Explica memória vetorial em sistemas de IA",
@@ -305,8 +283,9 @@ async function callOllama(sys, msg, modelKey = "codigo", signal) {
   const d = await r.json();
   return (d.response || "").trim();
 }
-const COMPLEXITY_SIMPLE_LOBES  = ["gemini"];
-const COMPLEXITY_MEDIUM_LOBES  = ["grok", "gemini", "perp"];
+const LOBOS_IDS = LOBOS.map((l) => l.id);
+const COMPLEXITY_SIMPLE_LOBES = [2];
+const COMPLEXITY_MEDIUM_LOBES = [1, 2, 5];
 
 function classifyQuery(q) {
   try {
@@ -337,19 +316,19 @@ function routerDecide(query) {
   const isPlan    = /plano|etapas|passos|estratégia|roadmap|arquitetura/.test(q);
 
   if (level === "MEDIUM") {
-    if (isCode && isDebug) return ["ollama_debug", "gemini"];
-    if (isCode)            return ["ollama_codigo", "genspark"];
-    if (isCurrent)         return ["perp", "grok"];
-    if (isPlan)            return ["gemini", "genspark"];
+    if (isCode && isDebug) return [1, 3, 5];
+    if (isCode)            return [1, 3, 2];
+    if (isCurrent)         return [1, 4, 5];
+    if (isPlan)            return [2, 3, 4];
     return COMPLEXITY_MEDIUM_LOBES;
   }
 
-  // COMPLEX → routing original mas sem limites
-  if (isCode && isDebug) return ["grok", "gemini", "perp"];
-  if (isCode)            return ["ollama_codigo", "deepseek", "genspark", "gemini"];
-  if (isCurrent)         return ["perp", "grok", "gemini"];
-  if (isPlan)            return ["gemini", "genspark", "manus", "grok"];
-  return ["grok", "gemini", "perp", "genspark", "llama"]; // geral complexo
+  // COMPLEX → corre os 5 lobos oficiais do conselho v12.
+  if (isCode && isDebug) return LOBOS_IDS;
+  if (isCode)            return LOBOS_IDS;
+  if (isCurrent)         return LOBOS_IDS;
+  if (isPlan)            return LOBOS_IDS;
+  return LOBOS_IDS; // geral complexo
 }
 
 // ── API CALLS ────────────────────────────────────────────────
@@ -696,7 +675,9 @@ export default function Cortex(){
   const [pinErr,setPinErr]           = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  const [focusLobes, setFocusLobes] = useState(new Set(LOBES.map(l=>l.id)));
+  const [focusLobes, setFocusLobes] = useState(new Set(LOBOS.map(l=>l.id)));
+  const [showFileUpload, setShowFileUpload] = useState(false);
+  const [ficheiroAnexado, setFicheiroAnexado] = useState(null);
   const { textosParciais, aStreaming, onToken, iniciar, terminar } = useStreaming();
   const { ref: inputRef, ajustar } = useAutoResize({
     minHeight: 52,
@@ -705,7 +686,7 @@ export default function Cortex(){
 
   const botRef  = useRef(null);
   const chatRef = useRef(null);
-  const { carregar, ficheiro: ficheiroAnexado, erro: erroUpload, limpar: limparUpload } = useFileUpload();
+  const uploadPreviewUrlsRef = useRef(new Set());
   const T = THEMES[theme];
 
   const hG=keys.grok?.trim().length>10, hGm=keys.gemini?.trim().length>10;
@@ -721,6 +702,10 @@ export default function Cortex(){
   }
 
   useEffect(()=>{load();},[]);
+  useEffect(()=>() => {
+    uploadPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    uploadPreviewUrlsRef.current.clear();
+  },[]);
   useEffect(()=>{if(atBottom)botRef.current?.scrollIntoView({behavior:"smooth"});},[msgs,phase]);
   useEffect(()=>{
     ajustar();
@@ -816,16 +801,57 @@ async function invoke(id, sys, msg) {
   return runInvoke(id, sys, msg, { toast, callOllama });
 }
 
+async function handleFileUpload(ficheiro) {
+  let anexo = ficheiro;
+
+  if (ficheiro?.previewUrl) {
+    try {
+      const blob = await fetch(ficheiro.previewUrl).then((res) => res.blob());
+      const previewUrl = URL.createObjectURL(blob);
+      uploadPreviewUrlsRef.current.add(previewUrl);
+      anexo = { ...ficheiro, previewUrl };
+    } catch {
+      // Mantém o painel montado para preservar o object URL original se a cópia falhar.
+    }
+  }
+
+  setFicheiroAnexado(anexo);
+  setShowFileUpload(!ficheiro?.previewUrl || anexo.previewUrl !== ficheiro.previewUrl ? false : true);
+  toast(`Ficheiro anexado: ${ficheiro.nome}`, "success");
+}
+
+function removerFicheiroAnexado() {
+  if (ficheiroAnexado?.previewUrl && uploadPreviewUrlsRef.current.has(ficheiroAnexado.previewUrl)) {
+    URL.revokeObjectURL(ficheiroAnexado.previewUrl);
+    uploadPreviewUrlsRef.current.delete(ficheiroAnexado.previewUrl);
+  }
+  setFicheiroAnexado(null);
+}
+
 async function send(query) {
   const q = (query || input).trim();
-  const prefixo = ficheiroAnexado
-    ? `[Ficheiro: ${ficheiroAnexado.nome}]\n---\n${ficheiroAnexado.texto.slice(0,6000)}\n---\n\n`
-    : '';
-  const qComFicheiro = (prefixo + q).trim();
-  limparUpload();
+  const anexoUpload = ficheiroAnexado
+    ? {
+        nome: ficheiroAnexado.nome,
+        tipo: ficheiroAnexado.tipo,
+        tamanho: ficheiroAnexado.tamanho,
+        conteudo: ficheiroAnexado.conteudo,
+        previewUrl: ficheiroAnexado.previewUrl,
+      }
+    : null;
+  let qComFicheiro = q;
+
+  if (ficheiroAnexado?.conteudo) {
+    qComFicheiro = `[Ficheiro: ${ficheiroAnexado.nome}]\n[Conteúdo]:\n${ficheiroAnexado.conteudo.slice(0, 12000)}\n\nPergunta do utilizador: ${q}`;
+  } else if (ficheiroAnexado?.previewUrl) {
+    qComFicheiro = `[Imagem: ${ficheiroAnexado.nome}]\n[Preview URL]: ${ficheiroAnexado.previewUrl}\n\nPergunta do utilizador: ${q}`;
+  }
+  setFicheiroAnexado(null);
 
   return runCouncil(qComFicheiro, {
     input,
+    displayQuery: q,
+    anexoUpload,
     setInput,
     classifyQuery,
     saveMsgs,
@@ -837,7 +863,7 @@ async function send(query) {
     brain,
     selectUsedMem,
     routerDecide,
-    LOBES,
+    LOBES: LOBOS,
     modelsOn,
     focusMode,
     focusLobes,
@@ -938,7 +964,7 @@ async function send(query) {
   }
 
   const phases={
-    council:{label:t.phases.council(LOBES.filter(l=>l.id!=="claude"&&modelsOn[l.id]!==false).length),color:"#a78bfa",pct:"50%"},
+    council:{label:t.phases.council(LOBOS.filter(l=>modelsOn[l.id]!==false).length),color:"#a78bfa",pct:"50%"},
     judges:{label:t.phases.judges, color:AC.perp, pct:"68%"},
     rei:{label:t.phases.rei, color:AC.claude, pct:"88%"},
     cortex: {label:t.phases.cortex, color:AC.claude, pct:"88%"},
@@ -1196,11 +1222,13 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
   {/* Pontinhos — só DEV_MODE */}
   {DEV_MODE && (
     <div style={{display:"flex",gap:3,marginRight:4}}>
-      {LOBES.slice(0,10).filter((_,i)=>i%2===0).map((l,index)=>{
-        const hasKey=l.id==="grok"?hG:l.id==="gemini"?hGm:l.id==="perp"?hP:l.id==="openai"?hO:l.id==="deepseek"?hD:l.id==="llama"?hL:true;
-        return <div key={`lobe-${l.id}-${index}`} title={`${l.label}: ${hasKey?"Real":"Simulado"}`} style={{padding:"2px 5px",borderRadius:16,border:`1px solid ${hasKey?l.color+"44":T.b1}`,background:hasKey?l.color+"12":"transparent",display:"flex",alignItems:"center",gap:2}}>
-          <div style={{width:4,height:4,borderRadius:"50%",background:hasKey?l.color:T.tf}}/>
-          <span style={{fontSize:6,fontWeight:700,color:hasKey?l.color:T.tf}}>{l.label.slice(0,3)}</span>
+      {LOBOS.filter((_,i)=>i%2===0).map((l,index)=>{
+        const hasKey=true;
+        const cor = lobeColor(l);
+        const nome = lobeLabel(l);
+        return <div key={`lobe-${l.id}-${index}`} title={`${nome}: ${hasKey?"Proxy":"Simulado"}`} style={{padding:"2px 5px",borderRadius:16,border:`1px solid ${hasKey?cor+"44":T.b1}`,background:hasKey?cor+"12":"transparent",display:"flex",alignItems:"center",gap:2}}>
+          <div style={{width:4,height:4,borderRadius:"50%",background:hasKey?cor:T.tf}}/>
+          <span style={{fontSize:6,fontWeight:700,color:hasKey?cor:T.tf}}>{nome.slice(0,3)}</span>
         </div>;
       })}
     </div>
@@ -1346,15 +1374,16 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
 </>
           {DEV_MODE && (
   <div style={{display:"flex",alignItems:"center",gap:7,padding:"3px 12px",background:T.s2,borderBottom:`1px solid ${T.b2}`,fontSize:8,flexShrink:0,overflowX:"auto"}}>
-    {LOBES.map((l,i)=>{
-      const active=phase==="council"||(l.id==="claude"&&["judges","rei","cortex","reflex"].includes(phase));
-      const done=["judges","rei","cortex","reflex"].includes(phase)&&l.id!=="claude";
-      return <div key={`lobe-${l.id}-${i}`} style={{display:"flex",alignItems:"center",gap:i<LOBES.length-1?6:0}}>
+    {LOBOS.map((l,i)=>{
+      const cor = lobeColor(l);
+      const active=phase==="council";
+      const done=["judges","rei","cortex","reflex"].includes(phase);
+      return <div key={`lobe-${l.id}-${i}`} style={{display:"flex",alignItems:"center",gap:i<LOBOS.length-1?6:0}}>
         <div style={{display:"flex",alignItems:"center",gap:2}}>
-          <div style={{width:5,height:5,borderRadius:"50%",background:(active||done)?l.color:"#444",boxShadow:active?`0 0 6px ${l.color}`:"none",transition:"all 0.3s"}} className={active?"pulse":""}/>
-          <span style={{color:(active||done)?l.color:T.ts,fontWeight:active?700:400,letterSpacing:1,opacity:(active||done)?1:0.7}}>{l.label}</span>
+          <div style={{width:5,height:5,borderRadius:"50%",background:(active||done)?cor:"#444",boxShadow:active?`0 0 6px ${cor}`:"none",transition:"all 0.3s"}} className={active?"pulse":""}/>
+          <span style={{color:(active||done)?cor:T.ts,fontWeight:active?700:400,letterSpacing:1,opacity:(active||done)?1:0.7}}>{lobeLabel(l)}</span>
         </div>
-        {i<LOBES.length-1&&<span style={{color:T.ts,opacity:0.15}}>·</span>}
+        {i<LOBOS.length-1&&<span style={{color:T.ts,opacity:0.15}}>·</span>}
       </div>;
     })}
     <div style={{marginLeft:"auto",display:"flex",gap:7,color:T.tf,flexShrink:0}}>
@@ -1602,13 +1631,13 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                     <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:"3px 18px 18px 18px",padding:"14px 16px",minWidth:240,maxWidth:"80%",boxShadow:`0 2px 12px ${T.b2}88`}}>
                       {/* Label fase */}
                       <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:10}}>
-                        <div style={{display:"flex",gap:2}}>{LOBES.slice(0,8).map((l,index)=><div key={`lobe-${l.id}-${index}`} style={{width:5,height:5,borderRadius:"50%",background:l.color,opacity:phase==="council"?1:l.id==="claude"?1:0.08,transition:"opacity 0.5s"}} className={phase==="council"?"pulse":""}/>)}</div>
+                        <div style={{display:"flex",gap:2}}>{LOBOS.map((l,index)=><div key={`lobe-${l.id}-${index}`} style={{width:5,height:5,borderRadius:"50%",background:lobeColor(l),opacity:phase==="council"?1:0.08,transition:"opacity 0.5s"}} className={phase==="council"?"pulse":""}/>)}</div>
                         <span style={{fontSize:10,color:cur.color,fontWeight:600,letterSpacing:1}}>{cur.label}</span>
                       </div>
                       {/* Streaming parcial ou skeleton */}
                       {aStreaming && Object.keys(textosParciais).length>0 ? (
                         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                          {LOBOS_DEBATE.filter(l=>textosParciais[l.id]).map(l=>(
+                          {LOBOS.filter(l=>textosParciais[l.id]).map(l=>(
                             <div key={`stream-${l.id}`} style={{border:`1px solid ${l.cor}33`,background:`${l.cor}10`,borderRadius:10,padding:"8px 10px"}}>
                               <div style={{fontSize:9,fontWeight:800,color:l.cor,letterSpacing:0.3,marginBottom:4}}>{l.nome}</div>
                               <div style={{fontSize:11,lineHeight:1.55,color:T.tx,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
@@ -1657,15 +1686,25 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                 <span style={{ color:'var(--warning)' }}>⏱ ~2× mais lento</span>
               }
             </label>
+            {showFileUpload && (
+              <div style={{maxWidth:820,margin:"0 auto 8px",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,padding:12,boxShadow:`0 8px 30px ${T.b2}88`}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10}}>
+                  <strong style={{fontSize:12,color:T.tx}}>Anexar ficheiro</strong>
+                  <button type="button" onClick={()=>setShowFileUpload(false)} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:8,color:T.ts,cursor:"pointer",fontSize:12,padding:"4px 9px",fontFamily:"inherit"}}>Fechar</button>
+                </div>
+                <FileUpload onUpload={handleFileUpload} />
+              </div>
+            )}
             <div style={{display:"flex",gap:8,maxWidth:820,margin:"0 auto",alignItems:"flex-end"}}>
               {/* caixa de texto */}
               <div style={{flex:1,display:"flex",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:16,padding:"8px 10px",alignItems:"flex-end",boxShadow:`0 2px 14px ${T.b2}66`,transition:"border-color 0.2s",gap:8}}>
-  <FileUploadButton
-      onFicheiro={carregar}
-      ficheiro={ficheiroAnexado}
-      erro={erroUpload}
-      onLimpar={limparUpload}
-    />
+  <button type="button" onClick={()=>setShowFileUpload(p=>!p)} title="Anexar ficheiro" style={{background:ficheiroAnexado?`${AC.claude}18`:"transparent",border:`1px solid ${ficheiroAnexado?AC.claude+"55":T.b1}`,borderRadius:10,width:38,height:52,cursor:"pointer",fontSize:17,color:ficheiroAnexado?AC.claude:T.ts,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>📎</button>
+  {ficheiroAnexado && (
+    <div style={{maxWidth:150,minHeight:52,display:"flex",alignItems:"center",gap:6,border:`1px solid ${AC.claude}33`,background:`${AC.claude}10`,borderRadius:10,padding:"6px 8px",color:AC.claude,fontSize:10,flexShrink:0}}>
+      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={ficheiroAnexado.nome}>{ficheiroAnexado.nome}</span>
+      <button type="button" onClick={removerFicheiroAnexado} title="Remover ficheiro" style={{background:"transparent",border:"none",color:T.ts,cursor:"pointer",fontSize:12,padding:0,lineHeight:1}}>✕</button>
+    </div>
+  )}
   <textarea
     ref={inputRef}
     value={input}

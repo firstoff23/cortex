@@ -147,28 +147,95 @@ describe('runDebate — Advogado do Diabo', () => {
   });
 });
 
-// ── Teste 8: NIM usa chave dedicada quando existe ────────────
+// ── Teste 8: NIM usa proxy gerido pelo servidor ──────────────
 describe('getAPIKey', () => {
-  it("getAPIKey('nim') devolve VITE_NVIDIA_NIM_KEY se definida", async () => {
+  it("getAPIKey('nim') devolve marcador de proxy gerido pelo servidor", async () => {
     const { getAPIKey } = await import('../src/api/council.js');
-    const anteriorNim = process.env.VITE_NVIDIA_NIM_KEY;
-    const anteriorOpenRouter = process.env.VITE_OPENROUTER_KEY;
 
-    process.env.VITE_NVIDIA_NIM_KEY = 'nvapi-teste';
-    process.env.VITE_OPENROUTER_KEY = 'sk-or-fallback';
+    assert.equal(getAPIKey('nim'), 'proxy-gerido-pelo-servidor');
+  });
+});
+
+// ── Teste 9: NIM passa pela proxy serverless ────────────────
+describe('NIM proxy', () => {
+  it("getBaseURL('nim') aponta para /api/nim-proxy", async () => {
+    const { getBaseURL } = await import('../src/api/council.js');
+
+    assert.equal(getBaseURL('nim'), '/api/nim-proxy');
+  });
+});
+
+// ── Teste 10: chamadas NIM não enviam keys do cliente ───────
+describe('chamarLobe — NIM', () => {
+  it('usa /api/nim-proxy sem Authorization no browser', async () => {
+    const { chamarLobe } = await import('../src/api/council.js');
+    const fetchAnterior = global.fetch;
+    let chamada = null;
+
+    global.fetch = async (url, init) => {
+      chamada = { url, init };
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: 'resposta nim' } }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    };
 
     try {
-      assert.equal(getAPIKey('nim'), 'nvapi-teste');
+      const resultado = await chamarLobe(
+        { id: 3, nome: 'Pragmático Técnico', modelo: 'nvidia/teste', provider: 'nim' },
+        'Pergunta',
+      );
+
+      assert.equal(chamada.url, '/api/nim-proxy');
+      assert.equal(chamada.init.headers.Authorization, undefined);
+      assert.equal(resultado.resposta, 'resposta nim');
     } finally {
-      if (anteriorNim === undefined) delete process.env.VITE_NVIDIA_NIM_KEY;
-      else process.env.VITE_NVIDIA_NIM_KEY = anteriorNim;
-      if (anteriorOpenRouter === undefined) delete process.env.VITE_OPENROUTER_KEY;
-      else process.env.VITE_OPENROUTER_KEY = anteriorOpenRouter;
+      global.fetch = fetchAnterior;
     }
   });
 });
 
-// ── Teste 9: streaming SSE acumula tokens ───────────────────
+// ── Teste 11: OpenRouter usa proxy /api/chat no modo normal ──
+describe('chamarLobe — OpenRouter', () => {
+  it('usa /api/chat para evitar dependência de VITE_OPENROUTER_KEY no browser', async () => {
+    const { chamarLobe } = await import('../src/api/council.js');
+    const fetchAnterior = global.fetch;
+    let chamada = null;
+
+    global.fetch = async (url, init) => {
+      chamada = { url, init };
+      return new Response(
+        JSON.stringify({ content: 'resposta openrouter' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    };
+
+    try {
+      const resultado = await chamarLobe(
+        { id: 1, nome: 'Analista Crítico', modelo: 'deepseek/deepseek-r1', provider: 'openrouter' },
+        'Pergunta',
+      );
+
+      assert.equal(chamada.url, '/api/chat');
+      assert.equal(chamada.init.headers.Authorization, undefined);
+      assert.equal(resultado.resposta, 'resposta openrouter');
+    } finally {
+      global.fetch = fetchAnterior;
+    }
+  });
+});
+
+// ── Teste 12: cortex usa os lobos importados ─────────────────
+describe('Cortex routing — LOBOS', () => {
+  it('não mantém o array LOBES antigo inline no ficheiro principal', () => {
+    const fonte = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+
+    assert.doesNotMatch(fonte, /const\s+LOBES\s*=\s*\[/);
+    assert.match(fonte, /import \{ LOBOS,/);
+  });
+});
+
+// ── Teste 13: streaming SSE acumula tokens ───────────────────
 describe('chamarLobeStream — SSE', () => {
   it('lê eventos data: e chama onToken com texto parcial por lobe', async () => {
     const { chamarLobeStream } = await import('../src/api/council.js');
@@ -225,7 +292,7 @@ describe('chamarLobeStream — SSE', () => {
   });
 });
 
-// ── Teste 10: runDebateStream degrada para chamada normal ────
+// ── Teste 14: runDebateStream degrada para chamada normal ────
 describe('runDebateStream — fallback', () => {
   it('usa chamarLobe normal quando o provider falha em stream', async () => {
     const { runDebateStream } = await import('../src/api/council.js');
@@ -291,5 +358,83 @@ describe('Sugestões rápidas do Rei', () => {
     assert.match(fonteMessageList, /m\.king\?\.suggestions/);
     assert.match(fonteMessageList, /onSuggestionClick\(sugestao\)/);
     assert.match(fonteMessageList, /border: "1px solid var\(--accent\)"/);
+  });
+});
+
+// ── Teste 17: F4-02 hook universal usa imports dinâmicos ─────
+describe('F4-02 useFileUpload universal', () => {
+  it('expõe a interface nova, previews de imagem e cleanup de object URLs', () => {
+    const fonte = readFileSync(new URL('../src/hooks/useFileUpload.js', import.meta.url), 'utf8');
+
+    assert.match(fonte, /export function useFileUpload\(\{ onUpload \} = \{\}\)/);
+    assert.match(fonte, /ficheiro/);
+    assert.match(fonte, /isDragging/);
+    assert.match(fonte, /inputRef/);
+    assert.match(fonte, /handleClick/);
+    assert.match(fonte, /handleChange/);
+    assert.match(fonte, /handleDrop/);
+    assert.match(fonte, /handleDragOver/);
+    assert.match(fonte, /handleDragEnter/);
+    assert.match(fonte, /handleDragLeave/);
+    assert.match(fonte, /handleRemove/);
+    assert.match(fonte, /URL\.createObjectURL/);
+    assert.match(fonte, /URL\.revokeObjectURL/);
+  });
+
+  it('carrega pdfjs-dist, mammoth e xlsx por import dinâmico', () => {
+    const fonte = readFileSync(new URL('../src/hooks/useFileUpload.js', import.meta.url), 'utf8');
+
+    assert.match(fonte, /import\(['"]pdfjs-dist/);
+    assert.match(fonte, /import\(['"]mammoth['"]\)/);
+    assert.match(fonte, /import\(['"]xlsx['"]\)/);
+    assert.match(fonte, /\[áudio: processamento pendente\]/);
+    assert.doesNotMatch(fonte, /from ['"]pdfjs-dist/);
+    assert.doesNotMatch(fonte, /from ['"]mammoth['"]/);
+    assert.doesNotMatch(fonte, /from ['"]xlsx['"]/);
+  });
+});
+
+// ── Teste 18: F4-02 componente visual ───────────────────────
+describe('F4-02 FileUpload component', () => {
+  it('renderiza drop zone, preview de imagem e botão remover sem Tailwind', () => {
+    const fonte = readFileSync(new URL('../src/components/FileUpload.jsx', import.meta.url), 'utf8');
+
+    assert.match(fonte, /useFileUpload\(\{ onUpload \}\)/);
+    assert.match(fonte, /Arrasta ou clica para enviar/);
+    assert.match(fonte, /imagens, PDF, DOCX, TXT, CSV, XLSX, áudio/);
+    assert.match(fonte, /border: '2px dashed var\(--border\)'/);
+    assert.match(fonte, /borderColor: 'var\(--accent\)'/);
+    assert.match(fonte, /background: 'rgba\(168,85,247,0\.05\)'/);
+    assert.match(fonte, /<img/);
+    assert.match(fonte, /maxHeight: '200px'/);
+    assert.doesNotMatch(fonte, /className=/);
+  });
+});
+
+// ── Teste 19: F4-02 integração no chat ──────────────────────
+describe('F4-02 integração no Cortex', () => {
+  it('abre FileUpload pelo botão attach e anexa conteúdo ao contexto', () => {
+    const fonte = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+
+    assert.match(fonte, /import FileUpload from ['"]\.\/components\/FileUpload\.jsx['"]/);
+    assert.match(fonte, /const \[showFileUpload, setShowFileUpload\]/);
+    assert.match(fonte, /<FileUpload\s+onUpload=\{handleFileUpload\}/);
+    assert.match(fonte, /\[Ficheiro: \$\{ficheiroAnexado\.nome\}\]\\n\[Conteúdo\]:\\n/);
+    assert.match(fonte, /Pergunta do utilizador: \$\{q\}/);
+    assert.match(fonte, /previewUrl: ficheiroAnexado\.previewUrl/);
+    assert.match(fonte, /uploadPreviewUrlsRef/);
+    assert.match(fonte, /fetch\(ficheiro\.previewUrl\)/);
+    assert.match(fonte, /URL\.createObjectURL\(blob\)/);
+    assert.match(fonte, /URL\.revokeObjectURL\(ficheiroAnexado\.previewUrl\)/);
+    assert.match(fonte, /anexoUpload/);
+  });
+
+  it('MessageList mostra preview de imagem anexada no chat', () => {
+    const fonte = readFileSync(new URL('../src/components/MessageList.jsx', import.meta.url), 'utf8');
+
+    assert.match(fonte, /m\.anexo\?\.previewUrl/);
+    assert.match(fonte, /<img/);
+    assert.match(fonte, /maxHeight: 180/);
+    assert.match(fonte, /objectFit: "cover"/);
   });
 });

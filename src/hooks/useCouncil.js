@@ -3,7 +3,6 @@ import { callOpenRouter, OR_MODELS } from "../lib/openrouter.js";
 import { calcularConsensoMatematico, runJudges } from "../api/judges.js";
 import { runKing } from "../api/king.js";
 import {
-  LOBOS as LOBOS_DEBATE,
   runDebate as runDebateApi,
   runDebateStream as runDebateStreamApi,
 } from "../api/council.js";
@@ -201,6 +200,8 @@ export default function useCouncil(msgs, setMsgs) {
       modoDebate = "paralelo",
       runDebateStream = runDebateStreamApi,
       streaming,
+      displayQuery,
+      anexoUpload,
     } = ctx;
 
     const q = (query || input).trim();
@@ -214,7 +215,13 @@ export default function useCouncil(msgs, setMsgs) {
 
     const complexityLevel = classifyQuery(q);
     setInput("");
-    const uMsg = { id: Date.now() + Math.random(), role: "user", content: q, complexity: complexityLevel };
+    const uMsg = {
+      id: Date.now() + Math.random(),
+      role: "user",
+      content: displayQuery || q,
+      complexity: complexityLevel,
+      anexo: anexoUpload || null,
+    };
     const nm = [...msgs, uMsg];
     setMsgs(nm);
     saveMsgs(nm);
@@ -231,7 +238,6 @@ export default function useCouncil(msgs, setMsgs) {
 
     let councilLobes = LOBES.filter(
       (l) =>
-        l.id !== "claude" &&
         modelsOn[l.id] !== false &&
         routedIds.includes(l.id) &&
         (!focusMode || focusLobes.has(l.id))
@@ -239,7 +245,7 @@ export default function useCouncil(msgs, setMsgs) {
 
     if (!councilLobes.length && focusMode) {
       councilLobes = LOBES.filter(
-        (l) => l.id !== "claude" && modelsOn[l.id] !== false && routedIds.includes(l.id)
+        (l) => modelsOn[l.id] !== false && routedIds.includes(l.id)
       ).slice(0, 5);
     }
 
@@ -262,44 +268,20 @@ export default function useCouncil(msgs, setMsgs) {
     let debateResultado = null;
     let nextLobeResults = [];
 
-    if (modoDebate === "debate") {
-      streaming?.iniciar?.();
-      try {
-        debateResultado = await runDebateStream(qFinal, "debate", {
-          onToken: streaming?.onToken,
-        });
-      } finally {
-        streaming?.terminar?.();
-      }
-      setDebateResult(debateResultado);
-      nextLobeResults = LOBOS_DEBATE.map((l, i) =>
-        lobeDebateParaUI(l, i, debateResultado.ronda1, debateResultado.ronda2, lobeConfidenceScore)
-      );
-    } else {
-      const results = await Promise.allSettled(
-        councilLobes.map((l) =>
-          invoke(l.id, P[l.id]?.(mem, qFinal) || `Answer: ${qFinal}`, qFinal, { toast, callOllama })
-        )
-      );
-      nextLobeResults = councilLobes.map((l, i) => {
-        const r =
-          results[i].status === "fulfilled"
-            ? results[i].value
-            : { result: `Tempo esgotado ou serviço indisponível`, model: "?", real: false };
-        const isErr = !r.result || r.result.startsWith("[") || r.result.startsWith("Tempo");
-        const confidence = lobeConfidenceScore(r.result, isErr);
-        return {
-          ...l,
-          _key: l.id + i,
-          result: r.result,
-          srcModel: r.model,
-          srcReal: r.real,
-          isErr,
-          latency: r.latency,
-          confidence,
-        };
+    const modoExecucao = modoDebate === "debate" ? "debate" : "paralelo";
+    streaming?.iniciar?.();
+    try {
+      debateResultado = await runDebateStream(qFinal, modoExecucao, {
+        lobos: councilLobes,
+        onToken: streaming?.onToken,
       });
+    } finally {
+      streaming?.terminar?.();
     }
+    setDebateResult(modoExecucao === "debate" ? debateResultado : null);
+    nextLobeResults = councilLobes.map((l, i) =>
+      lobeDebateParaUI(l, i, debateResultado.ronda1, debateResultado.ronda2, lobeConfidenceScore)
+    );
     setLobeResults(nextLobeResults);
 
     const consenso = calcularConsensoMatematico(nextLobeResults);

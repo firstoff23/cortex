@@ -1,5 +1,7 @@
 // council.js — lobos v2.0 e debate multi-ronda
 
+import { runKing } from './king.js';
+
 export const LOBOS = [
   {
     id: 1,
@@ -139,7 +141,7 @@ PT-PT. Sem limite de palavras.`;
 
 export function getBaseURL(provider) {
   if (provider === 'openrouter') return 'https://openrouter.ai/api/v1';
-  if (provider === 'nim') return 'https://integrate.api.nvidia.com/v1';
+  if (provider === 'nim') return '/api/nim-proxy';
   throw new Error(`Provider desconhecido: ${provider}`);
 }
 
@@ -150,8 +152,8 @@ function lerEnv(nome) {
 }
 
 export function getAPIKey(provider) {
-  if (provider === 'openrouter') return lerEnv('VITE_OPENROUTER_KEY');
-  if (provider === 'nim') return lerEnv('VITE_NVIDIA_NIM_KEY') || lerEnv('VITE_OPENROUTER_KEY');
+  if (provider === 'openrouter') return lerEnv('VITE_OPENROUTER_KEY') || 'proxy-gerido-pelo-servidor';
+  if (provider === 'nim') return 'proxy-gerido-pelo-servidor';
   return '';
 }
 
@@ -190,23 +192,35 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
   const apiKey = getAPIKey(lobe.provider);
   if (!apiKey) throw new Error(`API key ausente para ${lobe.provider}`);
 
-  const resposta = await fetch(`${getBaseURL(lobe.provider)}/chat/completions`, {
+  const system = SYSTEM_PROMPTS[lobe.id];
+  const messages = [{ role: 'user', content: mensagemUtilizador(pergunta, contextoDebate) }];
+  const body =
+    lobe.provider === 'openrouter'
+      ? { model: lobe.modelo, system, messages, max_tokens: options.max_tokens || 420 }
+      : {
+          model: lobe.modelo,
+          messages: [
+            { role: 'system', content: system },
+            ...messages,
+          ],
+          max_tokens: options.max_tokens || 420,
+        };
+
+  const resposta = await fetch(
+    lobe.provider === 'nim' ? getBaseURL(lobe.provider) : '/api/chat',
+    {
     method: 'POST',
     signal: options.signal,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://cortex-digital.vercel.app',
-      'X-Title': 'Córtex Digital',
+      ...(lobe.provider !== 'nim' &&
+        apiKey !== 'proxy-gerido-pelo-servidor' && {
+          Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://cortex-digital.vercel.app',
+          'X-Title': 'Córtex Digital',
+        }),
     },
-    body: JSON.stringify({
-      model: lobe.modelo,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPTS[lobe.id] },
-        { role: 'user', content: mensagemUtilizador(pergunta, contextoDebate) },
-      ],
-      max_tokens: options.max_tokens || 420,
-    }),
+    body: JSON.stringify(body),
   });
 
   const dados = await resposta.json().catch(() => ({}));
@@ -219,7 +233,9 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
 }
 
 export async function chamarLobeStream(lobe, pergunta, contextoDebate = null, options = {}) {
-  const apiKey = getAPIKey(lobe.provider);
+  if (lobe.provider === 'nim') throw new Error('Stream SSE indisponível via proxy NIM');
+
+  const apiKey = lerEnv('VITE_OPENROUTER_KEY');
   if (!apiKey) throw new Error(`API key ausente para ${lobe.provider}`);
 
   const resposta = await fetch(`${getBaseURL(lobe.provider)}/chat/completions`, {
@@ -285,6 +301,10 @@ export async function chamarLobeStream(lobe, pergunta, contextoDebate = null, op
   }
 
   return normalizarValorLobe(lobe, { resposta: textoCompleto }, contextoDebate);
+}
+
+export function chamarRei(...args) {
+  return runKing(...args);
 }
 
 async function chamarComMapa(lobe, pergunta, contextoDebate, mapa, chamar) {
