@@ -2,7 +2,7 @@
 // Corre com: node --experimental-vm-modules node_modules/.bin/jest api/chat.test.js
 // (ou: npx vitest run api/chat.test.js)
 
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -525,5 +525,61 @@ describe('UI v12 — header, settings e memória', () => {
     assert.doesNotMatch(fonteKingCard, /king\?\.suggestions\?\.length/);
     assert.match(fonteMessageList, /GENERIC_ERROR_SUGGESTIONS/);
     assert.match(fonteMessageList, /Continua sem juízes/);
+  });
+});
+
+// ── Teste 21: componentes 21st.dev adaptados ────────────────
+describe('UI v12 — componentes 21st.dev adaptados', () => {
+  it('cria componentes nativos sem Tailwind, Radix ou framer-motion', () => {
+    const ficheiros = [
+      '../src/components/ChatBubble.jsx',
+      '../src/components/AlertaBanner.jsx',
+      '../src/components/Toast.jsx',
+      '../src/components/LobeLoader.jsx',
+      '../src/components/EstadoVazio.jsx',
+      '../src/components/SidePanel.jsx',
+      '../src/components/Abas.jsx',
+      '../src/components/Slider.jsx',
+    ];
+
+    for (const ficheiro of ficheiros) {
+      const fonte = readFileSync(new URL(ficheiro, import.meta.url), 'utf8');
+      assert.doesNotMatch(fonte, /framer-motion|@radix|next\/image|use client|interface\s+\w+|:\s*React\./);
+      assert.doesNotMatch(fonte, /className=\{?["'`][\s\S]{0,120}(bg-|text-|rounded-|p-\d|flex)/);
+      assert.match(fonte, /style=\{\{/);
+    }
+  });
+
+  it('integra bolhas, estado vazio, side panel, toasts, alertas e contador no Cortex', () => {
+    const fonteCortex = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+    const fonteMessageList = readFileSync(new URL('../src/components/MessageList.jsx', import.meta.url), 'utf8');
+    const fonteKingCard = readFileSync(new URL('../src/components/KingCard.jsx', import.meta.url), 'utf8');
+
+    assert.match(fonteCortex, /useToast\(\)/);
+    assert.match(fonteCortex, /<Toast toasts=\{toasts\} onFechar=\{removerToast\}/);
+    assert.match(fonteCortex, /<SidePanel aberto=\{showSidebar\}/);
+    assert.match(fonteCortex, /<SidePanel[\s\S]*aberto=\{showBlueprintsPanel\}/);
+    assert.match(fonteCortex, /<SidePanel[\s\S]*aberto=\{showForensePanel\}/);
+    assert.match(fonteCortex, /<EstadoVazio/);
+    assert.match(fonteCortex, /<AlertaBanner/);
+    assert.match(fonteCortex, /\{inputChars\} chars · ~\{inputTokens\} tokens/);
+    assert.match(fonteMessageList, /<ChatBubble\s+papel="user"/);
+    assert.match(fonteKingCard, /<ChatBubble papel="rei"/);
+  });
+
+  it('usa tabs para o debate e slider persistido para temperatura por lobe', () => {
+    const fonteCortex = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+    const fonteTimeline = readFileSync(new URL('../src/components/DebateTimeline.jsx', import.meta.url), 'utf8');
+    const fonteCouncil = readFileSync(new URL('../src/api/council.js', import.meta.url), 'utf8');
+
+    assert.match(fonteTimeline, /<Abas/);
+    assert.match(fonteTimeline, /defaultActiva="veredicto"/);
+    assert.match(fonteTimeline, /titulo: "Ronda 1"/);
+    assert.match(fonteTimeline, /titulo: "Ronda 2"/);
+    assert.match(fonteCortex, /const \[temperaturas,setTemperaturas\]/);
+    assert.match(fonteCortex, /saveTemperaturas/);
+    assert.match(fonteCortex, /<Slider/);
+    assert.match(fonteCouncil, /opcoesGeracaoLobe/);
+    assert.match(fonteCouncil, /temperature: Number\(temperatura\)/);
   });
 });

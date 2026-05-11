@@ -174,7 +174,7 @@ córtex/
 - **Juiz final** — Claude/Codex sintetiza e veredita
 - **Upload universal** — PDF, DOCX, TXT, CSV, XLSX, imagens com extração de texto
 - **Blueprints/Mapas** — padrões de arquitetura, RAG, IA pré-definidos
-- **Memória vetorial** — compressaão semântica em `localStorage`
+- **Memória vetorial** — compressão semântica em `localStorage`
 - **Temas visuais** — Córtex, Grok, Neural, Obsidian, Midnight, Gemini, Perplexity, Crimson
 - **i18n** — português e inglês
 - **Router inteligente** — seleciona automaticamente os lobos mais adequados à query

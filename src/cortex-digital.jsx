@@ -5,6 +5,11 @@ import DebateTimeline from './components/DebateTimeline';
 import BlueprintsPanel from './components/BlueprintsPanel';
 import EvalsPanel from './components/EvalsPanel'
 import FileUpload from './components/FileUpload.jsx';
+import AlertaBanner from './components/AlertaBanner.jsx';
+import EstadoVazio from './components/EstadoVazio.jsx';
+import SidePanel from './components/SidePanel.jsx';
+import Slider from './components/Slider.jsx';
+import Toast, { useToast } from './components/Toast.jsx';
 import useCouncil from './hooks/useCouncil';
 import { useAutoResize } from "./hooks/useAutoResize.js";
 import { useI18n } from "./hooks/useI18n.js";
@@ -641,8 +646,10 @@ export default function Cortex(){
   const [pagina, setPagina] = useState('chat'); // 'chat' | 'blueprints'
   const [theme,setTheme]     = useState("cortex");
   const [keys,setKeys]       = useState(defaultKeys);
-  const [toasts,setToasts]   = useState([]);
+  const { toasts, toast, removerToast } = useToast();
   const [modelsOn,setModelsOn] = useState(Object.fromEntries(MODELS.map(m=>[m.id,true])));
+  const [temperaturas,setTemperaturas] = useState(Object.fromEntries(MODELS.map(m=>[m.id,0.7])));
+  const [lobeConfigAberto,setLobeConfigAberto] = useState(null);
   const [modoDebate, setModoDebate] = useState(false);
 
 // ── REMOVIDO v12 — Computer Mode (mantido para referência futura) ──
@@ -666,6 +673,8 @@ export default function Cortex(){
   const [showModels,setShowModels] = useState(false);
   const [showEvals, setShowEvals] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showBlueprintsPanel, setShowBlueprintsPanel] = useState(false);
+  const [showForensePanel, setShowForensePanel] = useState(false);
   const [showCouncil, setShowCouncil] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [currentConvId, setCurrentConvId] = useState(null);
@@ -694,12 +703,9 @@ export default function Cortex(){
   const hO=keys.openai?.trim().length>10, hD=keys.deepseek?.trim().length>10;
   const hL=keys.llama?.trim().length>10, hM=keys.mistral?.trim().length>10;
   const hN=keys.nemotron?.trim().length>10;
-
-  function toast(msg,type="error"){
-    const id=Date.now();
-    setToasts(prev=>[...prev,{id,msg,type}]);
-    setTimeout(()=>setToasts(prev=>prev.filter(t=>t.id!==id)),type==="error"?5000:3000);
-  }
+  const inputChars = input.length;
+  const inputTokens = Math.round(inputChars / 4);
+  const inputCounterWarn = inputChars > 2000;
 
   useEffect(()=>{load();},[]);
   useEffect(()=>() => {
@@ -725,8 +731,8 @@ export default function Cortex(){
   },[isMobile]);
 
   useEffect(()=>{
-    if(showGuide || showModels || showTP || showSidebar) setFabOpen(false);
-  },[showGuide,showModels,showTP,showSidebar]);
+    if(showGuide || showModels || showTP || showSidebar || showBlueprintsPanel || showForensePanel) setFabOpen(false);
+  },[showGuide,showModels,showTP,showSidebar,showBlueprintsPanel,showForensePanel]);
 
   async function load(){
     try{
@@ -735,6 +741,7 @@ export default function Cortex(){
       const k  = await safeGet("cortex-keys-global", null) || await safeGet(MV+"-keys", defaultKeys);
       const t  = await safeGet(MV+"-theme",  "cortex");
       const mo = await safeGet(MV+"-models", null); // ← ADICIONA ESTA LINHA
+      const temps = await safeGet(MV+"-temperaturas", null);
       // const ct = await safeGet(MV+"-tasks",  []); // REMOVIDO v12
       const convs = await safeGet(MV+"-convs", []);
       setConversations(Array.isArray(convs) ? convs : []);
@@ -743,6 +750,7 @@ export default function Cortex(){
       setKeys({...defaultKeys,...(k&&typeof k==="object"?k:{})});
       setTheme(typeof t==="string"&&THEMES[t]?t:"cortex");
       setModelsOn(mo&&typeof mo==="object"?mo:Object.fromEntries(MODELS.map(x=>[x.id,true])));
+      setTemperaturas(temps&&typeof temps==="object"?{...Object.fromEntries(MODELS.map(x=>[x.id,0.7])),...temps}:Object.fromEntries(MODELS.map(x=>[x.id,0.7])));
       // setCompTasks(Array.isArray(ct)?ct:[]); // REMOVIDO v12
     }catch(e){toast(t.toasts.loadError);}
     setLoaded(true);
@@ -753,6 +761,7 @@ const saveConvs = c => safePut(MV+"-convs", c.slice(0,50));
   const saveKeys   = k  => safePut("cortex-keys-global", k);
   const saveTheme  = t  => safePut(MV+"-theme",  t);
   const saveModels = mo => safePut(MV+"-models", mo);
+  const saveTemperaturas = temps => safePut(MV+"-temperaturas", temps);
 // const saveTasks  = ct => safePut(MV+"-tasks",  ct.slice(0,20)); // REMOVIDO v12
 
 function newChat() {
@@ -865,6 +874,7 @@ async function send(query) {
     routerDecide,
     LOBES: LOBOS,
     modelsOn,
+    temperaturas,
     focusMode,
     focusLobes,
     P,
@@ -1112,17 +1122,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       `}</style>
 
       {/* ── TOASTS ─────────────────────────────────────────── */}
-      {toasts.length>0 && (
-        <div style={{position:"fixed",bottom:80,right:14,zIndex:2000,display:"flex",flexDirection:"column",gap:6,pointerEvents:"none"}}>
-          {toasts.map((t,idx)=>{
-            const c={error:{bg:"#2a0a0a",border:"#5a1a1a",tx:"#fca5a5",ic:"⚠"},success:{bg:"#0a2a12",border:"#1a5a22",tx:"#86efac",ic:"✓"},info:{bg:"#0a1a2a",border:"#1a3a5a",tx:"#93c5fd",ic:"ℹ"}}[t.type]||{bg:"#2a0a0a",border:"#5a1a1a",tx:"#fca5a5",ic:"⚠"};
-            return <div key={`toast-${idx}-${t.id}`} style={{display:"flex",alignItems:"center",gap:8,background:c.bg,border:`1px solid ${c.border}`,borderRadius:10,padding:"8px 13px",fontSize:11,color:c.tx,boxShadow:"0 4px 16px #00000066",pointerEvents:"all",animation:"toastIn 0.2s ease",maxWidth:300}}>
-              <span>{c.ic}</span><span style={{flex:1}}>{t.msg}</span>
-              <button onClick={()=>setToasts(p=>p.filter(x=>x.id!==t.id))} style={{background:"transparent",border:"none",cursor:"pointer",color:c.tx,fontSize:13,opacity:0.6}}>✕</button>
-            </div>;
-          })}
-        </div>
-      )}
+      <Toast toasts={toasts} onFechar={removerToast} />
 
       {/* ── MODALS ─────────────────────────────────────────── */}
       {showGuide && (
@@ -1197,12 +1197,36 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
           <p style={{fontSize:11,color:T.ts,marginBottom:8}}>{t.models.hint}</p>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {MODELS.filter(m=>m.id!=="claude").map((m,idx)=>(
-              <div key={`model-${idx}-${m.id}`} style={{display:"flex",alignItems:"center",gap:9,background:T.s2,borderRadius:9,padding:"8px 11px"}}>
-                                <div style={{width:7,height:7,borderRadius:"50%",background:modelsOn[m.id]!==false?m.color:"#666",flexShrink:0}}/>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:11,fontWeight:600,color:T.tx}}>{m.name} <span style={{fontSize:8,color:T.ts,fontFamily:"monospace",opacity:0.9}}>{m.version}</span></div>
+              <div key={`model-${idx}-${m.id}`} style={{background:T.s2,borderRadius:9,padding:"8px 11px",border:`1px solid ${lobeConfigAberto===m.id?m.color+"55":"transparent"}`}}>
+                <div style={{display:"flex",alignItems:"center",gap:9}}>
+                  <div style={{width:7,height:7,borderRadius:"50%",background:modelsOn[m.id]!==false?m.color:"#666",flexShrink:0}}/>
+                  <button
+                    type="button"
+                    onClick={()=>setLobeConfigAberto(v=>v===m.id?null:m.id)}
+                    style={{flex:1,background:"transparent",border:"none",padding:0,textAlign:"left",cursor:"pointer",fontFamily:"inherit"}}
+                  >
+                    <div style={{fontSize:11,fontWeight:700,color:T.tx}}>{m.name} <span style={{fontSize:8,color:T.ts,fontFamily:"monospace",opacity:0.9}}>{m.version}</span></div>
+                    <div style={{fontSize:9,color:T.tf,marginTop:2}}>Clicar para ajustar temperatura</div>
+                  </button>
+                  <Toggle on={modelsOn[m.id]!==false} onChange={v=>{const ne={...modelsOn,[m.id]:v};setModelsOn(ne);saveModels(ne);}} color={m.color}/>
                 </div>
-                <Toggle on={modelsOn[m.id]!==false} onChange={v=>{const ne={...modelsOn,[m.id]:v};setModelsOn(ne);saveModels(ne);}} color={m.color}/>
+                {lobeConfigAberto===m.id && (
+                  <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${T.b1}`}}>
+                    <Slider
+                      valor={temperaturas[m.id] ?? 0.7}
+                      min={0}
+                      max={1}
+                      passo={0.1}
+                      cor={m.color}
+                      label={`Temperatura de ${m.name}`}
+                      onChange={(valor)=>{
+                        const next={...temperaturas,[m.id]:valor};
+                        setTemperaturas(next);
+                        saveTemperaturas(next);
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1251,8 +1275,8 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
     {!isMobile && (
       <button
         type="button"
-        onClick={() => {setPagina(p => p === "blueprints" ? "chat" : "blueprints");setPage("chat");}}
-        style={{background:pagina==="blueprints"?`${AC.claude}20`:T.s2,border:`1px solid ${pagina==="blueprints"?AC.claude+"66":T.b1}`,borderRadius:12,minHeight:42,padding:"8px 13px",transition:"all 220ms cubic-bezier(0.4,0,0.2,1)",boxShadow:pagina==="blueprints"?`0 0 16px ${AC.claude}22`:"none",color:pagina==="blueprints"?AC.claude:T.ts,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:pagina==="blueprints"?800:600,display:"flex",alignItems:"center",gap:7,flexShrink:0}}
+        onClick={() => {setShowBlueprintsPanel(true);setPage("chat");setPagina("chat");}}
+        style={{background:showBlueprintsPanel?`${AC.claude}20`:T.s2,border:`1px solid ${showBlueprintsPanel?AC.claude+"66":T.b1}`,borderRadius:12,minHeight:42,padding:"8px 13px",transition:"all 220ms cubic-bezier(0.4,0,0.2,1)",boxShadow:showBlueprintsPanel?`0 0 16px ${AC.claude}22`:"none",color:showBlueprintsPanel?AC.claude:T.ts,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:showBlueprintsPanel?800:600,display:"flex",alignItems:"center",gap:7,flexShrink:0}}
       >
         <span>🗺️</span>
         <span>Mapas</span>
@@ -1294,30 +1318,61 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       {page==="chat" && (
         <>
         <>
-  {showSidebar &&<div style={{position:"fixed",inset:0,zIndex:498,background:"transparent"}} onClick={()=>setShowSidebar(false)}/>}
-  <div style={{position:"fixed",top:50,left:0,bottom:0,zIndex:499,width:260,background:T.s1,borderRight:`1px solid ${T.b1}`,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"4px 0 24px #00000055",transform:showSidebar?"translateX(0)":"translateX(-102%)",opacity:showSidebar?1:0,transition:"transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.28s cubic-bezier(0.4,0,0.2,1)",willChange:"transform, opacity"}}>
-    <div style={{padding:"10px 12px",borderBottom:`1px solid ${T.b1}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-      <span style={{fontSize:11,fontWeight:700,color:T.tx}}>{t.sidebar.title}</span>
-      <button onClick={newChat} style={{...btn(T,AC.claude),fontSize:9,padding:"3px 9px"}}>{t.nav.newChat}</button>
+  <SidePanel aberto={showSidebar} onFechar={()=>setShowSidebar(false)} titulo={t.sidebar.title}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:10}}>
+      <span style={{fontSize:11,color:T.ts}}>{conversations.length} {t.sidebar.conversations}</span>
+      <button onClick={newChat} style={{...btn(T,AC.claude),fontSize:9,padding:"4px 10px"}}>{t.nav.newChat}</button>
     </div>
-    <div style={{flex:1,overflowY:"auto",padding:6,display:"flex",flexDirection:"column",gap:4}}>
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
       {conversations.length===0
-        ?<div style={{fontSize:10,color:T.tf,textAlign:"center",marginTop:24,lineHeight:1.8}}>{t.sidebar.empty.split("\n")[0]}<br/>{t.sidebar.empty.split("\n")[1]}</div>
+        ?<div style={{fontSize:11,color:T.tf,textAlign:"center",marginTop:24,lineHeight:1.8}}>{t.sidebar.empty.split("\n")[0]}<br/>{t.sidebar.empty.split("\n")[1]}</div>
         :conversations.map((conv,idx)=>(
-          <div key={`conversation-${idx}-${conv.id}`} onClick={()=>switchConv(conv)} style={{background:conv.id===currentConvId?`${AC.claude}18`:T.s2,border:`1px solid ${conv.id===currentConvId?AC.claude+"44":T.b1}`,borderRadius:8,padding:"7px 9px",cursor:"pointer",display:"flex",alignItems:"flex-start",gap:6,transition:"all 0.12s"}}>
+          <div key={`conversation-${idx}-${conv.id}`} onClick={()=>switchConv(conv)} style={{background:conv.id===currentConvId?`${AC.claude}18`:T.s2,border:`1px solid ${conv.id===currentConvId?AC.claude+"44":T.b1}`,borderRadius:10,padding:"9px 10px",cursor:"pointer",display:"flex",alignItems:"flex-start",gap:8,transition:"background 0.2s, border-color 0.2s"}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:10,fontWeight:600,color:T.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{conv.title}</div>
-              <div style={{fontSize:8,color:T.ts,marginTop:1}}>{t.sidebar.msgs(conv.msgs?.filter(m=>m.role==="user").length)} · {new Date(conv.updatedAt).toLocaleDateString(lang==="pt"?"pt-PT":"en-US")}</div>
+              <div style={{fontSize:11,fontWeight:700,color:T.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{conv.title}</div>
+              <div style={{fontSize:9,color:T.ts,marginTop:3}}>{t.sidebar.msgs(conv.msgs?.filter(m=>m.role==="user").length)} · {new Date(conv.updatedAt).toLocaleDateString(lang==="pt"?"pt-PT":"en-US")}</div>
             </div>
-            <button onClick={e=>deleteConv(conv.id,e)} style={{background:"transparent",border:"none",color:T.tf,cursor:"pointer",fontSize:10,flexShrink:0,opacity:0.5,padding:2,lineHeight:1}}>✕</button>
+            <button onClick={e=>deleteConv(conv.id,e)} aria-label="Apagar conversa" style={{background:"transparent",border:"none",color:T.tf,cursor:"pointer",fontSize:12,flexShrink:0,opacity:0.65,padding:2,lineHeight:1}}>✕</button>
           </div>
         ))
       }
     </div>
-    <div style={{padding:"6px 12px",borderTop:`1px solid ${T.b1}`,fontSize:8,color:T.tf,flexShrink:0}}>
+    <div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${T.b1}`,fontSize:9,color:T.tf,lineHeight:1.6}}>
       {t.sidebar.memNote}
     </div>
-  </div>
+  </SidePanel>
+  <SidePanel
+    aberto={showBlueprintsPanel}
+    onFechar={()=>setShowBlueprintsPanel(false)}
+    titulo="Mapas e blueprints"
+    largura="min(920px, 94vw)"
+  >
+    <BlueprintsPanel compact onVoltar={()=>setShowBlueprintsPanel(false)} />
+  </SidePanel>
+  <SidePanel
+    aberto={showForensePanel}
+    onFechar={()=>setShowForensePanel(false)}
+    titulo="Modo Forense"
+    largura="min(520px, 94vw)"
+  >
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <AlertaBanner tipo="info" mensagem="Diagnóstico local da sessão actual do Córtex." />
+      {[
+        ["Mensagens", msgs.length],
+        ["Conversas guardadas", conversations.length],
+        ["Factos na memória", brain.semantic.length],
+        ["Sessões memorizadas", brain.sessions],
+        ["Lobos activos", MODELS.filter(m=>modelsOn[m.id]!==false).length],
+        ["Fase actual", phase || "parado"],
+      ].map(([label, value])=>(
+        <div key={`forense-${label}`} style={{display:"flex",justifyContent:"space-between",gap:12,border:`1px solid ${T.b1}`,background:T.s2,borderRadius:10,padding:"9px 10px",fontSize:12}}>
+          <span style={{color:T.ts}}>{label}</span>
+          <strong style={{color:AC.claude}}>{value}</strong>
+        </div>
+      ))}
+      <button type="button" onClick={exportConv} style={{...btn(T,AC.gemini),width:"100%"}}>Exportar conversa actual</button>
+    </div>
+  </SidePanel>
 </>
           {DEV_MODE && (
   <div style={{display:"flex",alignItems:"center",gap:7,padding:"3px 12px",background:T.s2,borderBottom:`1px solid ${T.b2}`,fontSize:8,flexShrink:0,overflowX:"auto"}}>
@@ -1441,8 +1496,8 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               key:"blueprints",
               icon:"🗺️",
               label:"Mapas",
-              active:pagina==="blueprints",
-              onClick:()=>{setPagina("blueprints");setFabOpen(false);}
+              active:showBlueprintsPanel,
+              onClick:()=>{setShowBlueprintsPanel(true);setPagina("chat");setPage("chat");setFabOpen(false);}
             }
           ].map((item,idx)=>(
             <button
@@ -1508,38 +1563,14 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               <button onClick={()=>{botRef.current?.scrollIntoView({behavior:"smooth"});setAtBottom(true);}} style={{position:"sticky",bottom:10,left:"50%",transform:"translateX(-50%)",zIndex:10,display:"flex",alignItems:"center",gap:5,background:T.s1,border:`1px solid ${AC.claude}55`,borderRadius:18,padding:"5px 13px",color:AC.claude,fontSize:10,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${T.b2}88`,marginBottom:4}}>{t.chat.scrollDown}</button>
             )}
             {msgs.length===0 ? (
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"80%",gap:0,padding:"20px 14px"}}>
-                {/* Avatar compacto */}
-                <div style={{position:"relative",width:56,height:56,marginBottom:16}}>
-                  <div style={{position:"absolute",inset:0,borderRadius:"50%",background:`radial-gradient(circle at 35% 30%, ${AC.claude}cc, ${AC.claude}33, transparent)`,boxShadow:`0 0 24px ${AC.claude}44`,animation:"brainPulse 3s ease-in-out infinite"}}/>
-                  <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:AC.claude}}>◆</div>
-                  {[AC.grok,AC.gemini,AC.perp,AC.manus].map((c,i)=>(
-                    <div key={`orbit-${i}-${c}`} style={{position:"absolute",width:6,height:6,borderRadius:"50%",background:c,boxShadow:`0 0 8px ${c}`,top:"50%",left:"50%",transformOrigin:"0 0",animation:`orbit${i} ${2.2+i*0.45}s linear infinite`}}/>
-                  ))}
-                </div>
-                {/* Título */}
-                <h2 style={{margin:"0 0 6px",fontSize:isMobile?22:28,fontWeight:800,color:T.tx,letterSpacing:-1,textAlign:"center"}}>{t.home.title}</h2>
-                <p style={{margin:"0 0 28px",fontSize:12,color:T.ts,textAlign:"center",maxWidth:320,lineHeight:1.5}}>
-                  {t.home.subtitle} <span style={{color:AC.claude,fontWeight:600}}>{t.home.lobes}</span> · {t.home.judge} <span style={{color:AC.claude,fontWeight:600}}>Claude Opus 4.6</span>
-                </p>
-                {/* Sugestões — pills horizontais simples */}
-                <div style={{display:"flex",flexDirection:"column",gap:6,width:"100%",maxWidth:480,marginBottom:20}}>
-                  {[
-                    {icon:"◉",text:t.home.suggestions[0],color:AC.grok},
-                    {icon:"◈",text:t.home.suggestions[5],color:AC.gemini},
-                    {icon:"◐",text:t.home.suggestions[3],color:AC.deepseek},
-                    {icon:"◇",text:t.home.suggestions[4],color:AC.perp},
-                  ].map((s,i)=>(
-                    <button key={`suggestion-${i}-${s.text.slice(0,10)}`} onClick={()=>send(s.text)}
-                      style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:10,padding:"9px 13px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",fontSize:12,color:T.ts,display:"flex",alignItems:"center",gap:9,transition:"all 0.15s"}}>
-                      <span style={{color:s.color,fontSize:14,flexShrink:0}}>{s.icon}</span>
-                      <span style={{lineHeight:1.3}}>{s.text}</span>
-                      <span style={{marginLeft:"auto",color:T.tf,fontSize:11,flexShrink:0}}>↵</span>
-                    </button>
-                  ))}
-                </div>
-                {/* Stats rápidas + seed */}
-                <div style={{display:"flex",alignItems:"center",gap:12,fontSize:10,color:T.ts}}>
+              <div style={{minHeight:"80%",display:"flex",flexDirection:"column",justifyContent:"center"}}>
+                <EstadoVazio
+                  titulo={t.home.title}
+                  subtitulo={`${t.home.subtitle} ${t.home.lobes} · ${t.home.judge} Rei/Codex`}
+                  sugestoes={[t.home.suggestions[0], t.home.suggestions[5], t.home.suggestions[3], t.home.suggestions[4]]}
+                  onSugestao={aplicarSugestaoRei}
+                />
+                <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:12,fontSize:10,color:T.ts}}>
                   {brain.semantic.length>0
                     ?<span>🧠 {brain.semantic.length} {t.memory.stats.facts.toLowerCase()} · {brain.sessions} {t.memory.stats.sessions.toLowerCase()}</span>
                     :<button onClick={()=>setShowSeed(true)} style={{...btn(T,AC.genspark),fontSize:10,padding:"4px 10px"}}>{t.home.configBrain}</button>
@@ -1633,6 +1664,14 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                 <span style={{ color:'var(--warning)' }}>⏱ ~2× mais lento</span>
               }
             </label>
+            {(modoDebate || aStreaming) && (
+              <div style={{maxWidth:820,margin:"0 auto 8px"}}>
+                <AlertaBanner
+                  tipo="info"
+                  mensagem={aStreaming ? "Streaming a correr — respostas parciais dos lobos." : "Modo debate activo — os lobos fazem segunda ronda antes do Rei."}
+                />
+              </div>
+            )}
             {showFileUpload && (
               <div style={{maxWidth:820,margin:"0 auto 8px",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,padding:12,boxShadow:`0 8px 30px ${T.b2}88`}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10}}>
@@ -1652,16 +1691,32 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       <button type="button" onClick={removerFicheiroAnexado} title="Remover ficheiro" style={{background:"transparent",border:"none",color:T.ts,cursor:"pointer",fontSize:12,padding:0,lineHeight:1}}>✕</button>
     </div>
   )}
-  <textarea
-    ref={inputRef}
-    value={input}
-    onChange={e=>{setInput(e.target.value);requestAnimationFrame(() => ajustar());}}
-    onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();ajustar(true);}}}
-    placeholder="Pergunta ao council..."
-    disabled={!!phase}
-    rows={1}
-    style={{flex:1,background:"transparent",border:"none",outline:"none",fontSize:13,color:T.tx,fontFamily:"inherit",resize:"none",overflow:"hidden",transition:"height 0.15s ease",minHeight:"52px",height:"52px",maxHeight:200,padding:"0.75rem 1rem",lineHeight:"1.5"}}
-  />
+  <div style={{position:"relative",flex:1,minWidth:0}}>
+    <textarea
+      ref={inputRef}
+      value={input}
+      onChange={e=>{setInput(e.target.value);requestAnimationFrame(() => ajustar());}}
+      onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();ajustar(true);}}}
+      placeholder="Pergunta ao council..."
+      disabled={!!phase}
+      rows={1}
+      style={{width:"100%",background:"transparent",border:"none",outline:"none",fontSize:13,color:T.tx,fontFamily:"inherit",resize:"none",overflow:"hidden",transition:"height 0.15s ease",minHeight:"52px",height:"52px",maxHeight:200,padding:"0.75rem 1rem 1.35rem",lineHeight:"1.5"}}
+    />
+    <div
+      aria-hidden="true"
+      style={{
+        position:"absolute",
+        right:12,
+        bottom:6,
+        fontSize:10,
+        color:inputCounterWarn?"#f59e0b":T.tf,
+        pointerEvents:"none",
+        fontVariantNumeric:"tabular-nums",
+      }}
+    >
+      {inputChars} chars · ~{inputTokens} tokens
+    </div>
+  </div>
   <div style={{display:"flex",gap:3,alignItems:"flex-end",flexShrink:0}}>
     {msgs.filter(m=>m.role==="user").length>0&&!phase&&
       <button onClick={regenerate} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title={t.chat.regenerate}>↺</button>}
@@ -1787,6 +1842,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               {icon:"🔑",title:t.settings.keys.label,sub:t.settings.keys.sub(Object.values(keys).filter(k=>k?.trim().length>10).length,Object.keys(keys).length),action:t.settings.keys.action,color:AC.perp,onClick:()=>setPage("keys")},
               {icon:"◈",title:t.nav.models,sub:`${MODELS.filter(m=>modelsOn[m.id]!==false).length}/${MODELS.length} lobos activos`,action:"Gerir",color:AC.gemini,onClick:()=>setShowModels(true)},
               {icon:"🧠",title:t.memory.title,sub:`${brain.semantic.length} factos · ${brain.sessions} conversas`,action:"Abrir",color:AC.grok,onClick:()=>setPage("memory")},
+              {icon:"🔬",title:"Modo Forense",sub:`${msgs.length} mensagens · fase ${phase || "parado"}`,action:"Abrir",color:AC.deepseek,onClick:()=>setShowForensePanel(true)},
             ].map((card,idx)=>(
               <button key={`settings-card-${idx}-${card.title}`} type="button" onClick={card.onClick} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:14,padding:14,textAlign:"left",cursor:"pointer",fontFamily:"inherit",minHeight:118,display:"flex",flexDirection:"column",justifyContent:"space-between",boxShadow:`0 8px 24px ${T.b2}55`,transition:"border-color 0.2s, transform 0.2s"}}>
                 <div style={{display:"flex",alignItems:"center",gap:9}}>
@@ -1811,15 +1867,40 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:8}}>
               {MODELS.map((m,idx)=>(
-                <div key={`arch-${idx}-${m.id}`} style={{display:"flex",gap:9,alignItems:"center",padding:"10px 11px",border:`1px solid ${T.b2}`,borderRadius:12,background:T.s2}}>
-                  <span style={{width:9,height:9,borderRadius:"50%",background:modelsOn[m.id]!==false?m.color:T.tf,boxShadow:modelsOn[m.id]!==false?`0 0 10px ${m.color}66`:"none",flexShrink:0}}/>
-                  <div style={{minWidth:0,flex:1}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-                      <div style={{fontSize:11,fontWeight:800,color:T.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.name}</div>
-                      <span style={{fontSize:9,color:modelsOn[m.id]!==false?AC.claude:T.tf,fontWeight:800}}>{modelsOn[m.id]!==false?"activo":"off"}</span>
+                <div key={`arch-${idx}-${m.id}`} style={{padding:"10px 11px",border:`1px solid ${lobeConfigAberto===m.id?m.color+"55":T.b2}`,borderRadius:12,background:T.s2}}>
+                  <div style={{display:"flex",gap:9,alignItems:"center"}}>
+                    <span style={{width:9,height:9,borderRadius:"50%",background:modelsOn[m.id]!==false?m.color:T.tf,boxShadow:modelsOn[m.id]!==false?`0 0 10px ${m.color}66`:"none",flexShrink:0}}/>
+                    <div style={{minWidth:0,flex:1}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                        <button
+                          type="button"
+                          onClick={()=>setLobeConfigAberto(v=>v===m.id?null:m.id)}
+                          style={{background:"transparent",border:"none",padding:0,fontFamily:"inherit",fontSize:11,fontWeight:800,color:T.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",textAlign:"left"}}
+                        >
+                          {m.name}
+                        </button>
+                        <span style={{fontSize:9,color:modelsOn[m.id]!==false?AC.claude:T.tf,fontWeight:800}}>{modelsOn[m.id]!==false?"activo":"off"}</span>
+                      </div>
+                      <div style={{fontSize:9,color:T.ts,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.version}</div>
                     </div>
-                    <div style={{fontSize:9,color:T.ts,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.version}</div>
                   </div>
+                  {lobeConfigAberto===m.id && (
+                    <div style={{marginTop:10,paddingTop:9,borderTop:`1px solid ${T.b1}`}}>
+                      <Slider
+                        valor={temperaturas[m.id] ?? 0.7}
+                        min={0}
+                        max={1}
+                        passo={0.1}
+                        cor={m.color}
+                        label="Temperatura"
+                        onChange={(valor)=>{
+                          const next={...temperaturas,[m.id]:valor};
+                          setTemperaturas(next);
+                          saveTemperaturas(next);
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

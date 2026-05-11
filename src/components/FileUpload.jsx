@@ -1,5 +1,6 @@
 import { useFileUpload } from '../hooks/useFileUpload.js';
 
+// FileUpload.jsx — componente visual leve; a extracção fica toda no hook.
 export default function FileUpload({ onUpload }) {
   const {
     ficheiro,
@@ -23,8 +24,9 @@ export default function FileUpload({ onUpload }) {
     cursor: 'pointer',
     textAlign: 'center',
     transition: 'border-color 0.2s, background 0.2s',
-    background: 'transparent',
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.03), transparent)',
     color: 'var(--text)',
+    outline: 'none',
   };
 
   const draggingStyle = isDragging
@@ -37,7 +39,16 @@ export default function FileUpload({ onUpload }) {
   return (
     <div>
       <div
+        role="button"
+        tabIndex={0}
+        aria-label="Enviar ficheiro"
         onClick={handleClick}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleClick();
+          }
+        }}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragEnter={handleDragEnter}
@@ -54,12 +65,44 @@ export default function FileUpload({ onUpload }) {
 
         {!ficheiro ? (
           <>
-            <div style={{ fontSize: 34, marginBottom: 10 }}>📎</div>
+            <div
+              style={{
+                width: 54,
+                height: 54,
+                borderRadius: 16,
+                margin: '0 auto 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(168,85,247,0.10)',
+                border: '1px solid rgba(168,85,247,0.28)',
+                fontSize: 26,
+              }}
+            >
+              📎
+            </div>
             <div style={{ color: 'var(--text-h)', fontSize: 15, fontWeight: 800 }}>
               Arrasta ou clica para enviar
             </div>
-            <div style={{ color: 'var(--text)', fontSize: 12, marginTop: 6 }}>
+            <div style={{ color: 'var(--text)', fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
               Tipos aceites: imagens, PDF, DOCX, TXT, CSV, XLSX, áudio
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 12 }}>
+              {['IMG', 'PDF', 'DOCX', 'TXT', 'CSV', 'XLSX', 'MP3/WAV'].map((tipo) => (
+                <span
+                  key={tipo}
+                  style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: 999,
+                    color: 'var(--text)',
+                    fontSize: 10,
+                    padding: '3px 7px',
+                    background: 'rgba(255,255,255,0.03)',
+                  }}
+                >
+                  {tipo}
+                </span>
+              ))}
             </div>
           </>
         ) : (

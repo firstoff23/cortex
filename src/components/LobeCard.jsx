@@ -1,4 +1,7 @@
 import React from "react";
+import AlertaBanner from "./AlertaBanner";
+import ChatBubble from "./ChatBubble";
+import LobeLoader from "./LobeLoader";
 
 const LobeCard = React.memo(function LobeCard({
   l,
@@ -22,6 +25,7 @@ const LobeCard = React.memo(function LobeCard({
   const textoParcial = textosParciais?.[streamKey] || textosParciais?.[l.id] || "";
   const respostaVisivel = textoParcial || l.result || "";
   const corLobe = l.color || l.cor || "#10b981";
+  const nomeLobe = l.label || l.nome || l.id || "Lobe";
 
   return (
     <div
@@ -29,7 +33,7 @@ const LobeCard = React.memo(function LobeCard({
       style={{
         position: "relative",
         background: T.s2,
-        border: `1px solid ${l.color}33`,
+        border: `1px solid ${corLobe}33`,
         borderRadius: 14,
         padding: "12px 12px 10px",
         boxShadow: "0 4px 14px #00000016",
@@ -50,8 +54,8 @@ const LobeCard = React.memo(function LobeCard({
               width: 26,
               height: 26,
               borderRadius: 8,
-              background: `${l.color}20`,
-              border: `1px solid ${l.color}44`,
+              background: `${corLobe}20`,
+              border: `1px solid ${corLobe}44`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -62,8 +66,8 @@ const LobeCard = React.memo(function LobeCard({
             {["🔍", "💡", "⚙️", "🌐", "😈"][idx] || "🐺"}
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: l.color, letterSpacing: 0.3 }}>
-              {l.label}
+            <div style={{ fontSize: 11, fontWeight: 800, color: corLobe, letterSpacing: 0.3 }}>
+              {nomeLobe}
             </div>
             <div
               style={{
@@ -87,7 +91,7 @@ const LobeCard = React.memo(function LobeCard({
               width: 28,
               height: 28,
               borderRadius: "50%",
-              background: `conic-gradient(${l.color} ${l.confidence * 3.6}deg, ${T.s2} 0deg)`,
+              background: `conic-gradient(${corLobe} ${l.confidence * 3.6}deg, ${T.s2} 0deg)`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -104,7 +108,7 @@ const LobeCard = React.memo(function LobeCard({
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 8,
-                color: l.color,
+                color: corLobe,
                 fontWeight: 800,
               }}
             >
@@ -196,7 +200,7 @@ const LobeCard = React.memo(function LobeCard({
             borderRadius: 9,
             border: `1px solid ${T.b1}`,
             background: "transparent",
-            color: l.regenerating ? l.color : T.ts,
+            color: l.regenerating ? corLobe : T.ts,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
@@ -217,19 +221,29 @@ const LobeCard = React.memo(function LobeCard({
           lineHeight: 1.65,
         }}
       >
-        <Markdown text={respostaVisivel} color={l.isErr ? "#fca5a5" : T.tx} faint={T.ts} />
-        {aStreaming && textoParcial && (
-          <span
-            style={{
-              display: "inline-block",
-              width: "2px",
-              height: "1em",
-              background: corLobe,
-              marginLeft: "2px",
-              animation: "piscar 1s step-end infinite",
-              verticalAlign: "-0.12em",
-            }}
-          />
+        {l.isErr && (
+          <AlertaBanner tipo="erro" mensagem={`${nomeLobe} falhou — a usar fallback quando disponível.`} />
+        )}
+
+        {l.regenerating || (!respostaVisivel && aStreaming) ? (
+          <LobeLoader cor={corLobe} texto="A pensar..." />
+        ) : (
+          <ChatBubble papel="assistant" nome={nomeLobe} cor={corLobe}>
+            <Markdown text={respostaVisivel} color={l.isErr ? "#fca5a5" : T.tx} faint={T.ts} />
+            {aStreaming && textoParcial && (
+              <span
+                style={{
+                  display: "inline-block",
+                  width: "2px",
+                  height: "1em",
+                  background: corLobe,
+                  marginLeft: "2px",
+                  animation: "piscar 1s step-end infinite",
+                  verticalAlign: "-0.12em",
+                }}
+              />
+            )}
+          </ChatBubble>
         )}
       </div>
     </div>

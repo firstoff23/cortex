@@ -1,4 +1,7 @@
 export default async function handler(req, res) {
+  console.log('NIM Proxy chamado:', JSON.stringify(req.body));
+  console.log('API Key presente:', !!process.env.NVIDIA_NIM_KEY);
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método não permitido' });
   }

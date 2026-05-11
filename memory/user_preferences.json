@@ -1,0 +1,113 @@
+{
+  "schema_version": "1.0",
+  "updated_at": "",
+  "user": {
+    "id": "user_001",
+    "name": "",
+    "language": "pt",
+    "location": "PT",
+    "timezone": "Europe/Lisbon"
+  },
+  "preferences": {
+    "response_style": {
+      "tone": "direto",
+      "length": "médio",
+      "format": "markdown",
+      "use_emojis": false,
+      "use_bullet_points": true,
+      "preferred_language": "pt"
+    },
+    "council_mode": {
+      "default_mode": "full",
+      "preferred_wolves": ["pragmático_técnico", "analista_crítico"],
+      "auto_compress_memory": true,
+      "show_wolf_attribution": true
+    },
+    "search": {
+      "preferred_engine": "serper",
+      "fallback_order": ["serper", "duckduckgo"],
+      "max_results_per_query": 5,
+      "search_language": "pt",
+      "search_region": "PT"
+    },
+    "code": {
+      "preferred_language": "typescript",
+      "framework": "next.js",
+      "style": "functional",
+      "comments_language": "pt",
+      "include_types": true
+    }
+  },
+  "project_context": {
+    "project_name": "Cortex Digital",
+    "current_phase": "Fase 4",
+    "stack": {
+      "frontend": "Next.js 15, React, TailwindCSS",
+      "backend": "Node.js, Supabase",
+      "ai_router": "OpenRouter",
+      "cloud_models": ["claude-3.7-sonnet", "gemini-2.5-pro", "gpt-4o", "deepseek-r1"],
+      "local_runtime": "Ollama (localhost:11434)",
+      "local_models": ["qwen2.5-coder:7b", "deepseek-coder-v2", "llama3.3:8b"],
+      "inference_acceleration": "Nvidia NIM",
+      "judge": "claude-3.7-sonnet",
+      "deployment": "Vercel",
+      "database": "Supabase (PostgreSQL)",
+      "vector_db": "Qdrant (planeado — Fase 5)"
+    },
+    "architecture": {
+      "type": "multi-agent-council",
+      "wolves": [
+        "analista_crítico",
+        "inovador_criativo",
+        "pragmático_técnico",
+        "generalista",
+        "advogado_do_diabo"
+      ],
+      "judge": "claude-3.7-sonnet",
+      "orchestrator": "cortex_orchestrator_v1",
+      "local_proxy": "node-express → localhost:11434"
+    },
+    "roadmap": {
+      "completed_phases": ["Fase 1", "Fase 2", "Fase 3"],
+      "current_phase": "Fase 4",
+      "next_milestone": "RAG completo com Qdrant (Fase 5)"
+    }
+  },
+  "session_memory": {
+    "max_sessions_stored": 20,
+    "auto_summarize_after_turns": 5,
+    "summary_model": "qwen2.5-coder:7b",
+    "last_sessions": []
+  },
+  "semantic_memory": {
+    "topics_of_interest": [
+      "arquitetura de agentes",
+      "multi-agent systems",
+      "prompt engineering",
+      "RAG",
+      "automação industrial",
+      "Next.js",
+      "TypeScript",
+      "Supabase",
+      "OpenRouter",
+      "Ollama",
+      "Nvidia NIM"
+    ],
+    "known_constraints": [
+      "Serper free tier: 2.500 créditos/mês",
+      "Brave Search passou a pago em Fev 2026 — não usar",
+      "Ollama corre localmente — não acessível do browser sem proxy",
+      "GTX 960 com 2GB VRAM — modelos locais máx 7B/8B",
+      "32GB RAM — confortável para 7B/8B local",
+      "Sem Qdrant ainda — vector DB na Fase 5"
+    ],
+    "decisions_made": [
+      "Search stack: Serper → DuckDuckGo (Brave removido — passou a pago)",
+      "Council: 5 lobos + Claude 3.7 juiz via OpenRouter",
+      "Modelos locais via Ollama: qwen2.5-coder:7b, deepseek-coder-v2, llama3.3:8b",
+      "Orchestrator v1.0 definido",
+      "System prompts por lobo versionados",
+      "Nvidia NIM para inference acceleration"
+    ]
+  }
+}

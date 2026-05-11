@@ -1,6 +1,7 @@
 import React from "react";
 import LobeCard from "./LobeCard";
 import ClaudeCard from "./ClaudeCard";
+import ChatBubble from "./ChatBubble";
 
 const GENERIC_ERROR_SUGGESTIONS = new Set([
   "Tenta reformular a pergunta",
@@ -58,20 +59,18 @@ const MessageList = React.memo(function MessageList({
           }}
         >
           {m.role === "user" ? (
-            <div
-              style={{
-                alignSelf: "flex-end",
-                background: `linear-gradient(135deg, ${AC.claude}22, ${AC.claude}10)`,
-                border: `1px solid ${AC.claude}44`,
-                color: T.tx,
-                borderRadius: "18px 18px 6px 18px",
-                padding: "12px 14px",
-                fontSize: 13,
-                lineHeight: 1.65,
-                boxShadow: "0 6px 22px #00000022",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-              }}
+            <ChatBubble
+              papel="user"
+              cor={AC.claude}
+              meta={
+                m.complexity
+                  ? m.complexity === "SIMPLE"
+                    ? "⚡ Simples"
+                    : m.complexity === "MEDIUM"
+                    ? "⚙️ Médio"
+                    : "🧠 Complexo"
+                  : null
+              }
             >
               {m.content}
               {m.anexo?.previewUrl && (
@@ -102,29 +101,7 @@ const MessageList = React.memo(function MessageList({
                   📎 {m.anexo.nome}
                 </div>
               )}
-              {m.complexity && (
-                <div
-                  style={{
-                    fontSize: 9,
-                    marginTop: 5,
-                    opacity: 0.7,
-                    textAlign: "right",
-                    color:
-                      m.complexity === "SIMPLE"
-                        ? AC.perp
-                        : m.complexity === "MEDIUM"
-                        ? AC.grok
-                        : AC.claude,
-                  }}
-                >
-                  {m.complexity === "SIMPLE"
-                    ? "⚡ Simples"
-                    : m.complexity === "MEDIUM"
-                    ? "⚙️ Médio"
-                    : "🧠 Complexo"}
-                </div>
-              )}
-            </div>
+            </ChatBubble>
           ) : m.systemNote ? (
             <div
               style={{

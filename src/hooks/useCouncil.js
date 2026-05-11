@@ -176,6 +176,7 @@ export default function useCouncil(msgs, setMsgs) {
       routerDecide,
       LOBES,
       modelsOn,
+      temperaturas,
       focusMode,
       focusLobes,
       P,
@@ -273,6 +274,7 @@ export default function useCouncil(msgs, setMsgs) {
     try {
       debateResultado = await runDebateStream(qFinal, modoExecucao, {
         lobos: councilLobes,
+        temperaturas,
         onToken: streaming?.onToken,
       });
     } finally {
@@ -283,6 +285,10 @@ export default function useCouncil(msgs, setMsgs) {
       lobeDebateParaUI(l, i, debateResultado.ronda1, debateResultado.ronda2, lobeConfidenceScore)
     );
     setLobeResults(nextLobeResults);
+    nextLobeResults
+      .filter((l) => l.isErr)
+      .slice(0, 2)
+      .forEach((l) => toast?.(`Lobe ${l.label || l.id} falhou — a usar fallback`, "aviso"));
 
     const consenso = calcularConsensoMatematico(nextLobeResults);
     const juizesActivos = getJuizesParaPergunta(q);
@@ -467,6 +473,7 @@ export default function useCouncil(msgs, setMsgs) {
     }
 
     autoSaveConv(fm, currentConvId);
+    if (resultadoRei) toast?.("Rei terminou o veredicto", "sucesso");
     setTimeout(() => taRef.current?.focus(), 80);
   }
 

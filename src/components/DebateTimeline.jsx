@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import Abas from "./Abas.jsx";
 
 function valorLobe(item) {
   if (!item) return null;
@@ -111,15 +112,51 @@ export default function DebateTimeline({ ronda1, ronda2, modoDebate }) {
         borderBottom: "1px solid var(--cor-borda, var(--border, #2a2a3a))",
       }}
     >
-      <RondaSection
-        titulo="🔵 Ronda 1 — Posições iniciais"
-        lobos={ronda1}
-        defaultOpen={false}
-      />
-      <RondaSection
-        titulo="🔴 Ronda 2 — Reacções"
-        lobos={ronda2}
-        defaultOpen={false}
+      <Abas
+        defaultActiva="veredicto"
+        abas={[
+          {
+            id: "ronda1",
+            titulo: "Ronda 1",
+            conteudo: (
+              <RondaSection
+                titulo="Posições iniciais"
+                lobos={ronda1}
+                defaultOpen={false}
+              />
+            ),
+          },
+          {
+            id: "ronda2",
+            titulo: "Ronda 2",
+            conteudo: (
+              <RondaSection
+                titulo="Reacções"
+                lobos={ronda2}
+                defaultOpen={false}
+              />
+            ),
+          },
+          {
+            id: "veredicto",
+            titulo: "Veredicto",
+            conteudo: (
+              <div
+                style={{
+                  border: "1px solid var(--cor-borda, var(--border, #2a2a3a))",
+                  borderRadius: "8px",
+                  background: "var(--cor-fundo-2, var(--social-bg, #14141e))",
+                  padding: "10px",
+                  color: "var(--text-muted, var(--text, #a0a0b8))",
+                  fontSize: "0.78rem",
+                  lineHeight: 1.55,
+                }}
+              >
+                O Rei cruza as rondas dos lobos e mostra a síntese final abaixo.
+              </div>
+            ),
+          },
+        ]}
       />
     </div>
   );

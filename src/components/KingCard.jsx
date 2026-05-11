@@ -1,4 +1,5 @@
 import React from "react";
+import ChatBubble from "./ChatBubble.jsx";
 import JudgeCard from "./JudgeCard";
 
 function pct(valor) {
@@ -209,10 +210,9 @@ const KingCard = React.memo(function KingCard({
         )}
 
         <div style={{ paddingBottom: 4, borderBottom: `1px solid ${T.b1 || "var(--border)"}` }}>
-          <div style={{ color: accent, fontSize: 11, fontWeight: 900, marginBottom: 8 }}>
-            Veredicto
-          </div>
-          <Markdown text={textoPrincipal} color={T.tx || "var(--text-h)"} faint={T.ts || "var(--text)"} />
+          <ChatBubble papel="rei" nome="Rei do Córtex" cor={accent} destaque>
+            <Markdown text={textoPrincipal} color={T.tx || "var(--text-h)"} faint={T.ts || "var(--text)"} />
+          </ChatBubble>
         </div>
 
         {king && (

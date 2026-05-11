@@ -146,7 +146,7 @@ function Categoria({ categoria }) {
   );
 }
 
-export default function BlueprintsPanel({ onVoltar }) {
+export default function BlueprintsPanel({ onVoltar, compact = false }) {
   const [filtro, setFiltro] = useState('');
   const [activo, setActivo] = useState(BLUEPRINTS[0].id);
   const [mobile, setMobile] = useState(() => window.innerWidth < 760);
@@ -171,15 +171,15 @@ export default function BlueprintsPanel({ onVoltar }) {
   return (
     <main
       style={{
-        minHeight: '100vh',
-        background: 'var(--bg, #08080c)',
+        minHeight: compact ? 'auto' : '100vh',
+        background: compact ? 'transparent' : 'var(--bg, #08080c)',
         color: 'var(--text, #f5f5ff)',
-        padding: mobile ? '0.85rem' : '1.25rem',
+        padding: compact ? 0 : mobile ? '0.85rem' : '1.25rem',
         boxSizing: 'border-box',
         overflowY: 'auto',
       }}
     >
-      <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ maxWidth: compact ? '100%' : 1080, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <header
           style={{
             display: 'flex',

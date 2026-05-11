@@ -52,6 +52,14 @@
 
 - `BlueprintsPanel.jsx` = painel Mapas/Blueprints com padrões de arquitectura, RAG, IA, storage e checklist de lançamento
 - `FileUpload.jsx` = zona visual de drag/drop para imagens, PDF, DOCX, TXT, CSV, XLSX e áudio
+- `ChatBubble.jsx` = bolhas nativas para utilizador, lobos e Rei
+- `AlertaBanner.jsx` = alertas inline de erro, aviso, info e sucesso
+- `Toast.jsx` = notificações nativas com hook `useToast()`
+- `LobeLoader.jsx` = loader pequeno por lobe com cor própria
+- `EstadoVazio.jsx` = ecrã inicial sem histórico com sugestões clicáveis
+- `SidePanel.jsx` = painel lateral direito deslizante para histórico, Blueprints e Modo Forense
+- `Abas.jsx` = tabs nativas sem Radix usadas no debate
+- `Slider.jsx` = range nativo para temperatura por lobe
 
 ## Forma de trabalho
 
@@ -71,6 +79,10 @@
 - ✅ F4-02 Upload Universal — FEITO (`useFileUpload.js`, `FileUpload.jsx`)
 - ✅ Blueprints/Mapas — FEITO (`BlueprintsPanel.jsx`)
 - ✅ Routing/API keys — FEITO (`/api/chat` para OpenRouter, `/api/nim-proxy` para NIM)
+- ✅ Componentes 21st.dev adaptados — FEITO (`ChatBubble`, `AlertaBanner`, `Toast`, `LobeLoader`, `EstadoVazio`, `SidePanel`, `Abas`, `Slider`)
+- ✅ Input com contador chars/tokens — FEITO
+- ✅ Temperatura por lobe — FEITO (`Slider.jsx`)
+- ✅ Side panels — FEITO (Histórico, Blueprints, Modo Forense)
 - Persistência real com Supabase (substituir localStorage)
 - Conectores on-demand: Tavily, ElevenLabs, Obsidian, Notion
 - Cloudflare: DNS + WAF + rate limiting + Turnstile

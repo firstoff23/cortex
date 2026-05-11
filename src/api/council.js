@@ -199,15 +199,21 @@ function normalizarValorLobe(lobe, valor, contextoDebate) {
   };
 }
 
+function opcoesGeracaoLobe(lobe, options = {}) {
+  const temperatura = options.temperaturas?.[lobe.id] ?? options.temperature;
+  return Number.isFinite(Number(temperatura)) ? { temperature: Number(temperatura) } : {};
+}
+
 export async function chamarLobe(lobe, pergunta, contextoDebate = null, options = {}) {
   const apiKey = getAPIKey(lobe.provider);
   if (!apiKey) throw new Error(`API key ausente para ${lobe.provider}`);
 
   const system = SYSTEM_PROMPTS[lobe.id];
   const messages = [{ role: 'user', content: mensagemUtilizador(pergunta, contextoDebate) }];
+  const geracao = opcoesGeracaoLobe(lobe, options);
   const body =
     lobe.provider === 'openrouter'
-      ? { model: lobe.modelo, system, messages, max_tokens: options.max_tokens || 420 }
+      ? { model: lobe.modelo, system, messages, max_tokens: options.max_tokens || 420, ...geracao }
       : {
           model: lobe.modelo,
           messages: [
@@ -215,6 +221,7 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
             ...messages,
           ],
           max_tokens: options.max_tokens || 420,
+          ...geracao,
         };
 
   const resposta = await fetch(
@@ -261,6 +268,7 @@ export async function chamarLobeStream(lobe, pergunta, contextoDebate = null, op
     body: JSON.stringify({
       model: lobe.modelo,
       stream: true,
+      ...opcoesGeracaoLobe(lobe, options),
       messages: [
         { role: 'system', content: SYSTEM_PROMPTS[lobe.id] },
         { role: 'user', content: mensagemUtilizador(pergunta, contextoDebate) },
@@ -318,11 +326,14 @@ export function chamarRei(...args) {
   return runKing(...args);
 }
 
-async function chamarComMapa(lobe, pergunta, contextoDebate, mapa, chamar) {
+async function chamarComMapa(lobe, pergunta, contextoDebate, mapa, chamar, options = {}) {
   const ctrl = new AbortController();
   mapa.set(lobe.id, ctrl);
   try {
-    const valor = await chamar(lobe, pergunta, contextoDebate, { signal: ctrl.signal });
+    const valor = await chamar(lobe, pergunta, contextoDebate, {
+      signal: ctrl.signal,
+      ...opcoesGeracaoLobe(lobe, options),
+    });
     return normalizarValorLobe(lobe, valor, contextoDebate);
   } finally {
     if (mapa.get(lobe.id) === ctrl) mapa.delete(lobe.id);
@@ -335,7 +346,7 @@ export async function runDebate(pergunta, modo = 'paralelo', options = {}) {
   const ronda1Map = new Map();
 
   const ronda1 = await Promise.allSettled(
-    lobos.map((lobe) => chamarComMapa(lobe, pergunta, null, ronda1Map, chamar))
+    lobos.map((lobe) => chamarComMapa(lobe, pergunta, null, ronda1Map, chamar, options))
   );
 
   if (modo === 'paralelo') return { ronda1 };
@@ -347,23 +358,26 @@ export async function runDebate(pergunta, modo = 'paralelo', options = {}) {
 
   const ronda2Map = new Map();
   const ronda2 = await Promise.allSettled(
-    lobos.map((lobe) => chamarComMapa(lobe, pergunta, contextoDebate, ronda2Map, chamar))
+    lobos.map((lobe) => chamarComMapa(lobe, pergunta, contextoDebate, ronda2Map, chamar, options))
   );
 
   return { ronda1, ronda2 };
 }
 
-async function chamarStreamComFallback(lobe, pergunta, contextoDebate, chamarStream, chamarFallback, onToken) {
+async function chamarStreamComFallback(lobe, pergunta, contextoDebate, chamarStream, chamarFallback, onToken, options = {}) {
   const ctrl = new AbortController();
   const timeout = setTimeout(() => ctrl.abort(), 8000);
+  const geracao = opcoesGeracaoLobe(lobe, options);
 
   try {
     return await chamarStream(lobe, pergunta, contextoDebate, {
       signal: ctrl.signal,
       onToken,
+      ...geracao,
     }).catch(() =>
       chamarFallback(lobe, pergunta, contextoDebate, {
         signal: ctrl.signal,
+        ...geracao,
       }),
     );
   } finally {
@@ -378,7 +392,7 @@ export async function runDebateStream(pergunta, modo = 'paralelo', options = {})
 
   const ronda1 = await Promise.allSettled(
     lobos.map((lobe) =>
-      chamarStreamComFallback(lobe, pergunta, null, chamarStream, chamarFallback, options.onToken)
+      chamarStreamComFallback(lobe, pergunta, null, chamarStream, chamarFallback, options.onToken, options)
     )
   );
 
@@ -397,7 +411,8 @@ export async function runDebateStream(pergunta, modo = 'paralelo', options = {})
         contextoDebate,
         chamarStream,
         chamarFallback,
-        options.onToken
+        options.onToken,
+        options
       )
     )
   );
