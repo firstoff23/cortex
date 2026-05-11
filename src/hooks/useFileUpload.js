@@ -4,9 +4,9 @@ import { extrairPDF }   from '../utils/extractors/extractPDF.js';
 import { extrairDOCX }  from '../utils/extractors/extractDOCX.js';
 import { extrairSheet } from '../utils/extractors/extractSheet.js';
 import { extrairTexto } from '../utils/extractors/extractText.js';
-import { extrairAudio } from '../utils/extractors/extractAudio.js';
 
 const LIMITE_BYTES = 10 * 1024 * 1024; // 10 MB
+const ERRO_AUDIO = 'Transcrição de ficheiros áudio não suportada. Use o microfone 🎙 para voz em tempo real.';
 
 // Mapeia extensão → função extractor
 const EXTRACTORS = {
@@ -16,8 +16,6 @@ const EXTRACTORS = {
   md:   extrairTexto,
   csv:  extrairSheet,
   xlsx: extrairSheet,
-  mp3:  () => extrairAudio(),
-  wav:  () => extrairAudio(),
 };
 
 /**
@@ -43,6 +41,13 @@ export function useFileUpload() {
 
     // Detectar extensão
     const ext = file.name.split('.').pop().toLowerCase();
+
+    // A transcrição de voz é só em tempo real; ficheiros áudio não devem arrancar o microfone.
+    if (ext === 'mp3' || ext === 'wav') {
+      setErro(ERRO_AUDIO);
+      return;
+    }
+
     const extractor = EXTRACTORS[ext];
 
     if (!extractor) {
