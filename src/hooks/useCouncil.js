@@ -405,7 +405,18 @@ export default function useCouncil(msgs, setMsgs) {
 
     const buf2 = [...newBuf, `BRAIN: ${(structured?.final || cR || "").trim()}`];
     setBuf(buf2);
-    let nb = { ...brain, sessions: brain.sessions + 1 };
+    const perguntaMemoria = q.replace(/\s+/g, " ").trim();
+    const respostaMemoria = (structured?.final || cR || "").replace(/\s+/g, " ").trim();
+    const resumoEpisodico = respostaMemoria
+      ? `Pergunta: ${perguntaMemoria.slice(0, 180)} | Resposta: ${respostaMemoria.slice(0, 320)}`
+      : "";
+    let nb = {
+      ...brain,
+      sessions: brain.sessions + 1,
+      episodic: resumoEpisodico
+        ? [...brain.episodic, resumoEpisodico].slice(-MAX_EPISODIC)
+        : brain.episodic,
+    };
     let reflexOk = false;
 
     if (buf2.length >= MAX_BUF && nb.sessions >= 1) {

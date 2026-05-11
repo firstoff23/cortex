@@ -296,26 +296,6 @@ const KingCard = React.memo(function KingCard({
           </div>
         )}
 
-        {king?.suggestions?.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {king.suggestions.map((item, idx) => (
-              <span
-                key={`suggestion-${idx}-${item.slice(0, 10)}`}
-                style={{
-                  border: `1px solid ${T.b1 || "var(--border)"}`,
-                  borderRadius: 999,
-                  padding: "5px 8px",
-                  color: T.ts || "var(--text)",
-                  background: T.s2 || "var(--social-bg)",
-                  fontSize: 10,
-                }}
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-        )}
-
         {m.refinedQuery && (
           <div style={{ fontSize: 9, color: T.tf || "var(--text)", fontStyle: "italic" }}>
             Pergunta refinada: "{m.refinedQuery}"

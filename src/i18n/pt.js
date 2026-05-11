@@ -5,12 +5,12 @@ export default {
 
   // Navegação
   nav: {
-    title: "CÓRTEX",
-    subtitle: "11 Lobos · Council · Claude Opus 4.6",
+    title: "Córtex Digital",
+    subtitle: "5 lobos oficiais · Council v12 · Rei/Codex",
     chat: "Chat",
-    memory: "Mem.",
+    memory: "Memória",
     keys: "Chaves",
-    settings: "Defs",
+    settings: "Definições",
     history: "Histórico",
     newChat: "+ Nova conversa",
     models: "Modelos",
@@ -44,7 +44,7 @@ export default {
   home: {
     title: "Córtex Digital",
     subtitle: "Conselho de",
-    lobes: "11 lobos",
+    lobes: "5 lobos",
     judge: "Juiz",
     configBrain: "🌱 Configurar cérebro",
     suggestions: [
@@ -97,9 +97,9 @@ export default {
     reset: "⟳",
     stats: {
       facts: "Factos",
-      sessions: "Sessões",
+      sessions: "Conversas",
       patterns: "Padrões",
-      total: "Total",
+      total: "Registos",
     },
     sections: {
       semantic: { title: "Semântica", sub: "Factos e preferências" },
@@ -132,9 +132,9 @@ export default {
   // Guia modal
   guide: {
     title: "Guia de Utilização",
-    council: { title: "Conselho de 11 Lobos", body: "Cada pergunta é analisada em paralelo por até 11 modelos. Claude Opus 4.6 age como juiz e sintetiza a melhor resposta final." },
-    cortex: { title: "Córtex", body: "O Claude Opus 4.6 atua como juiz do conselho e sintetiza a resposta final com base nos lobes ativos." },
-    memory: { title: "Memória", body: (max) => `Usa "Seed" para dar contexto inicial. A cada ${max} trocas o sistema consolida memórias automaticamente.` },
+    council: { title: "Conselho de 5 Lobos", body: "Cada pergunta é analisada pelos lobos oficiais necessários. O Rei/Codex consolida a melhor resposta final." },
+    cortex: { title: "Córtex", body: "O Rei/Codex atua como juiz do conselho e sintetiza a resposta final com base nos lobos ativos." },
+    memory: { title: "Memória", body: (max) => `Usa "Seed" para dar contexto inicial. Cada resposta guarda um resumo episódico e, a cada ${max} trocas, o sistema consolida factos e padrões.` },
     tip: "Shift+Enter = nova linha · 21 temas · Histórico sem limite · ↺ regenerar · ↓ exportar · 📤 partilhar",
   },
 

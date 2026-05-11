@@ -157,6 +157,17 @@ export function getAPIKey(provider) {
   return '';
 }
 
+async function lerJsonResposta(resposta) {
+  const texto = await resposta.text().catch(() => '');
+  if (!texto.trim()) return {};
+
+  try {
+    return JSON.parse(texto);
+  } catch {
+    return { error: `Resposta não-JSON HTTP ${resposta.status}` };
+  }
+}
+
 function mensagemUtilizador(pergunta, contextoDebate) {
   if (!contextoDebate) return pergunta;
   return `Pergunta original: ${pergunta}
@@ -223,7 +234,7 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
     body: JSON.stringify(body),
   });
 
-  const dados = await resposta.json().catch(() => ({}));
+  const dados = await lerJsonResposta(resposta);
   if (!resposta.ok || dados.error) {
     throw new Error(dados.error?.message || dados.error || `HTTP ${resposta.status}`);
   }

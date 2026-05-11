@@ -41,6 +41,17 @@ async function fetchWithTimeout(url, opts = {}, ms = 30000, externalSignal) {
   }
 }
 
+async function lerJsonSeguro(res) {
+  const texto = await res.text().catch(() => "");
+  if (!texto.trim()) return null;
+
+  try {
+    return JSON.parse(texto);
+  } catch {
+    return { error: `Resposta não-JSON HTTP ${res.status}` };
+  }
+}
+
 export async function callOpenRouter(id, sys, msg, maxTokens = 420, timeoutMs = 30000, options = {}) {
   let model = OR_MODELS[id];
   if (!model) throw new Error(`OR_MODELS: id desconhecido "${id}"`);
@@ -64,9 +75,9 @@ export async function callOpenRouter(id, sys, msg, maxTokens = 420, timeoutMs = 
           max_tokens: maxTokens,
         }),
       }, timeoutMs, options.signal);
-      const data = await res.json();
-      if (res.ok && !data.error) return data.content ?? "";
-      lastErr = data.error || `HTTP ${res.status}`;
+      const data = await lerJsonSeguro(res);
+      if (res.ok && data && !data.error) return data.content ?? "";
+      lastErr = data?.error || `resposta vazia HTTP ${res.status}`;
       // Se não for 404, não tenta o seguinte
       if (!String(lastErr).includes("404")) throw new Error(lastErr);
     } catch (e) {

@@ -4,10 +4,10 @@ export default {
   speechLang: "en-US",
 
   nav: {
-    title: "CÓRTEX",
-    subtitle: "11 Lobes · Council · Claude Opus 4.6",
+    title: "Córtex Digital",
+    subtitle: "5 official lobes · Council v12 · King/Codex",
     chat: "Chat",
-    memory: "Mem.",
+    memory: "Memory",
     keys: "Keys",
     settings: "Settings",
     history: "History",
@@ -41,7 +41,7 @@ export default {
   home: {
     title: "Digital Córtex",
     subtitle: "Council of",
-    lobes: "11 lobes",
+    lobes: "5 lobes",
     judge: "Judge",
     configBrain: "🌱 Configure brain",
     suggestions: [
@@ -91,9 +91,9 @@ export default {
     reset: "⟳",
     stats: {
       facts: "Facts",
-      sessions: "Sessions",
+      sessions: "Conversations",
       patterns: "Patterns",
-      total: "Total",
+      total: "Records",
     },
     sections: {
       semantic: { title: "Semantic", sub: "Facts and preferences" },
@@ -123,9 +123,9 @@ export default {
 
   guide: {
     title: "User Guide",
-    council: { title: "Council of 11 Lobes", body: "Every question is analysed in parallel by up to 11 models. Claude Opus 4.6 acts as judge and synthesises the best final answer." },
-    cortex: { title: "Córtex", body: "Claude Opus 4.6 acts as council judge and synthesises the final answer based on active lobes." },
-    memory: { title: "Memory", body: (max) => `Use "Seed" to give initial context. Every ${max} exchanges the system consolidates memories automatically.` },
+    council: { title: "Council of 5 Lobes", body: "Every question is analysed by the official lobes that are needed. King/Codex consolidates the best final answer." },
+    cortex: { title: "Córtex", body: "King/Codex acts as council judge and synthesises the final answer based on the active lobes." },
+    memory: { title: "Memory", body: (max) => `Use "Seed" to give initial context. Every response saves an episodic summary and every ${max} exchanges the system consolidates facts and patterns.` },
     tip: "Shift+Enter = new line · 21 themes · Unlimited history · ↺ regenerate · ↓ export · 📤 share",
   },
 

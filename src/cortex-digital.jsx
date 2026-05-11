@@ -1210,134 +1210,81 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       )}
 
       {/* ── NAV ────────────────────────────────────────────── */}
-<nav style={{display:"flex",alignItems:"center",height:50,padding:"0 8px",background:T.s1,borderBottom:`1px solid ${T.b1}`,gap:4,flexShrink:0,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-  <div style={{display:"flex",alignItems:"center",gap:7,marginRight:"auto",flexShrink:0}}>
-    <div style={{width:28,height:28,borderRadius:8,background:`${AC.claude}22`,border:`1px solid ${AC.claude}33`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:AC.claude}}>C</div>
-    <div>
-      <div style={{fontSize:11,fontWeight:800,letterSpacing:3,color:T.tx}}>{t.nav.title} <span style={{opacity:0.4,fontSize:8}}>{MV.split("-")[1]}</span></div>
-      <div style={{fontSize:7,color:T.tf,letterSpacing:1}}>{t.nav.subtitle}</div>
-    </div>
-  </div>
-
-  {/* Pontinhos — só DEV_MODE */}
-  {DEV_MODE && (
-    <div style={{display:"flex",gap:3,marginRight:4}}>
-      {LOBOS.filter((_,i)=>i%2===0).map((l,index)=>{
-        const hasKey=true;
-        const cor = lobeColor(l);
-        const nome = lobeLabel(l);
-        return <div key={`lobe-${l.id}-${index}`} title={`${nome}: ${hasKey?"Proxy":"Simulado"}`} style={{padding:"2px 5px",borderRadius:16,border:`1px solid ${hasKey?cor+"44":T.b1}`,background:hasKey?cor+"12":"transparent",display:"flex",alignItems:"center",gap:2}}>
-          <div style={{width:4,height:4,borderRadius:"50%",background:hasKey?cor:T.tf}}/>
-          <span style={{fontSize:6,fontWeight:700,color:hasKey?cor:T.tf}}>{nome.slice(0,3)}</span>
-        </div>;
-      })}
-    </div>
-  )}
-
-  {!isMobile && [["chat","💬",t.nav.chat],...(DEV_MODE?[["keys","🔑",t.nav.keys]]:[]),["memory","🧠",t.nav.memory],["settings","⚙",t.nav.settings]].map(([p,ico,lbl],idx)=>(
+<nav style={{display:"grid",gridTemplateColumns:isMobile?"1fr auto":"minmax(260px,1fr) auto",alignItems:"center",minHeight:64,padding:"8px 12px",background:`linear-gradient(180deg, ${T.s1}, ${T.bg})`,borderBottom:`1px solid ${AC.claude}44`,gap:12,flexShrink:0,boxShadow:`0 8px 24px ${T.b2}66`}}>
   <button
-    key={`nav-${idx}-${p}`}
-    onClick={()=>setPage(p)}
-    style={{
-      background:page===p?`${AC.claude}18`:"transparent",
-      border:`1px solid ${page===p?AC.claude+"44":T.b1}`,
-      borderRadius:10,
-      minHeight:44,
-      padding:"8px 12px",
-      transition:"all 220ms cubic-bezier(0.4,0,0.2,1)",
-      boxShadow:page===p?`0 0 10px ${AC.claude}22`:"none",
-      color:page===p?AC.claude:T.ts,
-      cursor:"pointer",
-      fontSize:11,
-      fontFamily:"inherit",
-      fontWeight:page===p?700:500,
-      display:"flex",
-      alignItems:"center",
-      gap:5,
-      flexShrink:0
-    }}
+    type="button"
+    onClick={()=>{setPage("chat");setPagina("chat");}}
+    style={{display:"flex",alignItems:"center",gap:11,background:"transparent",border:"none",padding:0,cursor:"pointer",fontFamily:"inherit",textAlign:"left",minWidth:0}}
+    title="Voltar ao chat"
   >
-    <span>{ico}</span>
-    <span>{lbl}</span>
-    {p==="memory"&&brain.semantic.length>0&&(
-      <span style={{background:`${AC.claude}33`,color:AC.claude,borderRadius:10,padding:"0 4px",fontSize:8,fontWeight:800}}>
-        {brain.semantic.length}
-      </span>
+    <div style={{width:40,height:40,borderRadius:12,background:`linear-gradient(135deg, ${AC.claude}33, ${AC.claude}12)`,border:`1px solid ${AC.claude}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:AC.claude,letterSpacing:0.5,boxShadow:`0 0 18px ${AC.claude}22`,flexShrink:0}}>CD</div>
+    <div style={{minWidth:0}}>
+      <div style={{display:"flex",alignItems:"baseline",gap:7,flexWrap:"wrap"}}>
+        <div style={{fontSize:15,fontWeight:900,letterSpacing:0.6,color:T.tx,lineHeight:1}}>{t.nav.title}</div>
+        <span style={{fontSize:10,fontWeight:800,color:AC.claude,letterSpacing:0.4}}>{MV.split("-")[1]}</span>
+      </div>
+      <div style={{fontSize:10,color:T.ts,marginTop:5,letterSpacing:0.2,whiteSpace:"normal"}}>{t.nav.subtitle}</div>
+    </div>
+  </button>
+
+  <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:6,overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:1}}>
+    {!isMobile && [["chat","▣",t.nav.chat],...(DEV_MODE?[["keys","🔑",t.nav.keys]]:[]),["memory","🧠",t.nav.memory],["settings","⚙",t.nav.settings]].map(([p,ico,lbl],idx)=>{
+      const active=page===p&&pagina!=="blueprints";
+      return (
+        <button
+          key={`nav-${idx}-${p}`}
+          type="button"
+          onClick={()=>{setPage(p);setPagina("chat");}}
+          style={{background:active?`${AC.claude}20`:T.s2,border:`1px solid ${active?AC.claude+"66":T.b1}`,borderRadius:12,minHeight:42,padding:"8px 13px",transition:"all 220ms cubic-bezier(0.4,0,0.2,1)",boxShadow:active?`0 0 16px ${AC.claude}22`:"none",color:active?AC.claude:T.ts,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:active?800:600,display:"flex",alignItems:"center",gap:7,flexShrink:0}}
+        >
+          <span>{ico}</span>
+          <span>{lbl}</span>
+          {p==="memory"&&brain.semantic.length>0&&(
+            <span style={{background:`${AC.claude}33`,color:AC.claude,borderRadius:10,padding:"0 5px",fontSize:9,fontWeight:900}}>
+              {brain.semantic.length}
+            </span>
+          )}
+        </button>
+      );
+    })}
+
+    {!isMobile && (
+      <button
+        type="button"
+        onClick={() => {setPagina(p => p === "blueprints" ? "chat" : "blueprints");setPage("chat");}}
+        style={{background:pagina==="blueprints"?`${AC.claude}20`:T.s2,border:`1px solid ${pagina==="blueprints"?AC.claude+"66":T.b1}`,borderRadius:12,minHeight:42,padding:"8px 13px",transition:"all 220ms cubic-bezier(0.4,0,0.2,1)",boxShadow:pagina==="blueprints"?`0 0 16px ${AC.claude}22`:"none",color:pagina==="blueprints"?AC.claude:T.ts,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:pagina==="blueprints"?800:600,display:"flex",alignItems:"center",gap:7,flexShrink:0}}
+      >
+        <span>🗺️</span>
+        <span>Mapas</span>
+      </button>
     )}
-  </button>
-))}
 
-  {!isMobile && (
-  <button
-    onClick={() => setPagina(p => p === 'blueprints' ? 'chat' : 'blueprints')}
-    style={{
-      background:pagina==="blueprints"?`${AC.claude}18`:"transparent",
-      border:`1px solid ${pagina==="blueprints"?AC.claude+"44":T.b1}`,
-      borderRadius:10,
-      minHeight:44,
-      padding:"8px 12px",
-      transition:"all 220ms cubic-bezier(0.4,0,0.2,1)",
-      boxShadow:pagina==="blueprints"?`0 0 10px ${AC.claude}22`:"none",
-      color:pagina==="blueprints"?AC.claude:T.ts,
-      cursor:"pointer",
-      fontSize:11,
-      fontFamily:"inherit",
-      fontWeight:pagina==="blueprints"?700:500,
-      display:"flex",
-      alignItems:"center",
-      gap:5,
-      flexShrink:0
-    }}
-  >
-    <span>🗺️</span>
-    <span>Mapas</span>
-  </button>
-)}
+    {!isMobile && (
+      <>
+        <button type="button" onClick={()=>setShowModels(true)} style={{...navBtn(T),minWidth:42,minHeight:42,background:T.s2}} title={t.nav.models}>◈</button>
+        <button type="button" onClick={()=>setShowTP(true)} style={{...navBtn(T),minWidth:42,minHeight:42,background:T.s2}} title={t.nav.theme}>{THEMES[theme].emoji}</button>
+        <button type="button" onClick={()=>setShowGuide(true)} style={{...navBtn(T),minWidth:42,minHeight:42,background:T.s2}} title={t.nav.guide}>?</button>
+      </>
+    )}
 
-  {!isMobile && (
-  <>
-    <button onClick={()=>setShowModels(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title={t.nav.models}>◈</button>
-    <button onClick={()=>setShowTP(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title={t.nav.theme}>{THEMES[theme].emoji}</button>
-    <button onClick={()=>setShowGuide(true)} style={{...navBtn(T),minWidth:44,minHeight:44}} title={t.nav.guide}>?</button>
-  </>
-)}
+    <button
+      type="button"
+      onClick={toggleLang}
+      style={{...navBtn(T),minWidth:42,minHeight:42,fontWeight:800,color:T.tx,background:T.s2}}
+      title={lang === "pt" ? "Switch to English" : "Mudar para Português"}
+    >
+      {lang === "pt" ? "EN" : "PT"}
+    </button>
 
-<button
-  onClick={toggleLang}
-  style={{...navBtn(T),minWidth:44,minHeight:44,fontWeight:700,color:T.tx}}
-  title={lang === "pt" ? "Switch to English" : "Mudar para Português"}
->
-  {lang === "pt" ? "EN" : "PT"}
-</button>
-
-{/* Modo Foco */}
-<button
-  onClick={()=>setFocusMode(v=>!v)}
-  style={{
-    ...navBtn(T),
-    minWidth:44, minHeight:44,
-    background: focusMode ? `${AC.grok}22` : "transparent",
-    borderColor: focusMode ? `${AC.grok}55` : T.b1,
-    color: focusMode ? AC.grok : T.ts,
-  }}
-  title={t.focus.title}
->
-  ◎
-</button>
-
-<button
-  onClick={()=>setShowSidebar(v=>!v)}
-  style={{
-    ...navBtn(T),
-    minWidth:44,
-    minHeight:44,
-    background:showSidebar?`${AC.claude}22`:"transparent",
-    borderColor:showSidebar?`${AC.claude}55`:T.b1,
-  }}
-  title={t.sidebar.title}
->
-  ☰
-</button>
+    <button
+      type="button"
+      onClick={()=>setShowSidebar(v=>!v)}
+      style={{...navBtn(T),minWidth:42,minHeight:42,background:showSidebar?`${AC.claude}22`:T.s2,borderColor:showSidebar?`${AC.claude}55`:T.b1}}
+      title={t.sidebar.title}
+    >
+      ☰
+    </button>
+  </div>
 </nav>
 
 
@@ -1797,8 +1744,8 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               {[[()=>setShowSeed(true),AC.genspark,t.memory.seed],[()=>setShowExport(true),AC.perp,t.memory.export],[()=>setShowImport(true),AC.gemini,t.memory.import],[()=>{if(confirm(t.memory.confirmReset)){setBrain(defaultBrain);saveBrain(defaultBrain);setBuf([]);}},  "#ef4444",t.memory.reset]].map(([fn,c,lbl],i)=><button key={`memory-action-${i}-${lbl}`} onClick={fn} style={{...btn(T,c),padding:"4px 8px"}}>{lbl}</button>)}
             </div>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
-            {[[brain.semantic.length,t.memory.stats.facts,AC.claude,"◆"],[brain.episodic.length,t.memory.stats.sessions,AC.gemini,"◈"],[brain.patterns.length,t.memory.stats.patterns,AC.grok,"◉"],[brain.sessions,t.memory.stats.total,AC.genspark,"◎"]].map(([n,l,c,ic],idx)=>(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:7}}>
+            {[[brain.semantic.length,t.memory.stats.facts,AC.claude,"◆"],[brain.sessions,t.memory.stats.sessions,AC.gemini,"◈"],[brain.patterns.length,t.memory.stats.patterns,AC.grok,"◉"],[brain.semantic.length+brain.episodic.length+brain.patterns.length,t.memory.stats.total,AC.genspark,"◎"]].map(([n,l,c,ic],idx)=>(
               <div key={`memory-stat-${idx}-${l}`} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:13,padding:"11px 7px",textAlign:"center"}}>
                 <div style={{fontSize:10,color:c,marginBottom:2}}>{ic}</div>
                 <div style={{fontSize:21,fontWeight:800,color:T.tx,lineHeight:1}}>{n}</div>
@@ -1822,27 +1769,60 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
 
       {/* ── SETTINGS ───────────────────────────────────────── */}
       {page==="settings" && (
-        <div style={{flex:1,overflowY:"auto",padding:13,display:"flex",flexDirection:"column",gap:11,maxWidth:580,width:"100%",margin:"0 auto",boxSizing:"border-box"}}>
-          <h2 style={{margin:0,fontSize:14,fontWeight:800,color:T.tx}}>{t.settings.title}</h2>
-          <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div><div style={{fontSize:11,fontWeight:700,color:T.tx}}>{t.settings.theme.label}</div><div style={{fontSize:10,color:T.ts,marginTop:1}}>{THEMES[theme].emoji} {THEMES[theme].name} — {t.settings.theme.sub(Object.keys(THEMES).length)}</div></div>
-            <button onClick={()=>setShowTP(true)} style={btn(T,AC.claude)}>{t.settings.theme.action}</button>
-          </div>
-          <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{flex:1,overflowY:"auto",padding:"18px 16px 24px",maxWidth:880,width:"100%",margin:"0 auto",boxSizing:"border-box"}}>
+          <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:12,marginBottom:16,flexWrap:"wrap"}}>
             <div>
-              <div style={{fontSize:11,fontWeight:700,color:T.tx}}>{t.settings.keys.label}</div>
-              <div style={{fontSize:9,color:T.ts,marginTop:1}}>{t.settings.keys.sub(Object.values(keys).filter(k=>k?.trim().length>10).length, Object.keys(keys).length)}</div>
+              <h2 style={{margin:0,fontSize:20,fontWeight:900,color:T.tx,letterSpacing:0.2}}>{t.settings.title}</h2>
+              <p style={{margin:"6px 0 0",fontSize:12,color:T.ts,lineHeight:1.5}}>Córtex v12 com {MODELS.length} lobos oficiais, memória local e proxy serverless.</p>
             </div>
-            <button onClick={()=>setPage("keys")} style={btn(T,AC.perp)}>{t.settings.keys.action}</button>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              <span style={{border:`1px solid ${AC.claude}44`,background:`${AC.claude}12`,color:AC.claude,borderRadius:999,padding:"5px 9px",fontSize:11,fontWeight:800}}>Build {BUILD}</span>
+              <span style={{border:`1px solid ${T.b1}`,background:T.s2,color:T.ts,borderRadius:999,padding:"5px 9px",fontSize:11}}>{Object.values(keys).filter(k=>k?.trim().length>10).length}/{Object.keys(keys).length} keys</span>
+            </div>
           </div>
-          <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:12,padding:"10px 14px"}}>
-            <div style={{fontSize:11,fontWeight:700,color:T.tx,marginBottom:8}}>{t.settings.arch}</div>
-            {[["◉",AC.grok,"Grok","grok-3"],["◈",AC.gemini,"Gemini","gemini-2.5-flash"],["◇",AC.perp,"Perplexity","sonar-pro (via Groq)"],["◎",AC.genspark,"Genspark","simulado (via Claude)"],["◍",AC.manus,"Manus","simulado (via Claude)"],["○",AC.openai||"#74aa9c","OpenAI","gpt-4o"],["◐",AC.deepseek||"#4d9fff","DeepSeek","deepseek-chat"],["◑",AC.llama||"#e879f9","Llama","llama-4-scout via Groq"],["◒",AC.mistral||"#f97316","Mistral","mistral-large-latest"],["◓",AC.nemotron||"#a3e635","Nemotron","nemotron-4-340b NVIDIA"],["◆",AC.claude,"Claude","claude-opus-4-6 — Juiz final"],].map(([ic,c,t,d],idx)=>(
-              <div key={`arch-${idx}-${t}`} style={{display:"flex",gap:7,padding:"5px 0",borderBottom:`1px solid ${T.b2}`}}>
-                <span style={{color:c,fontSize:12,flexShrink:0}}>{ic}</span>
-                <div><div style={{fontSize:10,fontWeight:600,color:T.tx}}>{t}</div><div style={{fontSize:8,color:T.ts,marginTop:1}}>{d}</div></div>
+
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10,marginBottom:14}}>
+            {[
+              {icon:THEMES[theme].emoji,title:t.settings.theme.label,sub:`${THEMES[theme].name} · ${t.settings.theme.sub(Object.keys(THEMES).length)}`,action:t.settings.theme.action,color:AC.claude,onClick:()=>setShowTP(true)},
+              {icon:"🔑",title:t.settings.keys.label,sub:t.settings.keys.sub(Object.values(keys).filter(k=>k?.trim().length>10).length,Object.keys(keys).length),action:t.settings.keys.action,color:AC.perp,onClick:()=>setPage("keys")},
+              {icon:"◈",title:t.nav.models,sub:`${MODELS.filter(m=>modelsOn[m.id]!==false).length}/${MODELS.length} lobos activos`,action:"Gerir",color:AC.gemini,onClick:()=>setShowModels(true)},
+              {icon:"🧠",title:t.memory.title,sub:`${brain.semantic.length} factos · ${brain.sessions} conversas`,action:"Abrir",color:AC.grok,onClick:()=>setPage("memory")},
+            ].map((card,idx)=>(
+              <button key={`settings-card-${idx}-${card.title}`} type="button" onClick={card.onClick} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:14,padding:14,textAlign:"left",cursor:"pointer",fontFamily:"inherit",minHeight:118,display:"flex",flexDirection:"column",justifyContent:"space-between",boxShadow:`0 8px 24px ${T.b2}55`,transition:"border-color 0.2s, transform 0.2s"}}>
+                <div style={{display:"flex",alignItems:"center",gap:9}}>
+                  <span style={{width:30,height:30,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",background:`${card.color}18`,border:`1px solid ${card.color}44`,color:card.color,fontSize:15}}>{card.icon}</span>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:850,color:T.tx}}>{card.title}</div>
+                    <div style={{fontSize:10,color:T.ts,marginTop:3,lineHeight:1.4}}>{card.sub}</div>
+                  </div>
+                </div>
+                <div style={{fontSize:11,fontWeight:800,color:card.color,marginTop:12}}>{card.action} →</div>
+              </button>
+            ))}
+          </div>
+
+          <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:16,padding:14,boxShadow:`0 8px 24px ${T.b2}55`}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:900,color:T.tx}}>{t.settings.arch}</div>
+                <div style={{fontSize:10,color:T.ts,marginTop:3}}>Router inteligente escolhe só os lobos necessários; nunca corre uma lista antiga de 11 ao mesmo tempo.</div>
               </div>
+              <button type="button" onClick={()=>setShowModels(true)} style={btn(T,AC.gemini)}>Configurar lobos</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:8}}>
+              {MODELS.map((m,idx)=>(
+                <div key={`arch-${idx}-${m.id}`} style={{display:"flex",gap:9,alignItems:"center",padding:"10px 11px",border:`1px solid ${T.b2}`,borderRadius:12,background:T.s2}}>
+                  <span style={{width:9,height:9,borderRadius:"50%",background:modelsOn[m.id]!==false?m.color:T.tf,boxShadow:modelsOn[m.id]!==false?`0 0 10px ${m.color}66`:"none",flexShrink:0}}/>
+                  <div style={{minWidth:0,flex:1}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                      <div style={{fontSize:11,fontWeight:800,color:T.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.name}</div>
+                      <span style={{fontSize:9,color:modelsOn[m.id]!==false?AC.claude:T.tf,fontWeight:800}}>{modelsOn[m.id]!==false?"activo":"off"}</span>
+                    </div>
+                    <div style={{fontSize:9,color:T.ts,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.version}</div>
+                  </div>
+                </div>
               ))}
+            </div>
           </div>
         </div>
       )}

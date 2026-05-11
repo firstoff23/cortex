@@ -223,9 +223,66 @@ describe('chamarLobe — OpenRouter', () => {
       global.fetch = fetchAnterior;
     }
   });
+
+  it('não propaga Unexpected end quando /api/chat devolve corpo vazio', async () => {
+    const { chamarLobe } = await import('../src/api/council.js');
+    const fetchAnterior = global.fetch;
+
+    global.fetch = async () => new Response('', { status: 502 });
+
+    try {
+      await assert.rejects(
+        () =>
+          chamarLobe(
+            { id: 1, nome: 'Analista Crítico', modelo: 'deepseek/deepseek-r1', provider: 'openrouter' },
+            'Pergunta',
+          ),
+        (erro) => {
+          assert.match(erro.message, /HTTP 502/);
+          assert.doesNotMatch(erro.message, /Unexpected end/i);
+          return true;
+        },
+      );
+    } finally {
+      global.fetch = fetchAnterior;
+    }
+  });
 });
 
-// ── Teste 12: cortex usa os lobos importados ─────────────────
+// ── Teste 12: callOpenRouter não rebenta com JSON vazio ──────
+describe('callOpenRouter — resposta vazia', () => {
+  it('devolve erro controlado quando /api/chat responde sem corpo', async () => {
+    const { callOpenRouter } = await import('../src/lib/openrouter.js');
+    const fetchAnterior = global.fetch;
+
+    global.fetch = async () => new Response('', { status: 502 });
+
+    try {
+      await assert.rejects(
+        () => callOpenRouter('gemini', 'Sistema', 'Pergunta'),
+        (erro) => {
+          assert.match(erro.message, /HTTP 502|resposta vazia/i);
+          assert.doesNotMatch(erro.message, /Unexpected end/i);
+          return true;
+        },
+      );
+    } finally {
+      global.fetch = fetchAnterior;
+    }
+  });
+});
+
+// ── Teste 13: proxy local expõe rotas Vercel ─────────────────
+describe('proxy local — rotas API', () => {
+  it('declara /api/chat e /api/nim-proxy para o Vite dev server', () => {
+    const fonte = readFileSync(new URL('../proxy.js', import.meta.url), 'utf8');
+
+    assert.match(fonte, /app\.post\(["']\/api\/chat["']/);
+    assert.match(fonte, /app\.post\(["']\/api\/nim-proxy["']/);
+  });
+});
+
+// ── Teste 14: cortex usa os lobos importados ─────────────────
 describe('Cortex routing — LOBOS', () => {
   it('não mantém o array LOBES antigo inline no ficheiro principal', () => {
     const fonte = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
@@ -235,7 +292,7 @@ describe('Cortex routing — LOBOS', () => {
   });
 });
 
-// ── Teste 13: streaming SSE acumula tokens ───────────────────
+// ── Teste 15: streaming SSE acumula tokens ───────────────────
 describe('chamarLobeStream — SSE', () => {
   it('lê eventos data: e chama onToken com texto parcial por lobe', async () => {
     const { chamarLobeStream } = await import('../src/api/council.js');
@@ -292,7 +349,7 @@ describe('chamarLobeStream — SSE', () => {
   });
 });
 
-// ── Teste 14: runDebateStream degrada para chamada normal ────
+// ── Teste 16: runDebateStream degrada para chamada normal ────
 describe('runDebateStream — fallback', () => {
   it('usa chamarLobe normal quando o provider falha em stream', async () => {
     const { runDebateStream } = await import('../src/api/council.js');
@@ -436,5 +493,37 @@ describe('F4-02 integração no Cortex', () => {
     assert.match(fonte, /<img/);
     assert.match(fonte, /maxHeight: 180/);
     assert.match(fonte, /objectFit: "cover"/);
+  });
+});
+
+// ── Teste 20: limpeza de header/settings/memória ────────────
+describe('UI v12 — header, settings e memória', () => {
+  it('usa copy de 5 lobos e remove o botão de foco sem efeito', () => {
+    const fonteCortex = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+    const fontePt = readFileSync(new URL('../src/i18n/pt.js', import.meta.url), 'utf8');
+    const fonteEn = readFileSync(new URL('../src/i18n/en.js', import.meta.url), 'utf8');
+
+    assert.match(fontePt, /5 lobos oficiais/);
+    assert.match(fonteEn, /5 official lobes/);
+    assert.doesNotMatch(fontePt, /11 Lobos|11 lobos/);
+    assert.doesNotMatch(fonteEn, /11 Lobes|11 lobes/);
+    assert.doesNotMatch(fonteCortex, /title=\{t\.focus\.title\}/);
+    assert.doesNotMatch(fonteCortex, /setFocusMode\(v=>!v\)/);
+  });
+
+  it('Settings usa os MODELS reais e a memória guarda resumo episódico por resposta', () => {
+    const fonteCortex = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+    const fonteCouncil = readFileSync(new URL('../src/hooks/useCouncil.js', import.meta.url), 'utf8');
+    const fonteKingCard = readFileSync(new URL('../src/components/KingCard.jsx', import.meta.url), 'utf8');
+    const fonteMessageList = readFileSync(new URL('../src/components/MessageList.jsx', import.meta.url), 'utf8');
+
+    assert.match(fonteCortex, /MODELS\.map\(\(m,idx\)=>/);
+    assert.match(fonteCortex, /brain\.sessions,t\.memory\.stats\.sessions/);
+    assert.match(fonteCortex, /brain\.semantic\.length\+brain\.episodic\.length\+brain\.patterns\.length/);
+    assert.match(fonteCouncil, /const resumoEpisodico = respostaMemoria/);
+    assert.match(fonteCouncil, /episodic: resumoEpisodico/);
+    assert.doesNotMatch(fonteKingCard, /king\?\.suggestions\?\.length/);
+    assert.match(fonteMessageList, /GENERIC_ERROR_SUGGESTIONS/);
+    assert.match(fonteMessageList, /Continua sem juízes/);
   });
 });

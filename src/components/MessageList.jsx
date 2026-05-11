@@ -2,6 +2,12 @@ import React from "react";
 import LobeCard from "./LobeCard";
 import ClaudeCard from "./ClaudeCard";
 
+const GENERIC_ERROR_SUGGESTIONS = new Set([
+  "Tenta reformular a pergunta",
+  "Reporta o erro",
+  "Continua sem juízes",
+]);
+
 const MessageList = React.memo(function MessageList({
   msgs,
   T,
@@ -34,7 +40,10 @@ const MessageList = React.memo(function MessageList({
           ...(m.king?.suggestions || []),
           ...(m.sugestoes || []),
           ...(m.structured?.nextActions || []),
-        ].filter(Boolean).slice(0, 3);
+        ]
+          .filter(Boolean)
+          .filter((sugestao) => !GENERIC_ERROR_SUGGESTIONS.has(String(sugestao)))
+          .slice(0, 3);
 
         return (
           <div
