@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import KingCard from './components/KingCard';
 import MessageList from './components/MessageList';
+import DebateTimeline from './components/DebateTimeline';
 import EvalsPanel from './components/EvalsPanel'
 import FileUploadButton from './components/FileUploadButton.jsx';
 import useCouncil from './hooks/useCouncil';
@@ -658,6 +659,7 @@ export default function Cortex(){
   const [keys,setKeys]       = useState(defaultKeys);
   const [toasts,setToasts]   = useState([]);
   const [modelsOn,setModelsOn] = useState(Object.fromEntries(MODELS.map(m=>[m.id,true])));
+  const [modoDebate, setModoDebate] = useState(false);
 
 // ── REMOVIDO v12 — Computer Mode (mantido para referência futura) ──
 // const [compInput,setCompInput] = useState("");
@@ -851,6 +853,7 @@ async function send(query) {
     taRef,
     lobeConfidenceScore,
     callOllama,
+    modoDebate: modoDebate ? "debate" : "paralelo",
   });
   }
 
@@ -1532,6 +1535,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
   P={P}
   toast={toast}
   ClaudeCardComponent={KingCard}
+  BeforeVerdictComponent={DebateTimeline}
 />
 
                 {cur&&(
@@ -1561,6 +1565,17 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
           </div>
 
           <div style={{padding:"8px 10px",paddingBottom:isMobile?"calc(72px + env(safe-area-inset-bottom))":"10px",background:T.s1,borderTop:`1px solid ${T.b2}`,flexShrink:0}}>
+            <label style={{ fontSize:'0.85rem', color:'var(--text-muted)', display:'flex', alignItems:'center', gap:'6px', maxWidth:820, margin:'0 auto 6px' }}>
+              <input
+                type="checkbox"
+                checked={modoDebate}
+                onChange={e => setModoDebate(e.target.checked)}
+              />
+              🐺 Modo Debate
+              {modoDebate &&
+                <span style={{ color:'var(--warning)' }}>⏱ ~2× mais lento</span>
+              }
+            </label>
             <div style={{display:"flex",gap:8,maxWidth:820,margin:"0 auto",alignItems:"flex-end"}}>
               {/* caixa de texto */}
               <div style={{flex:1,display:"flex",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:16,padding:"8px 10px 8px 14px",alignItems:"flex-end",boxShadow:`0 2px 14px ${T.b2}66`,transition:"border-color 0.2s"}}>

@@ -57,6 +57,9 @@ async function lerJsonResposta(resposta) {
 function textoDoLobe(lobe) {
   if (!lobe) return "";
   if (typeof lobe === "string") return lobe;
+  if (lobe.ronda1 || lobe.ronda2) {
+    return [`Ronda 1: ${lobe.ronda1 || "sem resposta"}`, `Ronda 2: ${lobe.ronda2 || lobe.result || "sem resposta"}`].join("\n");
+  }
   return lobe.resultado || lobe.result || lobe.content || "";
 }
 

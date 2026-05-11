@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { callOpenRouter, OR_MODELS } from "../lib/openrouter.js";
 import { calcularConsensoMatematico, runJudges } from "../api/judges.js";
 import { runKing } from "../api/king.js";
+import { LOBOS as LOBOS_DEBATE, runDebate as runDebateApi } from "../api/council.js";
 import { runGraders } from "../utils/graders.js";
 import { getJuizesParaPergunta } from "../utils/orchestrator.js";
 
@@ -43,6 +44,43 @@ function fallbackDosLobos(lobes) {
     : "Nenhum serviço respondeu. Verifica a ligação.";
 }
 
+function valorSettled(resultado, fallback = {}) {
+  return resultado?.status === "fulfilled" ? resultado.value : fallback;
+}
+
+function erroSettled(resultado) {
+  return resultado?.status === "rejected" ? resultado.reason?.message || "Serviço indisponível" : null;
+}
+
+function lobeDebateParaUI(lobe, index, ronda1, ronda2, lobeConfidenceScore) {
+  const primeira = valorSettled(ronda1?.[index], {});
+  const segunda = valorSettled(ronda2?.[index], primeira);
+  const erro = erroSettled(ronda2?.[index]) || erroSettled(ronda1?.[index]);
+  const result = erro ? `[Erro em ${lobe.nome}: ${erro}]` : segunda.resposta || primeira.resposta || "";
+  const isErr = !!erro || !result || result.startsWith("[Erro");
+
+  return {
+    id: `debate-${lobe.id}`,
+    label: lobe.nome,
+    sub: lobe.provider,
+    color: lobe.cor,
+    icon: ["◉", "◈", "◐", "◑", "◒"][index] || "◌",
+    _key: `debate-${lobe.id}-${index}`,
+    result,
+    ronda1: primeira.resposta || "",
+    ronda2: segunda.resposta || "",
+    srcModel: lobe.modelo,
+    srcReal: !isErr,
+    isErr,
+    latency: segunda.latency || primeira.latency || null,
+    confidence: lobeConfidenceScore(result, isErr),
+  };
+}
+
+export async function runDebate(pergunta, modo = "paralelo", options = {}) {
+  return runDebateApi(pergunta, modo, options);
+}
+
 export default function useCouncil(msgs, setMsgs) {
   const [phase, setPhase] = useState(null);
   const [lobeResults, setLobeResults] = useState([]);
@@ -50,6 +88,7 @@ export default function useCouncil(msgs, setMsgs) {
   const [kingResult, setKingResult] = useState(null);
   const [gradersResult, setGradersResult] = useState(null);
   const [consensusScore, setConsensusScore] = useState(0);
+  const [debateResult, setDebateResult] = useState(null);
   const controllersRef = useRef(new Map());
 
   useEffect(() => {
@@ -150,6 +189,7 @@ export default function useCouncil(msgs, setMsgs) {
       taRef,
       lobeConfidenceScore,
       callOllama,
+      modoDebate = "paralelo",
     } = ctx;
 
     const q = (query || input).trim();
@@ -159,6 +199,7 @@ export default function useCouncil(msgs, setMsgs) {
     setKingResult(null);
     setGradersResult(null);
     setConsensusScore(0);
+    setDebateResult(null);
 
     const complexityLevel = classifyQuery(q);
     setInput("");
@@ -207,29 +248,40 @@ export default function useCouncil(msgs, setMsgs) {
       // Falha silenciosa.
     }
 
-    const results = await Promise.allSettled(
-      councilLobes.map((l) =>
-        invoke(l.id, P[l.id]?.(mem, qFinal) || `Answer: ${qFinal}`, qFinal, { toast, callOllama })
-      )
-    );
-    const nextLobeResults = councilLobes.map((l, i) => {
-      const r =
-        results[i].status === "fulfilled"
-          ? results[i].value
-          : { result: `Tempo esgotado ou serviço indisponível`, model: "?", real: false };
-      const isErr = !r.result || r.result.startsWith("[") || r.result.startsWith("Tempo");
-      const confidence = lobeConfidenceScore(r.result, isErr);
-      return {
-        ...l,
-        _key: l.id + i,
-        result: r.result,
-        srcModel: r.model,
-        srcReal: r.real,
-        isErr,
-        latency: r.latency,
-        confidence,
-      };
-    });
+    let debateResultado = null;
+    let nextLobeResults = [];
+
+    if (modoDebate === "debate") {
+      debateResultado = await runDebate(qFinal, "debate");
+      setDebateResult(debateResultado);
+      nextLobeResults = LOBOS_DEBATE.map((l, i) =>
+        lobeDebateParaUI(l, i, debateResultado.ronda1, debateResultado.ronda2, lobeConfidenceScore)
+      );
+    } else {
+      const results = await Promise.allSettled(
+        councilLobes.map((l) =>
+          invoke(l.id, P[l.id]?.(mem, qFinal) || `Answer: ${qFinal}`, qFinal, { toast, callOllama })
+        )
+      );
+      nextLobeResults = councilLobes.map((l, i) => {
+        const r =
+          results[i].status === "fulfilled"
+            ? results[i].value
+            : { result: `Tempo esgotado ou serviço indisponível`, model: "?", real: false };
+        const isErr = !r.result || r.result.startsWith("[") || r.result.startsWith("Tempo");
+        const confidence = lobeConfidenceScore(r.result, isErr);
+        return {
+          ...l,
+          _key: l.id + i,
+          result: r.result,
+          srcModel: r.model,
+          srcReal: r.real,
+          isErr,
+          latency: r.latency,
+          confidence,
+        };
+      });
+    }
     setLobeResults(nextLobeResults);
 
     const consenso = calcularConsensoMatematico(nextLobeResults);
@@ -336,6 +388,8 @@ export default function useCouncil(msgs, setMsgs) {
       structured,
       council,
       lobeResults: nextLobeResults,
+      debate: debateResultado,
+      modoDebate: modoDebate === "debate",
       judges: veredictoJuizes,
       king: resultadoRei,
       graders,
@@ -413,6 +467,7 @@ export default function useCouncil(msgs, setMsgs) {
     kingResult,
     gradersResult,
     consensusScore,
+    debateResult,
     phase,
     setPhase,
   };

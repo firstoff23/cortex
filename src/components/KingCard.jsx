@@ -70,6 +70,7 @@ const KingCard = React.memo(function KingCard({
   setShowCouncil,
   isMobile,
   toast,
+  beforeVerdict,
   children,
 }) {
   const king = m.king || m.resultadoRei || m.structured?.king || null;
@@ -189,6 +190,8 @@ const KingCard = React.memo(function KingCard({
       </div>
 
       <div style={{ padding: "14px", display: "flex", flexDirection: "column", gap: 12 }}>
+        {beforeVerdict}
+
         {king?.modo_degradado && (
           <div
             style={{

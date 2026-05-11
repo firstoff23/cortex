@@ -92,3 +92,78 @@ describe('MessageList — keys React', () => {
     assert.match(fonte, /key=\{`msg-\$\{i\}-\$\{m\.id \|\| m\.role \|\| "sem-id"\}`\}/);
   });
 });
+
+// ── Teste 5: debate paralelo mantém só uma ronda ────────────
+describe('runDebate — modo paralelo', () => {
+  it("devolve só ronda1 sem ronda2", async () => {
+    const { runDebate } = await import('../src/hooks/useCouncil.js');
+
+    const resultado = await runDebate('Pergunta teste', 'paralelo', {
+      chamarLobe: async (lobe) => ({
+        id: lobe.id,
+        nome: lobe.nome,
+        resposta: `Resposta ${lobe.id}`,
+      }),
+    });
+
+    assert.equal(resultado.ronda1.length, 5);
+    assert.equal('ronda2' in resultado, false);
+  });
+});
+
+// ── Teste 6: debate completo executa duas rondas ────────────
+describe('runDebate — modo debate', () => {
+  it('devolve ronda1 e ronda2 com 5 resultados cada', async () => {
+    const { runDebate } = await import('../src/hooks/useCouncil.js');
+
+    const resultado = await runDebate('Pergunta teste', 'debate', {
+      chamarLobe: async (lobe, pergunta, contextoDebate) => ({
+        id: lobe.id,
+        nome: lobe.nome,
+        resposta: contextoDebate ? `Ronda 2 ${lobe.nome}` : `Ronda 1 ${lobe.nome}`,
+      }),
+    });
+
+    assert.equal(resultado.ronda1.length, 5);
+    assert.equal(resultado.ronda2.length, 5);
+  });
+});
+
+// ── Teste 7: Advogado do Diabo mantém regra hard ────────────
+describe('runDebate — Advogado do Diabo', () => {
+  it("a ronda2 do lobe 5 inclui 'A questão que ninguém fez'", async () => {
+    const { runDebate } = await import('../src/hooks/useCouncil.js');
+
+    const resultado = await runDebate('Pergunta teste', 'debate', {
+      chamarLobe: async (lobe, pergunta, contextoDebate) => ({
+        id: lobe.id,
+        nome: lobe.nome,
+        resposta: contextoDebate ? `Resposta ronda 2 ${lobe.id}` : `Resposta ronda 1 ${lobe.id}`,
+      }),
+    });
+
+    const diabo = resultado.ronda2.find((r) => r.status === 'fulfilled' && r.value.id === 5);
+    assert.match(diabo.value.resposta, /A questão que ninguém fez/);
+  });
+});
+
+// ── Teste 8: NIM usa chave dedicada quando existe ────────────
+describe('getAPIKey', () => {
+  it("getAPIKey('nim') devolve VITE_NVIDIA_NIM_KEY se definida", async () => {
+    const { getAPIKey } = await import('../src/api/council.js');
+    const anteriorNim = process.env.VITE_NVIDIA_NIM_KEY;
+    const anteriorOpenRouter = process.env.VITE_OPENROUTER_KEY;
+
+    process.env.VITE_NVIDIA_NIM_KEY = 'nvapi-teste';
+    process.env.VITE_OPENROUTER_KEY = 'sk-or-fallback';
+
+    try {
+      assert.equal(getAPIKey('nim'), 'nvapi-teste');
+    } finally {
+      if (anteriorNim === undefined) delete process.env.VITE_NVIDIA_NIM_KEY;
+      else process.env.VITE_NVIDIA_NIM_KEY = anteriorNim;
+      if (anteriorOpenRouter === undefined) delete process.env.VITE_OPENROUTER_KEY;
+      else process.env.VITE_OPENROUTER_KEY = anteriorOpenRouter;
+    }
+  });
+});

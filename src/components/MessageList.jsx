@@ -20,6 +20,7 @@ const MessageList = React.memo(function MessageList({
   P,
   toast,
   ClaudeCardComponent = ClaudeCard,
+  BeforeVerdictComponent,
 }) {
   const ClaudeCardView = ClaudeCardComponent;
 
@@ -105,6 +106,15 @@ const MessageList = React.memo(function MessageList({
               setShowCouncil={setShowCouncil}
               isMobile={isMobile}
               toast={toast}
+              beforeVerdict={
+                BeforeVerdictComponent && m.modoDebate ? (
+                  <BeforeVerdictComponent
+                    ronda1={m.debate?.ronda1}
+                    ronda2={m.debate?.ronda2}
+                    modoDebate={m.modoDebate}
+                  />
+                ) : null
+              }
             >
               {/* Conselho expandido */}
               {showCouncil === m.id && m.lobeResults?.length > 0 && (
