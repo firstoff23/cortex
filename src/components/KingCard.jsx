@@ -50,6 +50,14 @@ function obterTextoPrincipal(m, king) {
   return (king?.veredicto || m.structured?.final || m.content || "").trim();
 }
 
+function sanitizarErroRei(texto) {
+  const valor = String(texto || "");
+  if (/Unexpected end of JSON input|Failed to execute 'json'/i.test(valor)) {
+    return "JSON inválido ou resposta vazia do proxy /api/chat";
+  }
+  return valor;
+}
+
 const KingCard = React.memo(function KingCard({
   m,
   i,
@@ -193,7 +201,7 @@ const KingCard = React.memo(function KingCard({
               lineHeight: 1.5,
             }}
           >
-            Modo degradado: {king.razao_incerteza}
+            Modo degradado: {sanitizarErroRei(king.razao_incerteza)}
           </div>
         )}
 

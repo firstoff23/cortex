@@ -27,7 +27,7 @@ const MessageList = React.memo(function MessageList({
     <>
       {msgs.map((m, i) => (
         <div
-          key={m.id || i}
+          key={`msg-${i}-${m.id || m.role || "sem-id"}`}
           className="msg-in"
           style={{
             alignSelf: m.role === "user" ? "flex-end" : "stretch",

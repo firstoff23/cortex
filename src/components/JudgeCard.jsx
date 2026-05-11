@@ -13,13 +13,23 @@ function scoreColor(score, T) {
   return "#ef4444";
 }
 
+function sanitizarProblemaJuiz(item) {
+  const texto = String(item || "");
+  if (/Unexpected end of JSON input|Failed to execute 'json'/i.test(texto)) {
+    return "JSON inválido ou resposta vazia do proxy /api/chat";
+  }
+  return texto;
+}
+
 const JudgeCard = React.memo(function JudgeCard({ judge, T = {}, compact = false }) {
   if (!judge) return null;
 
   const resultado = judge.resultado || {};
   const pct = scorePercent(resultado.score);
   const cor = scoreColor(resultado.score, T);
-  const problemas = Array.isArray(resultado.problemas) ? resultado.problemas : [];
+  const problemas = Array.isArray(resultado.problemas)
+    ? resultado.problemas.map(sanitizarProblemaJuiz)
+    : [];
   const validados = Array.isArray(resultado.validados) ? resultado.validados : [];
 
   return (

@@ -13,6 +13,12 @@ function garantirSugestoes(suggestions) {
   return base;
 }
 
+const PLACEHOLDER_REI_RE = /\[(?:Lobe X|Juiz Y|Nome do Juiz|elemento|Nome do Lobe)\]/i;
+
+function temPlaceholderDoPrompt(texto) {
+  return PLACEHOLDER_REI_RE.test(String(texto || ""));
+}
+
 function extrairJson(texto) {
   if (!texto || typeof texto !== "string") return null;
 
@@ -21,7 +27,30 @@ function extrairJson(texto) {
   } catch {
     const match = texto.match(/\{[\s\S]*\}/);
     if (!match) return null;
-    return JSON.parse(match[0]);
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function lerJsonResposta(resposta) {
+  // Evita mensagens técnicas do browser quando /api/chat devolve vazio ou HTML.
+  if (typeof resposta.text === "function") {
+    const texto = await resposta.text();
+    if (!texto.trim()) throw new Error("Resposta vazia do proxy /api/chat");
+    try {
+      return JSON.parse(texto);
+    } catch {
+      throw new Error("JSON inválido do proxy /api/chat");
+    }
+  }
+
+  try {
+    return await resposta.json();
+  } catch {
+    throw new Error("JSON inválido ou resposta vazia do proxy /api/chat");
   }
 }
 
@@ -33,6 +62,66 @@ function textoDoLobe(lobe) {
 
 function nomeDoLobe(lobe, idx) {
   return lobe?.label || lobe?.nome || lobe?.id || `Lobe ${idx + 1}`;
+}
+
+function excerto(texto, max = 220) {
+  const limpo = String(texto || "").replace(/\s+/g, " ").trim();
+  if (limpo.length <= max) return limpo;
+  return `${limpo.slice(0, max).trim()}...`;
+}
+
+function lobosValidos(respostasLobos) {
+  return (Array.isArray(respostasLobos) ? respostasLobos : [])
+    .map((lobe, idx) => ({
+      nome: nomeDoLobe(lobe, idx),
+      texto: textoDoLobe(lobe),
+    }))
+    .filter((lobe) => lobe.texto.trim().length > 0);
+}
+
+function juizesComSucesso(veredictoJuizes) {
+  return (Array.isArray(veredictoJuizes) ? veredictoJuizes : []).filter((j) => j.sucesso);
+}
+
+function criarRaciocinioSeguro(respostasLobos, veredictoJuizes, consensoMatematico) {
+  const lobos = lobosValidos(respostasLobos).map((lobe) => lobe.nome).slice(0, 3);
+  const juizes = juizesComSucesso(veredictoJuizes).map((juiz) => juiz.nome).slice(0, 3);
+  const consenso = Math.round(normalizarScore(consensoMatematico, 0) * 100);
+
+  return [
+    lobos.length
+      ? `Comparei as respostas de ${lobos.join(", ")}.`
+      : "Não houve respostas úteis dos lobos para comparar.",
+    juizes.length
+      ? `Usei ${juizes.join(", ")} como validação adicional.`
+      : "Sem juízes válidos; usei o consenso matemático como sinal principal.",
+    `Consenso matemático entre lobos: ${consenso}%.`,
+  ];
+}
+
+function criarVeredictoSeguro(respostasLobos, veredictoJuizes, consensoMatematico) {
+  const lobos = lobosValidos(respostasLobos);
+  const juizes = juizesComSucesso(veredictoJuizes);
+  const citacoesLobos = lobos.slice(0, 2).map((lobe) => `[${lobe.nome}]`).join(" e ");
+  const juizPrincipal = juizes[0] ? `[${juizes[0].nome}]` : null;
+  const validado = juizes.flatMap((j) => j.resultado?.validados || []).find(Boolean);
+  const problema = juizes.flatMap((j) => j.resultado?.problemas || []).find(Boolean);
+  const recomendacao = juizes.map((j) => j.resultado?.recomendacao).find(Boolean);
+  const baseLobos = lobos.slice(0, 2).map((lobe) => excerto(lobe.texto)).filter(Boolean).join(" ");
+  const consenso = Math.round(normalizarScore(consensoMatematico, 0) * 100);
+
+  if (!baseLobos) {
+    return `Não tenho respostas úteis dos lobos para formar um veredicto fiável. Consenso matemático: ${consenso}%.`;
+  }
+
+  const partes = [
+    `${citacoesLobos || "Os lobos"} indicam: ${baseLobos}`,
+    juizPrincipal && validado ? `${juizPrincipal} validou: ${validado}` : null,
+    problema ? `Atenção: ${problema}` : null,
+    recomendacao ? `Recomendação: ${recomendacao}` : null,
+  ].filter(Boolean);
+
+  return partes.join(" ");
 }
 
 export function calcularConfiancaFinal(scoreConsenso, scoreJuizes, divergenciaEntreCamadas) {
@@ -83,6 +172,7 @@ Processo obrigatório — raciocínio visível resumido:
 
 Regras:
 - Cita inline [Nome do Lobe] e [Nome do Juiz] quando usas as suas ideias
+- Usa apenas nomes reais presentes no contexto; nunca uses [Lobe X], [Juiz Y], [Nome do Juiz] ou [elemento]
 - Nunca ignores problema identificado por 2+ juízes
 - Admite "não sei com confiança" quando consenso < 40%
 - PT-PT natural, directo, sem jargão
@@ -91,8 +181,8 @@ Regras:
 
 Devolve APENAS JSON sem markdown:
 {
-  "raciocinio": ["passo 1", "passo 2", "passo 3"],
-  "veredicto": "texto com citações [Lobe X] e [Juiz Y]",
+  "raciocinio": ["síntese curta baseada nos nomes reais recebidos"],
+  "veredicto": "resposta final com citações inline usando apenas nomes reais do contexto",
   "confianca_lobos": 0,
   "confianca_juizes": 0,
   "confianca_final": 0,
@@ -112,17 +202,24 @@ function scoreMedioJuizes(veredictoJuizes) {
     : 0.5;
 }
 
-function normalizarResultadoRei(parseado, consensoMatematico, scoreJuizesMedio) {
+function normalizarResultadoRei(parseado, consensoMatematico, scoreJuizesMedio, respostasLobos, veredictoJuizes) {
   const consenso = normalizarScore(consensoMatematico, 0);
   const juizes = normalizarScore(scoreJuizesMedio);
   const divergencia = Math.abs(consenso - juizes);
   const confiancaFinal = calcularConfiancaFinal(consenso, juizes, divergencia);
+  const raciocinioRecebido = Array.isArray(parseado?.raciocinio)
+    ? parseado.raciocinio.filter(Boolean).map(String).filter((item) => !temPlaceholderDoPrompt(item))
+    : [];
+  const veredictoRecebido = String(parseado?.veredicto || "").trim();
+  const veredictoSeguro = veredictoRecebido && !temPlaceholderDoPrompt(veredictoRecebido)
+    ? veredictoRecebido
+    : criarVeredictoSeguro(respostasLobos, veredictoJuizes, consensoMatematico);
 
   return {
-    raciocinio: Array.isArray(parseado?.raciocinio)
-      ? parseado.raciocinio.filter(Boolean).map(String)
-      : ["Síntese directa dos sinais disponíveis."],
-    veredicto: String(parseado?.veredicto || "").trim(),
+    raciocinio: raciocinioRecebido.length
+      ? raciocinioRecebido
+      : criarRaciocinioSeguro(respostasLobos, veredictoJuizes, consensoMatematico),
+    veredicto: veredictoSeguro,
     confianca_lobos: Math.round(consenso * 100),
     confianca_juizes: Math.round(juizes * 100),
     confianca_final: confiancaFinal,
@@ -164,13 +261,19 @@ export async function runKing(
       }),
     });
 
-    const dados = await resposta.json();
+    const dados = await lerJsonResposta(resposta);
     if (!resposta.ok || dados.error) throw new Error(dados.error || `HTTP ${resposta.status}`);
 
     const parseado = extrairJson(dados.content || "");
     if (!parseado) throw new Error("Rei não devolveu JSON válido");
 
-    return normalizarResultadoRei(parseado, consensoMatematico, scoreJuizesMedio);
+    return normalizarResultadoRei(
+      parseado,
+      consensoMatematico,
+      scoreJuizesMedio,
+      respostasLobos,
+      veredictoJuizes,
+    );
   } catch (err) {
     if (err.name === "AbortError") return null;
 

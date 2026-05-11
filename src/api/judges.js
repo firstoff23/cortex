@@ -165,7 +165,30 @@ function extrairJson(texto) {
   } catch {
     const match = texto.match(/\{[\s\S]*\}/);
     if (!match) return null;
-    return JSON.parse(match[0]);
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function lerJsonResposta(resposta) {
+  // Evita expor erros brutos do browser quando /api/chat devolve vazio ou HTML.
+  if (typeof resposta.text === "function") {
+    const texto = await resposta.text();
+    if (!texto.trim()) throw new Error("Resposta vazia do proxy /api/chat");
+    try {
+      return JSON.parse(texto);
+    } catch {
+      throw new Error("JSON inválido do proxy /api/chat");
+    }
+  }
+
+  try {
+    return await resposta.json();
+  } catch {
+    throw new Error("JSON inválido ou resposta vazia do proxy /api/chat");
   }
 }
 
@@ -227,7 +250,7 @@ async function chamarJuizComCache(juiz, pergunta, respostasLobos, signalExterno)
       }),
     });
 
-    const dados = await resposta.json();
+    const dados = await lerJsonResposta(resposta);
     if (!resposta.ok || dados.error) throw new Error(dados.error || `HTTP ${resposta.status}`);
 
     const parseado = extrairJson(dados.content || "");

@@ -1,73 +1,72 @@
-import { useState } from "react";
+// useFileUpload.js — hook para upload e extracção de ficheiros
+import { useState, useCallback } from 'react';
+import { extrairPDF }   from '../utils/extractors/extractPDF.js';
+import { extrairDOCX }  from '../utils/extractors/extractDOCX.js';
+import { extrairSheet } from '../utils/extractors/extractSheet.js';
+import { extrairTexto } from '../utils/extractors/extractText.js';
+import { extrairAudio } from '../utils/extractors/extractAudio.js';
 
-// Importações lazy — só carregam se usadas
-async function extractPDF(file) {
-  const pdfjsLib = await import("pdfjs-dist");
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-  const buffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
-  let text = "";
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    text += content.items.map(s => s.str).join(" ") + "\n";
-  }
-  return text.trim();
-}
+const LIMITE_BYTES = 10 * 1024 * 1024; // 10 MB
 
-async function extractDOCX(file) {
-  const mammoth = await import("mammoth");
-  const buffer = await file.arrayBuffer();
-  const result = await mammoth.extractRawText({ arrayBuffer: buffer });
-  return result.value.trim();
-}
+// Mapeia extensão → função extractor
+const EXTRACTORS = {
+  pdf:  extrairPDF,
+  docx: extrairDOCX,
+  txt:  extrairTexto,
+  md:   extrairTexto,
+  csv:  extrairSheet,
+  xlsx: extrairSheet,
+  mp3:  () => extrairAudio(),
+  wav:  () => extrairAudio(),
+};
 
-async function extractCSV(file) {
-  return new Promise((res, rej) => {
-    const reader = new FileReader();
-    reader.onload = e => res(e.target.result);
-    reader.onerror = rej;
-    reader.readAsText(file);
-  });
-}
-
-async function extractTXT(file) {
-  return new Promise((res, rej) => {
-    const reader = new FileReader();
-    reader.onload = e => res(e.target.result);
-    reader.onerror = rej;
-    reader.readAsText(file);
-  });
-}
-
+/**
+ * Hook para carregar e extrair conteúdo de ficheiros.
+ * @returns {{ carregar, ficheiro, erro, limpar }}
+ *   ficheiro: { nome, tipo, texto, tamanho } | null
+ */
 export function useFileUpload() {
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState(null);
+  const [ficheiro, setFicheiro] = useState(null);
+  const [erro, setErro]         = useState(null);
 
-  async function extractFile(file) {
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const ext = file.name.split(".").pop().toLowerCase();
-      let text = "";
+  const carregar = useCallback(async (file) => {
+    setErro(null);
+    setFicheiro(null);
 
-      if (ext === "pdf")                      text = await extractPDF(file);
-      else if (ext === "docx")                text = await extractDOCX(file);
-      else if (ext === "csv" || ext === "txt" || ext === "md") text = await extractCSV(file);
-      else throw new Error(`Formato .${ext} ainda não suportado`);
+    if (!file) return;
 
-      // Trunca para não explodir o contexto (máx ~8000 chars)
-      if (text.length > 8000) text = text.slice(0, 8000) + "\n\n[... truncado]";
-      return text;
-
-    } catch (e) {
-      setUploadError(e.message);
-      return null;
-    } finally {
-      setUploading(false);
+    // Validar tamanho
+    if (file.size > LIMITE_BYTES) {
+      setErro(`Ficheiro demasiado grande (${(file.size / 1024 / 1024).toFixed(1)} MB). Máximo: 10 MB.`);
+      return;
     }
-  }
 
-  return { extractFile, uploading, uploadError };
+    // Detectar extensão
+    const ext = file.name.split('.').pop().toLowerCase();
+    const extractor = EXTRACTORS[ext];
+
+    if (!extractor) {
+      setErro(`Tipo não suportado: .${ext}. Usa PDF, DOCX, TXT, MD, CSV, XLSX, MP3 ou WAV.`);
+      return;
+    }
+
+    try {
+      const texto = await extractor(file);
+      setFicheiro({
+        nome:    file.name,
+        tipo:    ext,
+        texto:   texto.trim(),
+        tamanho: file.size,
+      });
+    } catch (e) {
+      setErro(`Erro ao processar ficheiro: ${e.message}`);
+    }
+  }, []);
+
+  const limpar = useCallback(() => {
+    setFicheiro(null);
+    setErro(null);
+  }, []);
+
+  return { carregar, ficheiro, erro, limpar };
 }

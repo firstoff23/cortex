@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import KingCard from './components/KingCard';
 import MessageList from './components/MessageList';
 import EvalsPanel from './components/EvalsPanel'
+import FileUploadButton from './components/FileUploadButton.jsx';
 import useCouncil from './hooks/useCouncil';
+import { useFileUpload } from './hooks/useFileUpload.js';
 import { useI18n } from "./hooks/useI18n.js";
 
 const MV="cortex-v12";
@@ -415,18 +417,18 @@ function Markdown({text,color,faint}){
     if(line.startsWith("```")){
       const lang=line.slice(3).trim();const code=[];i++;
       while(i<lines.length&&!lines[i].startsWith("```")){code.push(lines[i]);i++;}
-      out.push(<div key={i} style={{marginTop:6,marginBottom:6}}>{lang&&<div style={{fontSize:9,color:faint,fontFamily:"monospace",marginBottom:2}}>{lang}</div>}<pre style={{margin:0,padding:"9px 12px",background:"#0d0d18",border:"1px solid #2a2a3a",borderRadius:8,fontSize:11,lineHeight:1.6,color:"#c8d3f5",overflowX:"auto",fontFamily:"monospace",whiteSpace:"pre"}}>{code.join("\n")}</pre></div>);
+      out.push(<div key={`md-code-${i}-${code.length}`} style={{marginTop:6,marginBottom:6}}>{lang&&<div style={{fontSize:9,color:faint,fontFamily:"monospace",marginBottom:2}}>{lang}</div>}<pre style={{margin:0,padding:"9px 12px",background:"#0d0d18",border:"1px solid #2a2a3a",borderRadius:8,fontSize:11,lineHeight:1.6,color:"#c8d3f5",overflowX:"auto",fontFamily:"monospace",whiteSpace:"pre"}}>{code.join("\n")}</pre></div>);
       i++;continue;
     }
-    if(line.startsWith("### ")){out.push(<div key={i} style={{fontSize:13,fontWeight:700,color,marginTop:8,marginBottom:2}}>{iFmt(line.slice(4))}</div>);i++;continue;}
-    if(line.startsWith("## ")) {out.push(<div key={i} style={{fontSize:14,fontWeight:800,color,marginTop:10,marginBottom:3}}>{iFmt(line.slice(3))}</div>);i++;continue;}
-    if(line.startsWith("# "))  {out.push(<div key={i} style={{fontSize:15,fontWeight:800,color,marginTop:12,marginBottom:4}}>{iFmt(line.slice(2))}</div>);i++;continue;}
-    if(/^[-*•] /.test(line)){out.push(<div key={i} style={{display:"flex",gap:6,marginTop:2}}><span style={{color:faint,flexShrink:0}}>•</span><span>{iFmt(line.slice(2))}</span></div>);i++;continue;}
-    if(/^\d+\. /.test(line)){const n=line.match(/^(\d+)\. /)[1];out.push(<div key={i} style={{display:"flex",gap:6,marginTop:2}}><span style={{color:faint,flexShrink:0,minWidth:14}}>{n}.</span><span>{iFmt(line.replace(/^\d+\. /,""))}</span></div>);i++;continue;}
-    if(line.startsWith("> ")){out.push(<div key={i} style={{borderLeft:`2px solid ${faint}`,paddingLeft:10,margin:"4px 0",color:faint,fontSize:12,fontStyle:"italic"}}>{iFmt(line.slice(2))}</div>);i++;continue;}
-    if(/^---+$/.test(line.trim())){out.push(<hr key={i} style={{border:"none",borderTop:"1px solid #2a2a3a",margin:"8px 0"}}/>);i++;continue;}
-    if(line.trim()===""){out.push(<div key={i} style={{height:5}}/>);i++;continue;}
-    out.push(<div key={i} style={{marginTop:1,lineHeight:1.75}}>{iFmt(line)}</div>);i++;
+    if(line.startsWith("### ")){out.push(<div key={`md-h3-${i}-${line.slice(4,14)}`} style={{fontSize:13,fontWeight:700,color,marginTop:8,marginBottom:2}}>{iFmt(line.slice(4))}</div>);i++;continue;}
+    if(line.startsWith("## ")) {out.push(<div key={`md-h2-${i}-${line.slice(3,13)}`} style={{fontSize:14,fontWeight:800,color,marginTop:10,marginBottom:3}}>{iFmt(line.slice(3))}</div>);i++;continue;}
+    if(line.startsWith("# "))  {out.push(<div key={`md-h1-${i}-${line.slice(2,12)}`} style={{fontSize:15,fontWeight:800,color,marginTop:12,marginBottom:4}}>{iFmt(line.slice(2))}</div>);i++;continue;}
+    if(/^[-*•] /.test(line)){out.push(<div key={`md-bullet-${i}-${line.slice(2,12)}`} style={{display:"flex",gap:6,marginTop:2}}><span style={{color:faint,flexShrink:0}}>•</span><span>{iFmt(line.slice(2))}</span></div>);i++;continue;}
+    if(/^\d+\. /.test(line)){const n=line.match(/^(\d+)\. /)[1];out.push(<div key={`md-number-${i}-${n}`} style={{display:"flex",gap:6,marginTop:2}}><span style={{color:faint,flexShrink:0,minWidth:14}}>{n}.</span><span>{iFmt(line.replace(/^\d+\. /,""))}</span></div>);i++;continue;}
+    if(line.startsWith("> ")){out.push(<div key={`md-quote-${i}-${line.slice(2,12)}`} style={{borderLeft:`2px solid ${faint}`,paddingLeft:10,margin:"4px 0",color:faint,fontSize:12,fontStyle:"italic"}}>{iFmt(line.slice(2))}</div>);i++;continue;}
+    if(/^---+$/.test(line.trim())){out.push(<hr key={`md-hr-${i}-${line.length}`} style={{border:"none",borderTop:"1px solid #2a2a3a",margin:"8px 0"}}/>);i++;continue;}
+    if(line.trim()===""){out.push(<div key={`md-empty-${i}`} style={{height:5}}/>);i++;continue;}
+    out.push(<div key={`md-line-${i}-${line.slice(0,10)}`} style={{marginTop:1,lineHeight:1.75}}>{iFmt(line)}</div>);i++;
   }
   return <div style={{fontSize:13,color,display:"flex",flexDirection:"column",gap:1,wordBreak:"break-word"}}>{out}</div>;
 }
@@ -457,7 +459,7 @@ function Toggle({on,onChange,color}){
 
 function Splash(){
   return <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100dvh",background:"#08080c",gap:14}}>
-    <div style={{display:"flex",gap:8}}>{Object.values(AC).slice(0,8).map((c,i)=><div key={i} style={{width:10,height:10,borderRadius:"50%",background:c,animation:`orb 1.4s ${i*0.18}s ease-in-out infinite`}}/>)}</div>
+    <div style={{display:"flex",gap:8}}>{Object.values(AC).slice(0,8).map((c,i)=><div key={`accent-${i}-${c}`} style={{width:10,height:10,borderRadius:"50%",background:c,animation:`orb 1.4s ${i*0.18}s ease-in-out infinite`}}/>)}</div>
     <p style={{color:AC.claude,fontFamily:"monospace",fontSize:11,margin:0,letterSpacing:2}}>CÓRTEX {APP_VERSION}</p>
     <style>{`@keyframes orb{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.2;transform:scale(1.4)}}`}</style>
   </div>;
@@ -692,6 +694,7 @@ export default function Cortex(){
   const taRef   = useRef(null);
   const botRef  = useRef(null);
   const chatRef = useRef(null);
+  const { carregar, ficheiro: ficheiroAnexado, erro: erroUpload, limpar: limparUpload } = useFileUpload();
   const T = THEMES[theme];
 
   const hG=keys.grok?.trim().length>10, hGm=keys.gemini?.trim().length>10;
@@ -805,7 +808,14 @@ async function invoke(id, sys, msg) {
 }
 
 async function send(query) {
-  return runCouncil(query, {
+  const q = (query || input).trim();
+  const prefixo = ficheiroAnexado
+    ? `[Ficheiro: ${ficheiroAnexado.nome}]\n---\n${ficheiroAnexado.texto.slice(0,6000)}\n---\n\n`
+    : '';
+  const qComFicheiro = (prefixo + q).trim();
+  limparUpload();
+
+  return runCouncil(qComFicheiro, {
     input,
     setInput,
     classifyQuery,
@@ -1053,9 +1063,9 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       {/* ── TOASTS ─────────────────────────────────────────── */}
       {toasts.length>0 && (
         <div style={{position:"fixed",bottom:80,right:14,zIndex:2000,display:"flex",flexDirection:"column",gap:6,pointerEvents:"none"}}>
-          {toasts.map(t=>{
+          {toasts.map((t,idx)=>{
             const c={error:{bg:"#2a0a0a",border:"#5a1a1a",tx:"#fca5a5",ic:"⚠"},success:{bg:"#0a2a12",border:"#1a5a22",tx:"#86efac",ic:"✓"},info:{bg:"#0a1a2a",border:"#1a3a5a",tx:"#93c5fd",ic:"ℹ"}}[t.type]||{bg:"#2a0a0a",border:"#5a1a1a",tx:"#fca5a5",ic:"⚠"};
-            return <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,background:c.bg,border:`1px solid ${c.border}`,borderRadius:10,padding:"8px 13px",fontSize:11,color:c.tx,boxShadow:"0 4px 16px #00000066",pointerEvents:"all",animation:"toastIn 0.2s ease",maxWidth:300}}>
+            return <div key={`toast-${idx}-${t.id}`} style={{display:"flex",alignItems:"center",gap:8,background:c.bg,border:`1px solid ${c.border}`,borderRadius:10,padding:"8px 13px",fontSize:11,color:c.tx,boxShadow:"0 4px 16px #00000066",pointerEvents:"all",animation:"toastIn 0.2s ease",maxWidth:300}}>
               <span>{c.ic}</span><span style={{flex:1}}>{t.msg}</span>
               <button onClick={()=>setToasts(p=>p.filter(x=>x.id!==t.id))} style={{background:"transparent",border:"none",cursor:"pointer",color:c.tx,fontSize:13,opacity:0.6}}>✕</button>
             </div>;
@@ -1117,12 +1127,12 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       {showTP && (
         <Modal T={T} title={t.nav.theme} onClose={()=>setShowTP(false)}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
-            {Object.entries(THEMES).map(([key,th])=>(
-              <button key={key} onClick={()=>{setTheme(key);saveTheme(key);setShowTP(false);}} style={{background:theme===key?th.s2:"transparent",border:`2px solid ${theme===key?AC.claude:th.b1}`,borderRadius:13,padding:"9px 11px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:9,transition:"all 0.15s",boxShadow:theme===key?`0 0 12px ${AC.claude}44`:"none"}}>
+            {Object.entries(THEMES).map(([key,th],idx)=>(
+              <button key={`theme-${idx}-${key}`} onClick={()=>{setTheme(key);saveTheme(key);setShowTP(false);}} style={{background:theme===key?th.s2:"transparent",border:`2px solid ${theme===key?AC.claude:th.b1}`,borderRadius:13,padding:"9px 11px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:9,transition:"all 0.15s",boxShadow:theme===key?`0 0 12px ${AC.claude}44`:"none"}}>
                 <span style={{fontSize:18}}>{th.emoji}</span>
                 <div style={{textAlign:"left"}}>
                   <div style={{fontSize:11,fontWeight:700,color:theme===key?th.tx:T.ts}}>{th.name}</div>
-                  <div style={{display:"flex",gap:3,marginTop:3}}>{[th.bg,th.s1,AC.claude,th.tx].map((c,i)=><div key={i} style={{width:10,height:10,borderRadius:"50%",background:c,border:`1px solid ${th.b1}`}}/>)}</div>
+                  <div style={{display:"flex",gap:3,marginTop:3}}>{[th.bg,th.s1,AC.claude,th.tx].map((c,i)=><div key={`theme-swatch-${i}-${c}`} style={{width:10,height:10,borderRadius:"50%",background:c,border:`1px solid ${th.b1}`}}/>)}</div>
                 </div>
                 {theme===key&&<span style={{marginLeft:"auto",color:AC.claude,fontWeight:700}}>✓</span>}
               </button>
@@ -1135,8 +1145,8 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
         <Modal T={T} title={t.models.title} onClose={()=>setShowModels(false)}>
           <p style={{fontSize:11,color:T.ts,marginBottom:8}}>{t.models.hint}</p>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {MODELS.filter(m=>m.id!=="claude").map(m=>(
-              <div key={m.id} style={{display:"flex",alignItems:"center",gap:9,background:T.s2,borderRadius:9,padding:"8px 11px"}}>
+            {MODELS.filter(m=>m.id!=="claude").map((m,idx)=>(
+              <div key={`model-${idx}-${m.id}`} style={{display:"flex",alignItems:"center",gap:9,background:T.s2,borderRadius:9,padding:"8px 11px"}}>
                                 <div style={{width:7,height:7,borderRadius:"50%",background:modelsOn[m.id]!==false?m.color:"#666",flexShrink:0}}/>
                 <div style={{flex:1}}>
                   <div style={{fontSize:11,fontWeight:600,color:T.tx}}>{m.name} <span style={{fontSize:8,color:T.ts,fontFamily:"monospace",opacity:0.9}}>{m.version}</span></div>
@@ -1171,9 +1181,9 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
     </div>
   )}
 
-  {!isMobile && [["chat","💬",t.nav.chat],...(DEV_MODE?[["keys","🔑",t.nav.keys]]:[]),["memory","🧠",t.nav.memory],["settings","⚙",t.nav.settings]].map(([p,ico,lbl])=>(
+  {!isMobile && [["chat","💬",t.nav.chat],...(DEV_MODE?[["keys","🔑",t.nav.keys]]:[]),["memory","🧠",t.nav.memory],["settings","⚙",t.nav.settings]].map(([p,ico,lbl],idx)=>(
   <button
-    key={p}
+    key={`nav-${idx}-${p}`}
     onClick={()=>setPage(p)}
     style={{
       background:page===p?`${AC.claude}18`:"transparent",
@@ -1266,8 +1276,8 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
     <div style={{flex:1,overflowY:"auto",padding:6,display:"flex",flexDirection:"column",gap:4}}>
       {conversations.length===0
         ?<div style={{fontSize:10,color:T.tf,textAlign:"center",marginTop:24,lineHeight:1.8}}>{t.sidebar.empty.split("\n")[0]}<br/>{t.sidebar.empty.split("\n")[1]}</div>
-        :conversations.map(conv=>(
-          <div key={conv.id} onClick={()=>switchConv(conv)} style={{background:conv.id===currentConvId?`${AC.claude}18`:T.s2,border:`1px solid ${conv.id===currentConvId?AC.claude+"44":T.b1}`,borderRadius:8,padding:"7px 9px",cursor:"pointer",display:"flex",alignItems:"flex-start",gap:6,transition:"all 0.12s"}}>
+        :conversations.map((conv,idx)=>(
+          <div key={`conversation-${idx}-${conv.id}`} onClick={()=>switchConv(conv)} style={{background:conv.id===currentConvId?`${AC.claude}18`:T.s2,border:`1px solid ${conv.id===currentConvId?AC.claude+"44":T.b1}`,borderRadius:8,padding:"7px 9px",cursor:"pointer",display:"flex",alignItems:"flex-start",gap:6,transition:"all 0.12s"}}>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:10,fontWeight:600,color:T.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{conv.title}</div>
               <div style={{fontSize:8,color:T.ts,marginTop:1}}>{t.sidebar.msgs(conv.msgs?.filter(m=>m.role==="user").length)} · {new Date(conv.updatedAt).toLocaleDateString(lang==="pt"?"pt-PT":"en-US")}</div>
@@ -1399,9 +1409,9 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               active:showGuide,
               onClick:()=>{setShowGuide(true);setFabOpen(false);}
             }
-          ].map(item=>(
+          ].map((item,idx)=>(
             <button
-              key={item.key}
+              key={`fab-${idx}-${item.key}`}
               onClick={item.onClick}
               style={{
                 minWidth:44,
@@ -1469,7 +1479,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                   <div style={{position:"absolute",inset:0,borderRadius:"50%",background:`radial-gradient(circle at 35% 30%, ${AC.claude}cc, ${AC.claude}33, transparent)`,boxShadow:`0 0 24px ${AC.claude}44`,animation:"brainPulse 3s ease-in-out infinite"}}/>
                   <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:AC.claude}}>◆</div>
                   {[AC.grok,AC.gemini,AC.perp,AC.manus].map((c,i)=>(
-                    <div key={i} style={{position:"absolute",width:6,height:6,borderRadius:"50%",background:c,boxShadow:`0 0 8px ${c}`,top:"50%",left:"50%",transformOrigin:"0 0",animation:`orbit${i} ${2.2+i*0.45}s linear infinite`}}/>
+                    <div key={`orbit-${i}-${c}`} style={{position:"absolute",width:6,height:6,borderRadius:"50%",background:c,boxShadow:`0 0 8px ${c}`,top:"50%",left:"50%",transformOrigin:"0 0",animation:`orbit${i} ${2.2+i*0.45}s linear infinite`}}/>
                   ))}
                 </div>
                 {/* Título */}
@@ -1566,6 +1576,12 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       sr.onerror=()=>toast(t.toasts.voiceError,"error");
       sr.start();
     }} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.7}} onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0.7"} title={t.chat.voice}>🎙</button>
+    <FileUploadButton
+      onFicheiro={carregar}
+      ficheiro={ficheiroAnexado}
+      erro={erroUpload}
+      onLimpar={limparUpload}
+    />
         {msgs.length>0&&
       <button onClick={exportConv} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.gemini;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title={t.chat.export}>↓</button>}
   </div>
@@ -1615,8 +1631,8 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       {id:"genspark", label:"Genspark",  color:AC.genspark, link:"www.genspark.ai/settings/api",  ph:"gs-...",     desc:"Multi-AI synthesis"},
       {id:"manus",    label:"Manus",     color:AC.manus,    link:"manus.im",                       ph:"manus-...",  desc:"Agente autónomo"},
       {id:"claude",  label:"Claude",         color:AC.claude,           link:"console.anthropic.com",       ph:"sk-ant-...",  desc:"Pago · claude-sonnet"},
-    ].map(api=>(
-      <KeyRow key={api.id} api={api} T={T} t={t} value={keys[api.id]||""} onChange={v=>{
+    ].map((api,idx)=>(
+      <KeyRow key={`api-${idx}-${api.id}`} api={api} T={T} t={t} value={keys[api.id]||""} onChange={v=>{
         const nk={...keys,[api.id]:v};setKeys(nk);saveKeys(nk);
       }}/>
     ))}
@@ -1632,16 +1648,16 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
             </div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
-            {[[brain.semantic.length,t.memory.stats.facts,AC.claude,"◆"],[brain.episodic.length,t.memory.stats.sessions,AC.gemini,"◈"],[brain.patterns.length,t.memory.stats.patterns,AC.grok,"◉"],[brain.sessions,t.memory.stats.total,AC.genspark,"◎"]].map(([n,l,c,ic])=>(
-              <div key={l} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:13,padding:"11px 7px",textAlign:"center"}}>
+            {[[brain.semantic.length,t.memory.stats.facts,AC.claude,"◆"],[brain.episodic.length,t.memory.stats.sessions,AC.gemini,"◈"],[brain.patterns.length,t.memory.stats.patterns,AC.grok,"◉"],[brain.sessions,t.memory.stats.total,AC.genspark,"◎"]].map(([n,l,c,ic],idx)=>(
+              <div key={`memory-stat-${idx}-${l}`} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:13,padding:"11px 7px",textAlign:"center"}}>
                 <div style={{fontSize:10,color:c,marginBottom:2}}>{ic}</div>
                 <div style={{fontSize:21,fontWeight:800,color:T.tx,lineHeight:1}}>{n}</div>
                 <div style={{fontSize:8,color:T.ts,marginTop:2}}>{l}</div>
               </div>
             ))}
           </div>
-          {[{title:t.memory.sections.semantic.title,sub:t.memory.sections.semantic.sub,color:AC.claude,icon:"◆",items:brain.semantic.slice().reverse().map(x=>`[${x.tipo}] ${x.descricao}`)},{title:t.memory.sections.episodic.title,sub:t.memory.sections.episodic.sub,color:AC.gemini,icon:"◈",items:brain.episodic.slice().reverse()},{title:t.memory.sections.patterns.title,sub:t.memory.sections.patterns.sub,color:AC.grok,icon:"◉",items:brain.patterns}].map(sec=>(
-            <div key={sec.title} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:13,overflow:"hidden"}}>
+          {[{title:t.memory.sections.semantic.title,sub:t.memory.sections.semantic.sub,color:AC.claude,icon:"◆",items:brain.semantic.slice().reverse().map(x=>`[${x.tipo}] ${x.descricao}`)},{title:t.memory.sections.episodic.title,sub:t.memory.sections.episodic.sub,color:AC.gemini,icon:"◈",items:brain.episodic.slice().reverse()},{title:t.memory.sections.patterns.title,sub:t.memory.sections.patterns.sub,color:AC.grok,icon:"◉",items:brain.patterns}].map((sec,idx)=>(
+            <div key={`memory-section-${idx}-${sec.title}`} style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:13,overflow:"hidden"}}>
               <div style={{padding:"9px 13px",borderBottom:sec.items.length>0?`1px solid ${T.b2}`:"none",display:"flex",alignItems:"center",gap:6}}>
                 <span style={{color:sec.color,fontSize:12}}>{sec.icon}</span>
                 <div><div style={{fontSize:11,fontWeight:600,color:T.tx}}>{sec.title}</div><div style={{fontSize:9,color:T.ts}}>{sec.sub}</div></div>
@@ -1671,8 +1687,8 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
           </div>
           <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:12,padding:"10px 14px"}}>
             <div style={{fontSize:11,fontWeight:700,color:T.tx,marginBottom:8}}>{t.settings.arch}</div>
-            {[["◉",AC.grok,"Grok","grok-3"],["◈",AC.gemini,"Gemini","gemini-2.5-flash"],["◇",AC.perp,"Perplexity","sonar-pro (via Groq)"],["◎",AC.genspark,"Genspark","simulado (via Claude)"],["◍",AC.manus,"Manus","simulado (via Claude)"],["○",AC.openai||"#74aa9c","OpenAI","gpt-4o"],["◐",AC.deepseek||"#4d9fff","DeepSeek","deepseek-chat"],["◑",AC.llama||"#e879f9","Llama","llama-4-scout via Groq"],["◒",AC.mistral||"#f97316","Mistral","mistral-large-latest"],["◓",AC.nemotron||"#a3e635","Nemotron","nemotron-4-340b NVIDIA"],["◆",AC.claude,"Claude","claude-opus-4-6 — Juiz final"],].map(([ic,c,t,d])=>(
-              <div key={t} style={{display:"flex",gap:7,padding:"5px 0",borderBottom:`1px solid ${T.b2}`}}>
+            {[["◉",AC.grok,"Grok","grok-3"],["◈",AC.gemini,"Gemini","gemini-2.5-flash"],["◇",AC.perp,"Perplexity","sonar-pro (via Groq)"],["◎",AC.genspark,"Genspark","simulado (via Claude)"],["◍",AC.manus,"Manus","simulado (via Claude)"],["○",AC.openai||"#74aa9c","OpenAI","gpt-4o"],["◐",AC.deepseek||"#4d9fff","DeepSeek","deepseek-chat"],["◑",AC.llama||"#e879f9","Llama","llama-4-scout via Groq"],["◒",AC.mistral||"#f97316","Mistral","mistral-large-latest"],["◓",AC.nemotron||"#a3e635","Nemotron","nemotron-4-340b NVIDIA"],["◆",AC.claude,"Claude","claude-opus-4-6 — Juiz final"],].map(([ic,c,t,d],idx)=>(
+              <div key={`arch-${idx}-${t}`} style={{display:"flex",gap:7,padding:"5px 0",borderBottom:`1px solid ${T.b2}`}}>
                 <span style={{color:c,fontSize:12,flexShrink:0}}>{ic}</span>
                 <div><div style={{fontSize:10,fontWeight:600,color:T.tx}}>{t}</div><div style={{fontSize:8,color:T.ts,marginTop:1}}>{d}</div></div>
               </div>
