@@ -9,6 +9,9 @@ export default defineConfig({
       authToken: process.env.SENTRY_AUTH_TOKEN,
       org: "firstoff2",
       project: "lesma",
+      silent: true,
+      telemetry: false,
+      disable: !process.env.SENTRY_AUTH_TOKEN,
     }),
   ],
 
