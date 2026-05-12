@@ -47,6 +47,9 @@ pnpm-debug.log*
 # Claude / skills (não subir para git)
 .claude/
 
+# Antigravity / Gemini browser profile
+.gemini/
+
 # Ficheiros temporários e notas locais
 *.tmp
 *.bak
