@@ -18,7 +18,8 @@
 
 - 5 lobos oficiais em `src/api/council.js` com **Rei como juiz final** (`meta-llama/llama-3.3-70b-instruct:free` via OpenRouter)
 - Router inteligente antes de chamar APIs — usa apenas os lobos oficiais importados de `LOBOS`
-- Rei definido em `src/api/king.js` — passa por `/api/chat` (proxy serverless OpenRouter)
+- Rei definido em `src/api/king.js` — usa `JUIZ_REI.modelo = "meta-llama/llama-3.3-70b-instruct:free"` e passa por `/api/chat` (proxy serverless OpenRouter)
+- Runtime prompts: `src/api/council.js` e `src/api/king.js`; `/prompts/*.md` é documentação auxiliar e não é servido no Vercel
 - OpenRouter passa por `/api/chat`; NVIDIA NIM passa por `/api/nim-proxy` com key no servidor
 - Streaming SSE no council/chat: ✅ FEITO (`chamarLobeStream`, `runDebateStream`)
 - Memória em `localStorage` (migração para Supabase planeada)

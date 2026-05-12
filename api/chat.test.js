@@ -4,7 +4,7 @@
 
 import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 // ── Mocks antes dos imports ─────────────────────────────────
 // Mock de FileReader nativo
@@ -581,5 +581,43 @@ describe('UI v12 — componentes 21st.dev adaptados', () => {
     assert.match(fonteCortex, /<Slider/);
     assert.match(fonteCouncil, /opcoesGeracaoLobe/);
     assert.match(fonteCouncil, /temperature: Number\(temperatura\)/);
+  });
+});
+
+// ── Teste 22: prompts runtime e Rei OpenRouter ──────────────
+describe('Prompts modulares — runtime e Rei', () => {
+  it('Rei usa configuração explícita Llama via OpenRouter e /api/chat', () => {
+    const fonteKing = readFileSync(new URL('../src/api/king.js', import.meta.url), 'utf8');
+
+    assert.match(fonteKing, /const JUIZ_REI = \{/);
+    assert.match(fonteKing, /modelo: "meta-llama\/llama-3\.3-70b-instruct:free"/);
+    assert.match(fonteKing, /provider: "openrouter"/);
+    assert.match(fonteKing, /fetch\("\/api\/chat"/);
+    assert.match(fonteKing, /model: JUIZ_REI\.modelo/);
+    assert.doesNotMatch(fonteKing, /claude-3\.7-sonnet|Anthropic API|Opus 4\.7/i);
+  });
+
+  it('council mantém lobos em texto livre e remove SYSTEM_REI legado', () => {
+    const fonteCouncil = readFileSync(new URL('../src/api/council.js', import.meta.url), 'utf8');
+    const blocoNormalizar = fonteCouncil.match(/function normalizarValorLobe[\s\S]*?function opcoesGeracaoLobe/)?.[0] || '';
+
+    assert.doesNotMatch(fonteCouncil, /export const SYSTEM_REI/);
+    assert.doesNotMatch(fonteCouncil, /Devolve APENAS JSON sem markdown:[\s\S]*SYSTEM_PROMPTS/);
+    assert.doesNotMatch(blocoNormalizar, /JSON\.parse/);
+  });
+
+  it('prompts markdown são documentação e não runtime Vercel', () => {
+    const raiz = new URL('..', import.meta.url);
+    const fonteCortex = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+    const fonteCouncil = readFileSync(new URL('../src/api/council.js', import.meta.url), 'utf8');
+    const fonteKing = readFileSync(new URL('../src/api/king.js', import.meta.url), 'utf8');
+    const promptRei = readFileSync(new URL('../prompts/judge_rei.md', import.meta.url), 'utf8');
+
+    assert.equal(existsSync(new URL('prompts/judge_rei.md', raiz)), true);
+    assert.equal(existsSync(new URL('prompts/judge_claude.md', raiz)), false);
+    assert.doesNotMatch(`${fonteCortex}\n${fonteCouncil}\n${fonteKing}`, /fetch\(["']\/prompts\//);
+    assert.match(promptRei, /meta-llama\/llama-3\.3-70b-instruct:free/);
+    assert.match(promptRei, /src\/api\/king\.js/);
+    assert.doesNotMatch(promptRei, /Claude 3\.7 Sonnet|claude-3\.7-sonnet|Anthropic API|Opus 4\.7/i);
   });
 });

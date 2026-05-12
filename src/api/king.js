@@ -15,6 +15,11 @@ function garantirSugestoes(suggestions) {
 
 const PLACEHOLDER_REI_RE = /\[(?:Lobe X|Juiz Y|Nome do Juiz|elemento|Nome do Lobe)\]/i;
 
+const JUIZ_REI = {
+  modelo: "meta-llama/llama-3.3-70b-instruct:free",
+  provider: "openrouter",
+};
+
 function temPlaceholderDoPrompt(texto) {
   return PLACEHOLDER_REI_RE.test(String(texto || ""));
 }
@@ -257,7 +262,7 @@ export async function runKing(
       signal: abortSignal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.3-70b-instruct:free",
+        model: JUIZ_REI.modelo,
         system: SYSTEM_REI,
         messages: [{ role: "user", content: contexto }],
         max_tokens: 1500,
