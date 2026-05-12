@@ -200,6 +200,8 @@ describe('chamarLobe — OpenRouter', () => {
   it('usa /api/chat para evitar dependência de VITE_OPENROUTER_KEY no browser', async () => {
     const { chamarLobe } = await import('../src/api/council.js');
     const fetchAnterior = global.fetch;
+    const keyAnterior = process.env.VITE_OPENROUTER_KEY;
+    delete process.env.VITE_OPENROUTER_KEY; // força proxy-gerido-pelo-servidor
     let chamada = null;
 
     global.fetch = async (url, init) => {
@@ -221,6 +223,7 @@ describe('chamarLobe — OpenRouter', () => {
       assert.equal(resultado.resposta, 'resposta openrouter');
     } finally {
       global.fetch = fetchAnterior;
+      if (keyAnterior !== undefined) process.env.VITE_OPENROUTER_KEY = keyAnterior;
     }
   });
 

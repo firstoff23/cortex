@@ -6,35 +6,35 @@ export const LOBOS = [
   {
     id: 1,
     nome: 'Analista Crítico',
-    modelo: 'deepseek/deepseek-r1',
+    modelo: 'deepseek/deepseek-r1:free',
     provider: 'openrouter',
     cor: '#ef4444',
   },
   {
     id: 2,
     nome: 'Inovador Criativo',
-    modelo: 'google/gemini-flash-1.5',
+    modelo: 'google/gemini-2.0-flash-exp:free',
     provider: 'openrouter',
     cor: '#22c55e',
   },
   {
     id: 3,
     nome: 'Pragmático Técnico',
-    modelo: 'nvidia/llama-3.1-nemotron-70b-instruct',
-    provider: 'nim',
+    modelo: 'nvidia/llama-3.1-nemotron-70b-instruct:free',
+    provider: 'openrouter',
     cor: '#3b82f6',
   },
   {
     id: 4,
     nome: 'Generalista Contextual',
-    modelo: 'meta/llama-4-scout',
-    provider: 'nim',
+    modelo: 'meta-llama/llama-4-scout:free',
+    provider: 'openrouter',
     cor: '#eab308',
   },
   {
     id: 5,
     nome: 'Advogado do Diabo',
-    modelo: 'mistralai/mistral-small-3.1',
+    modelo: 'mistralai/mistral-small-3.1-24b-instruct:free',
     provider: 'openrouter',
     cor: '#6b7280',
   },
@@ -343,7 +343,7 @@ export async function runDebate(pergunta, modo = 'paralelo', options = {}) {
 
 async function chamarStreamComFallback(lobe, pergunta, contextoDebate, chamarStream, chamarFallback, onToken, options = {}) {
   const ctrl = new AbortController();
-  const timeout = setTimeout(() => ctrl.abort(), 8000);
+  const timeout = setTimeout(() => ctrl.abort(new Error('Timeout de 25s excedido')), 25000);
   const geracao = opcoesGeracaoLobe(lobe, options);
 
   try {
