@@ -22,6 +22,15 @@
 - Runtime prompts: `src/api/council.js` e `src/api/king.js`; `/prompts/*.md` é documentação auxiliar e não é servido no Vercel
 - OpenRouter passa por `/api/chat` (todos os 5 lobos + Rei via OpenRouter :free)
 - NIM removido — `api/nim-proxy.js` mantido mas inactivo; todos os lobos migrados para OpenRouter
+- Modelos confirmados activos (via API openrouter.ai/api/v1/models, 2026-05-12):
+  | Lobe | Modelo |
+  |---|---|
+  | Analista Crítico | `nousresearch/hermes-3-llama-3.1-405b:free` |
+  | Inovador Criativo | `google/gemma-4-31b-it:free` |
+  | Pragmático Técnico | `nvidia/nemotron-3-super-120b-a12b:free` |
+  | Generalista Contextual | `openai/gpt-oss-120b:free` |
+  | Advogado do Diabo | `qwen/qwen3-coder:free` |
+  | **Rei** | `meta-llama/llama-3.3-70b-instruct:free` |
 - Streaming SSE no council/chat: ✅ FEITO (`chamarLobeStream`, `runDebateStream`)
 - Memória em `localStorage` (migração para Supabase planeada)
 - Constante de versão: `const MV = "cortex-v12"` no topo do ficheiro
