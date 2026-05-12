@@ -16,8 +16,9 @@
 
 ## Arquitetura
 
-- 5 lobos oficiais em `src/api/council.js` com **Rei/Codex como juiz final** (council pattern)
+- 5 lobos oficiais em `src/api/council.js` com **Rei como juiz final** (`meta-llama/llama-3.3-70b-instruct:free` via OpenRouter)
 - Router inteligente antes de chamar APIs — usa apenas os lobos oficiais importados de `LOBOS`
+- Rei definido em `src/api/king.js` — passa por `/api/chat` (proxy serverless OpenRouter)
 - OpenRouter passa por `/api/chat`; NVIDIA NIM passa por `/api/nim-proxy` com key no servidor
 - Streaming SSE no council/chat: ✅ FEITO (`chamarLobeStream`, `runDebateStream`)
 - Memória em `localStorage` (migração para Supabase planeada)

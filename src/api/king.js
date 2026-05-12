@@ -257,7 +257,7 @@ export async function runKing(
       signal: abortSignal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro-exp-03-25:free",
+        model: "meta-llama/llama-3.3-70b-instruct:free",
         system: SYSTEM_REI,
         messages: [{ role: "user", content: contexto }],
         max_tokens: 1500,
