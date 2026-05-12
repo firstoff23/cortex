@@ -25,7 +25,11 @@ function erroCamposObrigatorios(res) {
 }
 
 function lerOpenRouterKey() {
-  return process.env.OPENROUTER_KEY || process.env.OPENROUTER_API_KEY;
+  const key = process.env.OPENROUTER_KEY || process.env.OPENROUTER_API_KEY;
+  console.log('[chat.js] OPENROUTER_KEY presente:', !!process.env.OPENROUTER_KEY);
+  console.log('[chat.js] OPENROUTER_API_KEY presente:', !!process.env.OPENROUTER_API_KEY);
+  console.log('[chat.js] Key resolvida (primeiros 8):', key ? key.slice(0, 8) + '...' : 'VAZIA');
+  return key;
 }
 
 async function lerJsonSeguro(upstream) {
