@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import KingCard from './components/KingCard';
 import MessageList from './components/MessageList';
 import DebateTimeline from './components/DebateTimeline';
@@ -951,6 +951,8 @@ async function send(query) {
     cortex: {label:"Córtex", color:AC.claude, pct:"88%"},
     reflex: {label:"Reflexão", color:AC.reflex, pct:"100%"},
   };
+
+  const sugestoesIniciais = useMemo(() => getRandomSuggestions(4), []);
   
 const safeParseJson = (value, fallback = null) => {
   try {
@@ -1529,7 +1531,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                 <EstadoVazio
                   titulo={"Bem-vindo ao Córtex"}
                   subtitulo={`${"O que vamos explorar hoje?"} ${"Lobos oficiais"} · ${"Veredicto"} Rei/Codex`}
-                  sugestoes={["Sugestões rápidas"[0], "Sugestões rápidas"[5], "Sugestões rápidas"[3], "Sugestões rápidas"[4]]}
+                  sugestoes={sugestoesIniciais}
                   onSugestao={aplicarSugestaoRei}
                 />
                 <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:12,fontSize:10,color:T.ts}}>
