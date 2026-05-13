@@ -102,15 +102,22 @@ export async function callOpenRouter(
 
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} — ${res.statusText}`);
-    }
+    } // Fecho do bloco anterior que já tinhas no código
 
+    // Guarda a resposta do OpenRouter numa constante
     const text = data.choices?.[0]?.message?.content;
+    
+    // Verifica se a resposta não está vazia. Se estiver, interrompe com um erro.
     if (!text) throw new Error("Resposta vazia do OpenRouter");
 
     // ✅ ALTERAÇÃO 2 — remove CoT visível do Qwen e outros
+    // O texto vai ser limpo. A Regex procura a tag <think>, qualquer conteúdo lá dentro [\s\S]*?, e a tag de fecho <\/think>.
+    // Nota: O 'g' no final significa "global", ou seja, remove todas as ocorrências que encontrar.
     const cleaned = text
-      .replace(\/<think>[\s\S]*?</think>/g, "")
-      .trim();
+      .replace(/<think>[\s\S]*?<\/think>/g, "")
+      .trim(); // Remove espaços em branco no início e no fim do texto limpo
+
+    // Devolve a resposta final limpa para ser utilizada
     return cleaned;
 
   } catch (err) {
