@@ -25,11 +25,11 @@
 - Modelos activos (actualizados 2026-05-13 — tier :free rápido):
   | Lobe | Modelo |
   |---|---|
-  | Analista Crítico | `deepseek/deepseek-r1-distill-llama-70b:free` |
-  | Inovador Criativo | `google/gemma-3-12b-it:free` |
-  | Pragmático Técnico | `microsoft/phi-4-reasoning-plus:free` |
+  | Analista Crítico | `qwen/qwen3-next-80b-a3b-instruct:free` |
+  | Inovador Criativo | `google/gemma-4-31b-it:free` |
+  | Pragmático Técnico | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` |
   | Generalista Contextual | `openai/gpt-oss-120b:free` |
-  | Advogado do Diabo | `qwen/qwen3-14b:free` |
+  | Advogado do Diabo | `nousresearch/hermes-3-llama-3.1-405b:free` |
   | **Rei** | `meta-llama/llama-3.3-70b-instruct:free` |
 - Streaming SSE no council/chat: ✅ FEITO (`chamarLobeStream`, `runDebateStream`)
 - Web search: `openrouter:web_search` server tool — activo em Analista Crítico (id=1) + Generalista (id=4); max_results 3, localização PT; custo ~$0.02/request via Exa; Rei não usa

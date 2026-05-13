@@ -2,11 +2,11 @@ const PROD_ORIGIN = "https://cortex-five-hazel.vercel.app";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 const FREE_FALLBACKS = [
-  "google/gemma-3-4b-it:free",
-  "google/gemma-3n-e4b-it:free",
-  "liquid/lfm-2.5-1.2b-instruct:free",
   "openai/gpt-oss-120b:free",
-  "nvidia/nemotron-3-nano-30b-a3b:free",
+  "google/gemma-4-31b-it:free",
+  "qwen/qwen3-next-80b-a3b-instruct:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "nousresearch/hermes-3-llama-3.1-405b:free",
 ];
 
 export const config = {
