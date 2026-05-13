@@ -89,6 +89,51 @@ const BLUEPRINTS = [
       { nome: 'Backend', items: ['Sessões stateless', 'Uploads em object storage', 'Filas para jobs longos', 'Logs estruturados'] },
     ]
   },
+  {
+    id: 'openrouter',
+    titulo: 'OpenRouter Features',
+    emoji: '🔌',
+    categorias: [
+      {
+        nome: 'Plugins activos',
+        items: [
+          'file-parser PDF (cloudflare-ai grátis)',
+          'response-healing (Rei — non-streaming)',
+          'web_search server tool (Analista + Generalista)',
+          'fusion fallback (Rei — pago, só em falha)',
+        ]
+      },
+      {
+        nome: 'Modelos gratuitos actuais',
+        items: [
+          'meta-llama/llama-3.3-70b:free (Rei)',
+          'openai/gpt-oss-120b:free (Generalista)',
+          'deepseek/deepseek-r1-distill-llama-70b:free (Analista)',
+          'google/gemma-3-12b-it:free (Criativo)',
+          'microsoft/phi-4-reasoning-plus:free (Pragmático)',
+          'qwen/qwen3-14b:free (Diabo)',
+        ]
+      },
+      {
+        nome: 'Obsoleto — não usar',
+        items: [
+          'plugin { id: web } → usar server tool',
+          'sufixo :online → usar tools array',
+          'pdfjs-dist → usar file-parser plugin',
+          'Tavily → usar openrouter:web_search',
+        ]
+      },
+      {
+        nome: 'No Córtex',
+        items: [
+          'Todos os lobos via OpenRouter (1 key)',
+          'Rei com response-healing activo',
+          'PDF sem bundle extra (cloudflare-ai)',
+          'Web search grátis via server tool',
+        ]
+      },
+    ]
+  },
 ];
 
 function contemTexto(blueprint, termo) {

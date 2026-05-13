@@ -14,6 +14,23 @@
 - Proxy de APIs: Vercel serverless functions (`/api/*`)
 - Sem Tailwind, sem shadcn, sem Express, sem SQLite
 
+## OpenRouter Plugins
+
+### Activos
+- file-parser PDF: engine cloudflare-ai (grátis)
+  → substitui pdfjs-dist local
+- response-healing: activo no Rei (non-streaming)
+  → corrige JSON malformado automaticamente
+- openrouter:web_search: server tool
+  → activo em Analista Crítico + Generalista
+- openrouter:fusion: fallback do Rei em falha
+  → pago, só activa quando Llama falha
+
+### Obsoletos (não usar)
+- { id: 'web' } → substituído por openrouter:web_search
+- sufixo :online → substituído por tools array
+- pdfjs-dist → substituído por file-parser plugin
+
 ## Arquitetura
 
 - 5 lobos oficiais em `src/api/council.js` com **Rei como juiz final** (`meta-llama/llama-3.3-70b-instruct:free` via OpenRouter)
