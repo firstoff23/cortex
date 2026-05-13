@@ -22,14 +22,14 @@
 - Runtime prompts: `src/api/council.js` e `src/api/king.js`; `/prompts/*.md` é documentação auxiliar e não é servido no Vercel
 - OpenRouter passa por `/api/chat` (todos os 5 lobos + Rei via OpenRouter :free)
 - NIM removido — `api/nim-proxy.js` mantido mas inactivo; todos os lobos migrados para OpenRouter
-- Modelos confirmados activos (via API openrouter.ai/api/v1/models, 2026-05-12):
+- Modelos activos (actualizados 2026-05-13 — tier :free rápido):
   | Lobe | Modelo |
   |---|---|
-  | Analista Crítico | `nousresearch/hermes-3-llama-3.1-405b:free` |
-  | Inovador Criativo | `google/gemma-4-31b-it:free` |
-  | Pragmático Técnico | `nvidia/nemotron-3-super-120b-a12b:free` |
+  | Analista Crítico | `deepseek/deepseek-r1-distill-llama-70b:free` |
+  | Inovador Criativo | `google/gemma-3-12b-it:free` |
+  | Pragmático Técnico | `microsoft/phi-4-reasoning-plus:free` |
   | Generalista Contextual | `openai/gpt-oss-120b:free` |
-  | Advogado do Diabo | `qwen/qwen3-coder:free` |
+  | Advogado do Diabo | `qwen/qwen3-14b:free` |
   | **Rei** | `meta-llama/llama-3.3-70b-instruct:free` |
 - Streaming SSE no council/chat: ✅ FEITO (`chamarLobeStream`, `runDebateStream`)
 - Memória em `localStorage` (migração para Supabase planeada)
@@ -95,6 +95,8 @@
 - ✅ Input com contador chars/tokens — FEITO
 - ✅ Temperatura por lobe — FEITO (`Slider.jsx`)
 - ✅ Side panels — FEITO (Histórico, Blueprints, Modo Forense)
+- ✅ Modelos :free rápidos — FEITO (timeout 28s, 4 lobos substituídos 2026-05-13)
+- ✅ Fix parser Rei — FEITO (`choices[0].message.content` em `king.js`)
 - Persistência real com Supabase (substituir localStorage)
 - Conectores on-demand: Tavily, ElevenLabs, Obsidian, Notion
 - Cloudflare: DNS + WAF + rate limiting + Turnstile

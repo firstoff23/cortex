@@ -6,21 +6,21 @@ export const LOBOS = [
   {
     id: 1,
     nome: 'Analista Crítico',
-    modelo: 'nousresearch/hermes-3-llama-3.1-405b:free',
+    modelo: 'deepseek/deepseek-r1-distill-llama-70b:free',
     provider: 'openrouter',
     cor: '#ef4444',
   },
   {
     id: 2,
     nome: 'Inovador Criativo',
-    modelo: 'google/gemma-4-31b-it:free',
+    modelo: 'google/gemma-3-12b-it:free',
     provider: 'openrouter',
     cor: '#22c55e',
   },
   {
     id: 3,
     nome: 'Pragmático Técnico',
-    modelo: 'nvidia/nemotron-3-super-120b-a12b:free',
+    modelo: 'microsoft/phi-4-reasoning-plus:free',
     provider: 'openrouter',
     cor: '#3b82f6',
   },
@@ -34,7 +34,7 @@ export const LOBOS = [
   {
     id: 5,
     nome: 'Advogado do Diabo',
-    modelo: 'qwen/qwen3-coder:free',
+    modelo: 'qwen/qwen3-14b:free',
     provider: 'openrouter',
     cor: '#6b7280',
   },
@@ -343,7 +343,7 @@ export async function runDebate(pergunta, modo = 'paralelo', options = {}) {
 
 async function chamarStreamComFallback(lobe, pergunta, contextoDebate, chamarStream, chamarFallback, onToken, options = {}) {
   const ctrl = new AbortController();
-  const timeout = setTimeout(() => ctrl.abort(new Error('Timeout de 25s excedido')), 25000);
+  const timeout = setTimeout(() => ctrl.abort(new Error('Timeout de 28s excedido')), 28000);
   const geracao = opcoesGeracaoLobe(lobe, options);
 
   try {

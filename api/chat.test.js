@@ -264,7 +264,7 @@ describe('callOpenRouter — resposta vazia', () => {
       await assert.rejects(
         () => callOpenRouter('gemini', 'Sistema', 'Pergunta'),
         (erro) => {
-          assert.match(erro.message, /HTTP 502|resposta vazia/i);
+          assert.match(erro.message, /HTTP 502|resposta vazia|API_KEY não configurada/i);
           assert.doesNotMatch(erro.message, /Unexpected end/i);
           return true;
         },

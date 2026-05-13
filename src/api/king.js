@@ -272,7 +272,8 @@ export async function runKing(
     const dados = await lerJsonResposta(resposta);
     if (!resposta.ok || dados.error) throw new Error(dados.error || `HTTP ${resposta.status}`);
 
-    const parseado = extrairJson(dados.content || "");
+    const textoRei = dados.choices?.[0]?.message?.content || dados.content || "";
+    const parseado = extrairJson(textoRei);
     if (!parseado) throw new Error("Rei não devolveu JSON válido");
 
     return normalizarResultadoRei(
