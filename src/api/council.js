@@ -194,7 +194,23 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
   const messages = [{ role: 'user', content: mensagemUtilizador(pergunta, contextoDebate) }];
   const geracao = opcoesGeracaoLobe(lobe, options);
   const webSearchTools = LOBOS_COM_WEB_SEARCH.has(lobe.id) && lobe.provider === 'openrouter'
-    ? { tools: [{ type: 'openrouter:web_search' }] }
+    ? {
+        tools: [
+          {
+            type: 'openrouter:web_search',
+            parameters: {
+              engine: 'auto',
+              max_results: 3,
+              max_total_results: 9,
+              user_location: {
+                type: 'approximate',
+                country: 'PT',
+                timezone: 'Europe/Lisbon'
+              }
+            }
+          }
+        ]
+      }
     : {};
 
   const body =
