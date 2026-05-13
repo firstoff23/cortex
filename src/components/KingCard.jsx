@@ -1,6 +1,7 @@
 import React from "react";
 import ChatBubble from "./ChatBubble.jsx";
 import JudgeCard from "./JudgeCard";
+import { exportarExcel, exportarNotion, exportarWord } from "../hooks/useExport.js";
 import { falarTexto } from "../hooks/useVoice.js";
 
 function pct(valor) {
@@ -60,6 +61,46 @@ function sanitizarErroRei(texto) {
   return valor;
 }
 
+function obterPergunta(msgs, i) {
+  return msgs
+    .slice(0, i)
+    .reverse()
+    .find((x) => x.role === "user")?.content || "";
+}
+
+function obterLobosExport(m) {
+  return (m.lobeResults || []).map((lobe) => ({
+    nome: lobe.nome || lobe.label,
+    resposta: lobe.resposta || lobe.result,
+    modelo: lobe.modelo || lobe.srcModel,
+    confianca: lobe.confianca ?? lobe.confidence,
+  }));
+}
+
+const estiloExport = {
+  background: "var(--bg-secondary, var(--social-bg, #14141e))",
+  border: "1px solid var(--border, rgba(255,255,255,0.12))",
+  borderRadius: 8,
+  padding: "6px 14px",
+  cursor: "pointer",
+  fontSize: 13,
+  color: "var(--text-primary, var(--text-h, #f5f5ff))",
+  transition: "background 0.2s, opacity 0.2s",
+  fontFamily: "inherit",
+};
+
+const estiloInput = {
+  background: "var(--bg-secondary, var(--social-bg, #14141e))",
+  border: "1px solid var(--border, rgba(255,255,255,0.12))",
+  borderRadius: 8,
+  padding: "7px 10px",
+  color: "var(--text-primary, var(--text-h, #f5f5ff))",
+  fontSize: 12,
+  minWidth: 220,
+  flex: "1 1 220px",
+  fontFamily: "inherit",
+};
+
 const KingCard = React.memo(function KingCard({
   m,
   i,
@@ -80,6 +121,36 @@ const KingCard = React.memo(function KingCard({
   const judges = m.judges || m.juizesResultados || [];
   const graders = m.graders || null;
   const accent = AC?.claude || "var(--accent)";
+  const [notionToken, setNotionToken] = React.useState("");
+  const [notionPageId, setNotionPageId] = React.useState("");
+  const [mostrarNotion, setMostrarNotion] = React.useState(false);
+  const [exportando, setExportando] = React.useState(false);
+  const dadosExport = {
+    pergunta: obterPergunta(msgs, i),
+    lobos: obterLobosExport(m),
+    veredicto: textoPrincipal,
+  };
+
+  async function executarExport(tipo) {
+    if (!dadosExport.veredicto) return;
+    if (tipo === "notion" && (!notionToken || !notionPageId)) {
+      setMostrarNotion(true);
+      return;
+    }
+
+    setExportando(true);
+    try {
+      if (tipo === "word") await exportarWord(dadosExport);
+      if (tipo === "excel") await exportarExcel(dadosExport);
+      if (tipo === "notion") await exportarNotion({ ...dadosExport, notionToken, notionPageId });
+      toast?.(tipo === "notion" ? "Exportado para Notion" : "Relatório exportado", "sucesso");
+    } catch (e) {
+      console.error("[Export]", e);
+      toast?.(e.message || "Export falhou", "erro");
+    } finally {
+      setExportando(false);
+    }
+  }
 
   return (
     <div
@@ -155,11 +226,7 @@ const KingCard = React.memo(function KingCard({
 
           <button
             onClick={async () => {
-              const question =
-                msgs
-                  .slice(0, i)
-                  .reverse()
-                  .find((x) => x.role === "user")?.content || "";
+              const question = obterPergunta(msgs, i);
               const shareText = `Pergunta:\n${question}\n\nResposta:\n${textoPrincipal}`;
 
               if (navigator.share && isMobile) {
@@ -231,6 +298,69 @@ const KingCard = React.memo(function KingCard({
             <Markdown text={textoPrincipal} color={T.tx || "var(--text-h)"} faint={T.ts || "var(--text)"} />
           </ChatBubble>
         </div>
+
+        {dadosExport.veredicto && (
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              marginTop: 0,
+              paddingTop: 12,
+              borderTop: "1px solid var(--border, rgba(255,255,255,0.12))",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => executarExport("word")}
+              disabled={exportando}
+              style={{ ...estiloExport, opacity: exportando ? 0.55 : 1 }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--accent-bg, rgba(168,85,247,0.1))"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = estiloExport.background; }}
+            >
+              📄 Word
+            </button>
+            <button
+              type="button"
+              onClick={() => executarExport("excel")}
+              disabled={exportando}
+              style={{ ...estiloExport, opacity: exportando ? 0.55 : 1 }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--accent-bg, rgba(168,85,247,0.1))"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = estiloExport.background; }}
+            >
+              📊 Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => executarExport("notion")}
+              disabled={exportando}
+              style={{ ...estiloExport, opacity: exportando ? 0.55 : 1 }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--accent-bg, rgba(168,85,247,0.1))"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = estiloExport.background; }}
+            >
+              {exportando ? "⏳" : "📝"} Notion
+            </button>
+          </div>
+        )}
+
+        {mostrarNotion && (
+          <div style={{ marginTop: -4, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <input
+              type="password"
+              placeholder="Notion Integration Token"
+              value={notionToken}
+              onChange={(e) => setNotionToken(e.target.value)}
+              style={estiloInput}
+            />
+            <input
+              type="text"
+              placeholder="Page ID"
+              value={notionPageId}
+              onChange={(e) => setNotionPageId(e.target.value)}
+              style={estiloInput}
+            />
+          </div>
+        )}
 
         {king && (
           <div

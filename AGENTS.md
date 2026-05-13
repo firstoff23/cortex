@@ -38,6 +38,7 @@
 - Rei definido em `src/api/king.js` — usa `JUIZ_REI.modelo = "meta-llama/llama-3.3-70b-instruct:free"` e passa por `/api/chat` (proxy serverless OpenRouter)
 - Runtime prompts: `src/api/council.js` e `src/api/king.js`; `/prompts/*.md` é documentação auxiliar e não é servido no Vercel
 - OpenRouter passa por `/api/chat` (todos os 5 lobos + Rei via OpenRouter :free)
+- Export Notion passa por `/api/notion-export.js` (proxy serverless; token só em memória de sessão)
 - NIM removido — `api/nim-proxy.js` mantido mas inactivo; todos os lobos migrados para OpenRouter
 - Modelos activos (actualizados 2026-05-13 — tier :free rápido):
   | Lobe | Modelo |
@@ -83,6 +84,7 @@
 - `useStreaming.js` = estado parcial por lobe durante streaming SSE
 - `useAutoResize.js` = auto-resize do input principal do chat
 - `useFileUpload.js` = F4-02 upload universal com extracção de texto, previews e `imageDataUrl` transitório para F4-01
+- `useExport.js` = F4-03 export Word/Excel/Notion com imports dinâmicos
 
 ## Componentes
 
@@ -114,6 +116,7 @@
 - ✅ Feature 19: chips de sugestões rápidas do Rei — FEITO
 - ✅ F4-01 Upload imagens multimodal — FEITO (`image_url` via OpenRouter content array; preview imagem no chat; `imageDataUrl` não persistido)
 - ✅ F4-02 Upload Universal — FEITO (`useFileUpload.js`, `FileUpload.jsx`)
+- ✅ F4-03 Export Word/Excel/Notion — FEITO (`useExport.js`, `api/notion-export.js`)
 - ✅ Blueprints/Mapas — FEITO (`BlueprintsPanel.jsx`)
 - ✅ Routing/API keys — FEITO (`/api/chat` para OpenRouter, `/api/nim-proxy` para NIM)
 - ✅ Componentes 21st.dev adaptados — FEITO (`ChatBubble`, `AlertaBanner`, `Toast`, `LobeLoader`, `EstadoVazio`, `SidePanel`, `Abas`, `Slider`)
@@ -123,9 +126,13 @@
 - ✅ Modelos :free rápidos — FEITO (timeout 28s, 4 lobos substituídos 2026-05-13)
 - ✅ Fix parser Rei — FEITO (`choices[0].message.content` em `king.js`)
 - ✅ Web search — FEITO (`openrouter:web_search` em lobos 1+4, parser tool_calls, custo ~$0.02/req)
+- ✅ DateTime tool — FEITO (`openrouter:datetime` em todos os lobos, Europe/Lisbon)
+- ✅ Response Cache — FEITO (TTL 300s lobos, TTL 600s Rei, Ronda 2 desactivado)
+- ✅ PDF via OpenRouter file-parser — FEITO (`cloudflare-ai` engine, substitui `pdfjs-dist`)
+- ✅ Fusion fallback Rei — FEITO (`openrouter/fusion`, pago, só em falha)
 - ✅ TTS: OpenRouter /api/v1/audio/speech (openai/gpt-4o-mini-tts-2025-12-15) — Botão 🔊 no veredicto do Rei
 - ✅ Fallback de modelos — FEITO (array models por lobe)
 - ✅ STT fallback — FEITO (OpenRouter Whisper via api/stt.js)
 - Persistência real com Supabase (substituir localStorage)
-- Conectores on-demand: Tavily, Obsidian, Notion
+- Conectores on-demand: Obsidian, Notion (ElevenLabs substituído por OpenRouter TTS)
 - Cloudflare: DNS + WAF + rate limiting + Turnstile

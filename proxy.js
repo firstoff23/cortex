@@ -3,6 +3,7 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { existsSync, readFileSync } from "fs";
 import sanitize from "./middleware/sanitize.js"; // ← .js obrigatório em ESM
+import notionExportHandler from "./api/notion-export.js";
 
 const PROD_ORIGIN = "https://cortex-five-hazel.vercel.app";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -130,6 +131,9 @@ app.post("/api/chat", async (req, res) => {
     return res.status(500).json({ error: e.message });
   }
 });
+
+// ── Proxy local compatível com /api/notion-export da Vercel ─
+app.post("/api/notion-export", (req, res) => notionExportHandler(req, res));
 
 // ── Proxy local compatível com /api/nim-proxy da Vercel ──────
 app.post("/api/nim-proxy", async (req, res) => {

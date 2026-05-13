@@ -21,6 +21,7 @@
     "axios": "^1.16.0",
     "cors": "^2.8.6",
     "crypto-js": "^4.2.0",
+    "docx": "^9.6.1",
     "dompurify": "^3.1.6",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.0",

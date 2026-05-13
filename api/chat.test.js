@@ -729,3 +729,104 @@ describe('F4-01 imagens multimodais', () => {
     assert.doesNotMatch(fonteCortex, /Preview URL/);
   });
 });
+
+// ── Teste 24: F4-03 export Word/Excel/Notion ────────────────
+describe('F4-03 Export Word/Excel/Notion', () => {
+  it('useExport existe e usa imports dinâmicos para docx/xlsx', () => {
+    const fonte = readFileSync(new URL('../src/hooks/useExport.js', import.meta.url), 'utf8');
+    const pkg = readFileSync(new URL('../package.json', import.meta.url), 'utf8');
+
+    assert.match(pkg, /"docx":/);
+    assert.match(pkg, /"xlsx":/);
+    assert.match(fonte, /export async function exportarWord/);
+    assert.match(fonte, /export async function exportarExcel/);
+    assert.match(fonte, /export async function exportarNotion/);
+    assert.match(fonte, /await import\('docx'\)/);
+    assert.match(fonte, /await import\('xlsx'\)/);
+    assert.match(fonte, /fetch\('\/api\/notion-export'/);
+    assert.doesNotMatch(fonte, /from ['"]docx['"]/);
+    assert.doesNotMatch(fonte, /from ['"]xlsx['"]/);
+  });
+
+  it('KingCard mostra botões de export e mantém token Notion só em useState', () => {
+    const fonte = readFileSync(new URL('../src/components/KingCard.jsx', import.meta.url), 'utf8');
+
+    assert.match(fonte, /exportarExcel, exportarNotion, exportarWord/);
+    assert.match(fonte, /const \[notionToken, setNotionToken\] = React\.useState\(""\)/);
+    assert.match(fonte, /const \[notionPageId, setNotionPageId\] = React\.useState\(""\)/);
+    assert.match(fonte, /📄 Word/);
+    assert.match(fonte, /📊 Excel/);
+    assert.match(fonte, /📝"\} Notion|📝\} Notion/);
+    assert.match(fonte, /placeholder="Notion Integration Token"/);
+    assert.match(fonte, /placeholder="Page ID"/);
+    assert.doesNotMatch(fonte, /localStorage.*notion|notion.*localStorage/i);
+  });
+
+  it('api/notion-export envia blocos para a API do Notion', async () => {
+    const { default: handler } = await import('../api/notion-export.js');
+    const fetchAnterior = global.fetch;
+    let chamada = null;
+
+    global.fetch = async (url, init) => {
+      chamada = { url, init, body: JSON.parse(init.body) };
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+
+    const res = {
+      statusCode: 200,
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(body) {
+        this.body = body;
+        return this;
+      },
+      end() {
+        this.ended = true;
+        return this;
+      },
+    };
+
+    try {
+      await handler(
+        {
+          method: 'POST',
+          body: {
+            pergunta: 'O que é RAG?',
+            lobos: [{ nome: 'Analista Crítico', resposta: 'Resposta do lobe' }],
+            veredicto: 'Veredicto final',
+            notionToken: 'secret_test',
+            notionPageId: 'pagina-123',
+          },
+        },
+        res,
+      );
+
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(res.body, { sucesso: true });
+      assert.equal(chamada.url, 'https://api.notion.com/v1/blocks/pagina-123/children');
+      assert.equal(chamada.init.method, 'PATCH');
+      assert.equal(chamada.init.headers.Authorization, 'Bearer secret_test');
+      assert.equal(chamada.init.headers['Notion-Version'], '2022-06-28');
+      assert.match(JSON.stringify(chamada.body.children), /Pergunta|Respostas dos Lobos|Veredicto do Rei/);
+    } finally {
+      global.fetch = fetchAnterior;
+    }
+  });
+
+  it('proxy local, AGENTS e serverless documentam F4-03', () => {
+    const fonteProxy = readFileSync(new URL('../proxy.js', import.meta.url), 'utf8');
+    const fonteAgents = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
+
+    assert.equal(existsSync(new URL('../api/notion-export.js', import.meta.url)), true);
+    assert.match(fonteProxy, /app\.post\(["']\/api\/notion-export["']/);
+    assert.match(fonteAgents, /F4-03 Export Word\/Excel\/Notion — FEITO/);
+    assert.match(fonteAgents, /useExport\.js/);
+    assert.match(fonteAgents, /api\/notion-export\.js/);
+  });
+});
