@@ -257,6 +257,8 @@ export async function runKing(
     );
     const scoreJuizesMedio = scoreMedioJuizes(veredictoJuizes);
 
+    // response-healing corrige JSON malformado automaticamente (OpenRouter plugin).
+    // NÃO adicionar stream:true — response-healing exige non-streaming.
     const resposta = await fetch("/api/chat", {
       method: "POST",
       signal: abortSignal,
@@ -265,6 +267,8 @@ export async function runKing(
         model: JUIZ_REI.modelo,
         system: SYSTEM_REI,
         messages: [{ role: "user", content: contexto }],
+        plugins: [{ id: "response-healing" }],
+        response_format: { type: "json_object" },
         max_tokens: 1500,
       }),
     });
