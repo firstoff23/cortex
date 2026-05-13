@@ -145,7 +145,8 @@ const MessageList = React.memo(function MessageList({
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: isMobile ? "1fr" : "repeat(2,minmax(0,1fr))",
+                    gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit,minmax(280px,1fr))",
+                    alignItems: "start",
                     gap: 10,
                     paddingTop: 2,
                   }}

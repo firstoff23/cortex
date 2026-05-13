@@ -32,6 +32,8 @@ const LobeCard = React.memo(function LobeCard({
       className="lobe-card"
       style={{
         position: "relative",
+        alignSelf: "start",
+        height: "fit-content",
         background: T.s2,
         border: `1px solid ${corLobe}33`,
         borderRadius: 14,

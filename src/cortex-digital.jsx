@@ -705,7 +705,13 @@ export default function Cortex(){
     uploadPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     uploadPreviewUrlsRef.current.clear();
   },[]);
-  useEffect(()=>{if(atBottom)botRef.current?.scrollIntoView({behavior:"smooth"});},[msgs,phase]);
+  useEffect(()=>{
+    if(!atBottom) return undefined;
+    const frame = requestAnimationFrame(()=>{
+      botRef.current?.scrollIntoView({behavior:"smooth", block:"end"});
+    });
+    return () => cancelAnimationFrame(frame);
+  },[msgs,phase,showCouncil,atBottom]);
   useEffect(()=>{
     ajustar();
   },[input, ajustar]);
@@ -1611,7 +1617,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                     </div>
                   </div>
                 )}
-                <div style={{height:8}}/><div ref={botRef}/>
+                <div ref={botRef} style={{height:isMobile?96:44,scrollMarginBottom:isMobile?120:64}}/>
               </div>
             )}
           </div>
