@@ -208,7 +208,8 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
                 timezone: 'Europe/Lisbon'
               }
             }
-          }
+          },
+          { type: 'datetime' }
         ]
       }
     : {};
