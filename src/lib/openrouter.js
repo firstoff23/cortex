@@ -1,27 +1,29 @@
-// lib/openrouter.js — Córtex Digital v12
 const BASE = "https://openrouter.ai/api/v1/chat/completions";
 
 export const OR_MODELS = {
-  "analista-critico":    "deepseek/deepseek-r1:free",
-  "inovador-criativo":   "google/gemma-3-27b-it:free",
-  "pragmatico-tecnico":  "mistralai/mistral-small-3.1-24b-instruct:free",
-  "generalista":         "meta-llama/llama-3.3-70b-instruct:free",
-  "advogado-do-diabo":   "mistralai/mistral-small-3.1-24b-instruct:free",
-  "juiz-factual":        "google/gemma-3-12b-it:free",
-  "juiz-relevancia":     "google/gemma-3-12b-it:free",
-  "juiz-coerencia":      "meta-llama/llama-3.3-70b-instruct:free",
-  grok:        "deepseek/deepseek-r1:free",
-  gemini:      "google/gemma-3-27b-it:free",
-  perp:        "meta-llama/llama-3.3-70b-instruct:free",
-  genspark:    "mistralai/mistral-small-3.1-24b-instruct:free",
-  manus:       "mistralai/mistral-small-3.1-24b-instruct:free",
-  openai:      "microsoft/phi-4:free",
-  deepseek:    "deepseek/deepseek-chat-v3-0324:free",
-  llama:       "meta-llama/llama-3.3-70b-instruct:free",
-  mistral:     "mistralai/mistral-small-3.1-24b-instruct:free",
-  nemotron:    "nvidia/llama-3.3-nemotron-super-49b-v1:free",
-  claude:      "google/gemma-3-27b-it:free",
-  default:     "google/gemma-3-12b-it:free",
+  "analista-critico": "deepseek/deepseek-r1:free",
+  "inovador-criativo": "google/gemma-3-27b-it:free",
+  "pragmatico-tecnico": "mistralai/mistral-small-3.1-24b-instruct:free",
+  "generalista": "meta-llama/llama-3.3-70b-instruct:free",
+  "advogado-do-diabo": "mistralai/mistral-small-3.1-24b-instruct:free",
+
+  "juiz-factual": "google/gemma-3-12b-it:free",
+  "juiz-relevancia": "google/gemma-3-12b-it:free",
+  "juiz-coerencia": "meta-llama/llama-3.3-70b-instruct:free",
+
+  grok: "deepseek/deepseek-r1:free",
+  gemini: "google/gemma-3-27b-it:free",
+  perp: "meta-llama/llama-3.3-70b-instruct:free",
+  genspark: "mistralai/mistral-small-3.1-24b-instruct:free",
+  manus: "mistralai/mistral-small-3.1-24b-instruct:free",
+  openai: "microsoft/phi-4:free",
+  deepseek: "deepseek/deepseek-chat-v3-0324:free",
+  llama: "meta-llama/llama-3.3-70b-instruct:free",
+  mistral: "mistralai/mistral-small-3.1-24b-instruct:free",
+  nemotron: "nvidia/llama-3.3-nemotron-super-49b-v1:free",
+  claude: "google/gemma-3-27b-it:free",
+
+  default: "google/gemma-3-12b-it:free",
 };
 
 const FALLBACKS = [
@@ -30,6 +32,15 @@ const FALLBACKS = [
   "qwen/qwen3-8b:free",
 ];
 
+const JSON_LOBES = [
+  "rei",
+  "juiz-factual",
+  "juiz-relevancia",
+  "juiz-coerencia",
+];
+
+const THINK_BLOCK_REGEX = new RegExp("<think>[\\s\\S]*?</think>", "g");
+
 export async function callOpenRouter(
   lobeIdOrModel,
   system,
@@ -37,62 +48,67 @@ export async function callOpenRouter(
   maxTokens = 420,
   signal = null
 ) {
-  const key = import.meta.env.VITE_OPENROUTER_API_KEY
-           || import.meta.env.OPENROUTER_API_KEY
-           || "";
+  const key = import.meta.env.VITE_OPENROUTER_API_KEY || "";
 
   if (!key || key.length < 10) {
     throw new Error(
-      "OPENROUTER_API_KEY não configurada. " +
-      "Adiciona VITE_OPENROUTER_API_KEY no Vercel → Settings → Environment Variables."
+      "OPENROUTER_API_KEY não configurada. Adiciona VITE_OPENROUTER_API_KEY no Vercel → Settings → Environment Variables."
     );
   }
 
   const model =
     OR_MODELS[lobeIdOrModel] ||
-    (lobeIdOrModel.includes("/") ? lobeIdOrModel : null) ||
+    (typeof lobeIdOrModel === "string" && lobeIdOrModel.includes("/")
+      ? lobeIdOrModel
+      : null) ||
     OR_MODELS.default;
 
-  // ✅ ALTERAÇÃO 1 — força JSON no Rei e Juízes
-  const isJsonLobe = ["rei", "juiz-factual", "juiz-relevancia", "juiz-coerencia"]
-    .includes(lobeIdOrModel);
+  const isJsonLobe = JSON_LOBES.includes(lobeIdOrModel);
+
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 25_000);
+  const mergedSignal = signal ? mergeSignals(signal, ctrl.signal) : ctrl.signal;
+
+  const payload = {
+    model,
+    max_tokens: maxTokens,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: userMsg },
+    ],
+    ...(isJsonLobe
+      ? {
+          response_format: {
+            type: "json_object",
+          },
+        }
+      : {}),
+  };
 
   const opts = {
     method: "POST",
     headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${key}`,
-      "HTTP-Referer":  "https://cortex-digital.vercel.app",
-      "X-Title":       "Córtex Digital",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+      "HTTP-Referer": "https://cortex-digital.vercel.app",
+      "X-Title": "Córtex Digital",
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      ...(isJsonLobe ? { response_format: { type: "json_object" } } : {}),
-      messages: [
-        { role: "system", content: system },
-        { role: "user",   content: userMsg },
-      ],
-    }),
-    ...(signal ? { signal } : {}),
+    body: JSON.stringify(payload),
+    signal: mergedSignal,
   };
 
-  const ctrl   = new AbortController();
-  const tid    = setTimeout(() => ctrl.abort(), 25_000);
-  const merged = signal
-    ? mergeSignals(signal, ctrl.signal)
-    : ctrl.signal;
-
   try {
-    const res = await fetch(BASE, { ...opts, signal: merged });
+    const res = await fetch(BASE, opts);
     clearTimeout(tid);
 
     const data = await res.json();
 
     if (data.error) {
-      const msg = typeof data.error === "string"
-        ? data.error
-        : data.error.message || JSON.stringify(data.error);
+      const msg =
+        typeof data.error === "string"
+          ? data.error
+          : data.error.message || JSON.stringify(data.error);
+
       throw new Error(`OpenRouter devolveu erro: ${msg}`);
     }
 
@@ -102,49 +118,49 @@ export async function callOpenRouter(
 
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} — ${res.statusText}`);
-    } // Fecho do bloco anterior que já tinhas no código
+    }
 
-    // Guarda a resposta do OpenRouter numa constante
     const text = data.choices?.[0]?.message?.content;
-    
-    // Verifica se a resposta não está vazia. Se estiver, interrompe com um erro.
-    if (!text) throw new Error("Resposta vazia do OpenRouter");
 
-    // ✅ ALTERAÇÃO 2 — remove CoT visível do Qwen e outros
-    // O texto vai ser limpo. A Regex procura a tag <think>, qualquer conteúdo lá dentro [\s\S]*?, e a tag de fecho <\/think>.
-    // Nota: O 'g' no final significa "global", ou seja, remove todas as ocorrências que encontrar.
-    const cleaned = text
-      .replace(/<think>[\s\S]*?<\/think>/g, "")
-      .trim(); // Remove espaços em branco no início e no fim do texto limpo
+    if (!text) {
+      throw new Error("Resposta vazia do OpenRouter");
+    }
 
-    // Devolve a resposta final limpa para ser utilizada
-    return cleaned;
-
+    return cleanModelText(text);
   } catch (err) {
     clearTimeout(tid);
 
-    if (err.name === "AbortError" && signal?.aborted) throw err;
+    if (err.name === "AbortError" && signal?.aborted) {
+      throw err;
+    }
 
-    for (const fb of FALLBACKS) {
-      if (fb === model) continue;
+    for (const fallbackModel of FALLBACKS) {
+      if (fallbackModel === model) continue;
+
       try {
+        const fallbackPayload = {
+          model: fallbackModel,
+          max_tokens: maxTokens,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: userMsg },
+          ],
+        };
+
         const res2 = await fetch(BASE, {
           ...opts,
-          body: JSON.stringify({
-            model: fb,
-            max_tokens: maxTokens,
-            messages: [
-              { role: "system", content: system },
-              { role: "user",   content: userMsg },
-            ],
-          }),
+          body: JSON.stringify(fallbackPayload),
+          signal: undefined,
         });
+
         const d2 = await res2.json();
-        if (d2.choices?.[0]?.message?.content) {
-          return d2.choices[0].message.content.trim();
+        const fallbackText = d2.choices?.[0]?.message?.content;
+
+        if (fallbackText) {
+          return cleanModelText(fallbackText);
         }
       } catch {
-        // continua para o próximo fallback
+        continue;
       }
     }
 
@@ -152,10 +168,17 @@ export async function callOpenRouter(
   }
 }
 
+function cleanModelText(text) {
+  return text.replace(THINK_BLOCK_REGEX, "").trim();
+}
+
 function mergeSignals(s1, s2) {
   const ctrl = new AbortController();
+
   const abort = () => ctrl.abort();
+
   s1.addEventListener("abort", abort, { once: true });
   s2.addEventListener("abort", abort, { once: true });
+
   return ctrl.signal;
 }
