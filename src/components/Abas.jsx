@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-// Abas.jsx — tabs acessíveis sem Radix.
+// Abas.jsx — abas acessíveis sem Radix.
 export default function Abas({ abas = [], defaultActiva }) {
   const primeira = defaultActiva || abas[0]?.id;
   const [activa, setActiva] = useState(primeira);

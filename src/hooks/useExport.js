@@ -1,4 +1,4 @@
-// EXPORT WORD
+// Exportar Word
 export async function exportarWord({ pergunta, lobos, veredicto }) {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import('docx');
   const doc = new Document({
@@ -41,13 +41,13 @@ export async function exportarWord({ pergunta, lobos, veredicto }) {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 }
 
-// EXPORT EXCEL
+// Exportar Excel
 export async function exportarExcel({ pergunta, lobos, veredicto }) {
   const XLSX = await import('xlsx');
   const dados = [
     ['Pergunta', pergunta],
     [''],
-    ['Lobe', 'Resposta', 'Modelo', 'Confiança'],
+    ['Lobo', 'Resposta', 'Modelo', 'Confiança'],
     ...lobos.map(l => [
       l.nome,
       l.resposta || '[sem resposta]',
@@ -65,10 +65,10 @@ export async function exportarExcel({ pergunta, lobos, veredicto }) {
   XLSX.writeFile(wb, 'cortex-relatorio.xlsx');
 }
 
-// EXPORT NOTION (via proxy serverless)
+// Exportar Notion (via proxy sem servidor)
 export async function exportarNotion({ pergunta, lobos, veredicto, notionToken, notionPageId }) {
   if (!notionToken || !notionPageId) {
-    throw new Error('Notion: token e page ID necessários');
+    throw new Error('Notion: token e ID da página necessários');
   }
 
   const resposta = await fetch('/api/notion-export', {
@@ -77,11 +77,11 @@ export async function exportarNotion({ pergunta, lobos, veredicto, notionToken, 
     body: JSON.stringify({ pergunta, lobos, veredicto, notionToken, notionPageId })
   });
 
-  if (!resposta.ok) throw new Error('Notion export falhou');
+  if (!resposta.ok) throw new Error('Exportação para Notion falhou');
   return resposta.json();
 }
 
-// Helper interno
+// Auxiliar interno
 function descarregarFicheiro(blob, nome, tipo) {
   const url = URL.createObjectURL(new Blob([blob], { type: tipo }));
   const a = document.createElement('a');

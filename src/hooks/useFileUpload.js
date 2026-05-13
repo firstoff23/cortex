@@ -1,4 +1,4 @@
-// useFileUpload.js — F4-02 Upload Universal
+// useFileUpload.js — F4-02 Carregamento Universal
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const ACCEPT = '.jpg,.jpeg,.png,.webp,.gif,.pdf,.docx,.txt,.md,.csv,.xlsx,.mp3,.wav,image/*,audio/*';
@@ -42,8 +42,8 @@ async function extrairImagem(file) {
   };
 }
 
-// Extrai texto de PDF via OpenRouter file-parser plugin (cloudflare-ai).
-// Elimina a dependência local pdfjs-dist (~500kb bundle).
+// Extrai texto de PDF via plugin file-parser do OpenRouter (cloudflare-ai).
+// Elimina a dependência local pdfjs-dist (~500kb do pacote).
 // As anotações da resposta são devolvidas para cache pelo chamador.
 async function extrairPdfViaOpenRouter(file) {
   const buffer = await file.arrayBuffer();
@@ -156,7 +156,7 @@ export function useFileUpload({ onUpload } = {}) {
       };
 
       setFicheiro(novoFicheiro);
-      // Guarda anotações do PDF para reutilização sem re-parsear
+      // Guarda anotações do PDF para reutilização sem novo parse
       if (extraido.anotacoes) {
         setAnotacoesPDF((prev) => ({ ...prev, [file.name]: extraido.anotacoes }));
       }

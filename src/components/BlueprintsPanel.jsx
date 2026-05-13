@@ -3,45 +3,45 @@ import { useEffect, useMemo, useState } from "react";
 const BLUEPRINTS = [
   {
     id: 'web-dev',
-    titulo: 'Web Development',
+    titulo: 'Desenvolvimento Web',
     emoji: '🌐',
     categorias: [
-      { nome: 'Frontend', items: ['React', 'Vite', 'CSS Variables', 'Web Components'] },
-      { nome: 'Backend', items: ['Node.js', 'Express', 'Serverless Functions', 'Edge Functions'] },
+      { nome: 'Frontend', items: ['React', 'Vite', 'Variáveis CSS', 'Componentes Web'] },
+      { nome: 'Backend', items: ['Node.js', 'Express', 'Funções sem servidor', 'Funções de periferia'] },
       { nome: 'API', items: ['REST', 'GraphQL', 'WebSocket', 'SSE'] },
-      { nome: 'Database', items: ['PostgreSQL', 'Supabase', 'Redis', 'Qdrant'] },
+      { nome: 'Base de dados', items: ['PostgreSQL', 'Supabase', 'Redis', 'Qdrant'] },
     ]
   },
   {
     id: 'storage',
-    titulo: 'Storage Patterns',
+    titulo: 'Padrões de armazenamento',
     emoji: '🗄️',
     categorias: [
       { nome: 'Browser', items: ['localStorage', 'sessionStorage', 'IndexedDB', 'Cookies'] },
-      { nome: 'Cache', items: ['Redis', 'CDN Edge Cache', 'Service Worker', 'Memory Cache'] },
-      { nome: 'Cloud', items: ['Object Storage (S3)', 'Supabase Storage', 'R2 Cloudflare'] },
-      { nome: 'Database', items: ['SQL (relacional)', 'NoSQL (documentos)', 'Vector DB (Qdrant)'] },
+      { nome: 'Cache', items: ['Redis', 'Cache CDN edge', 'Service Worker', 'Cache em memória'] },
+      { nome: 'Cloud', items: ['Armazenamento de objectos (S3)', 'Supabase Storage', 'R2 Cloudflare'] },
+      { nome: 'Base de dados', items: ['SQL (relacional)', 'NoSQL (documentos)', 'Base vectorial (Qdrant)'] },
     ]
   },
   {
     id: 'backend-api',
-    titulo: 'Backend Architecture',
+    titulo: 'Arquitectura Backend',
     emoji: '⚙️',
     categorias: [
-      { nome: 'Camadas', items: ['Routes', 'Controllers', 'Services', 'Repositories'] },
-      { nome: 'Middleware', items: ['Auth JWT', 'Rate Limiting', 'CORS', 'Logging'] },
+      { nome: 'Camadas', items: ['Rotas', 'Controladores', 'Serviços', 'Repositórios'] },
+      { nome: 'Middleware', items: ['Autenticação JWT', 'Limitação de pedidos', 'CORS', 'Registos'] },
       { nome: 'Schemas', items: ['Validação entrada', 'DTOs', 'OpenAPI/Swagger'] },
-      { nome: 'Boas práticas', items: ['Stateless sessions', 'Filas async', 'Background jobs', 'Load test antes de lançar'] },
+      { nome: 'Boas práticas', items: ['Sessões sem estado', 'Filas assíncronas', 'Jobs em segundo plano', 'Teste de carga antes de lançar'] },
     ]
   },
   {
     id: 'rag',
-    titulo: 'RAG Patterns',
+    titulo: 'Padrões RAG',
     emoji: '🧠',
     categorias: [
-      { nome: 'Tipos', items: ['Traditional RAG', 'Adaptive RAG', 'Agentic RAG', 'Hybrid RAG'] },
-      { nome: 'Técnicas', items: ['Reranker', 'Sub-question decomposition', 'RAG + CAG', 'HyDE'] },
-      { nome: 'Pipeline', items: ['Chunk → Embed → Store → Retrieve → Augment → Generate'] },
+      { nome: 'Tipos', items: ['RAG tradicional', 'RAG adaptativo', 'RAG agentivo', 'RAG híbrido'] },
+      { nome: 'Técnicas', items: ['Reranker', 'Decomposição em subperguntas', 'RAG + CAG', 'HyDE'] },
+      { nome: 'Pipeline', items: ['Fragmentar → Embedding → Guardar → Recuperar → Aumentar → Gerar'] },
       { nome: 'No Córtex', items: ['Qdrant (planeado F5-01)', 'Memória entre sessões (F5-02)'] },
     ]
   },
@@ -51,31 +51,31 @@ const BLUEPRINTS = [
     emoji: '🤖',
     categorias: [
       { nome: 'Tipos', items: ['LLM (texto)', 'VLM (visão+texto)', 'SLM (pequenos)', 'MLM (multimodal)'] },
-      { nome: 'Arquitectura', items: ['MoE (Mixture of Experts)', 'LCM (Large Concept)', 'LAM (Action)', 'SAM (Segment)'] },
+      { nome: 'Arquitectura', items: ['MoE (mistura de especialistas)', 'LCM (conceitos largos)', 'LAM (acção)', 'SAM (segmentação)'] },
       { nome: 'No Córtex', items: ['DeepSeek-R1', 'Gemini Flash', 'Llama 4 Scout', 'Nemotron 70B', 'Mistral Small', 'Claude Sonnet'] },
-      { nome: 'Routing', items: ['Por complexidade (routerDecide)', 'Por tipo tarefa', 'Por custo/latência'] },
+      { nome: 'Routing', items: ['Por complexidade (routerDecide)', 'Por tipo de tarefa', 'Por custo/latência'] },
     ]
   },
   {
     id: 'multi-agent',
-    titulo: 'Multi-Agent Patterns',
+    titulo: 'Padrões multiagente',
     emoji: '🐺',
     categorias: [
-      { nome: 'Padrões', items: ['Council Pattern (actual)', 'Pipeline (série)', 'Router (routerDecide)', 'Reflection (auto-crítica)'] },
-      { nome: 'Orchestration', items: ['Orchestrator + Subagents', 'Peer-to-peer', 'Hierarchical', 'Blackboard'] },
-      { nome: 'Comunicação', items: ['Shared context (debate)', 'Tool calls', 'Memory shared', 'Event-driven'] },
-      { nome: 'No Córtex', items: ['5 lobos paralelos', 'Ronda 1 + Ronda 2', 'Juiz Claude', 'Score consenso'] },
+      { nome: 'Padrões', items: ['Padrão de conselho (actual)', 'Pipeline (série)', 'Router (routerDecide)', 'Reflexão (auto-crítica)'] },
+      { nome: 'Orquestração', items: ['Orquestrador + subagentes', 'Par-a-par', 'Hierárquico', 'Quadro partilhado'] },
+      { nome: 'Comunicação', items: ['Contexto partilhado (debate)', 'Chamadas de ferramentas', 'Memória partilhada', 'Orientado por eventos'] },
+      { nome: 'No Córtex', items: ['5 lobos paralelos', 'Ronda 1 + Ronda 2', 'Juiz Claude', 'Pontuação de consenso'] },
     ]
   },
   {
     id: 'prompting',
-    titulo: 'Prompting Techniques',
+    titulo: 'Técnicas de prompting',
     emoji: '💬',
     categorias: [
-      { nome: 'Básico', items: ['Zero-shot', 'Few-shot (exemplos)', 'System vs User prompt', 'Role prompting'] },
-      { nome: 'Avançado', items: ['Chain-of-Thought (CoT)', 'Tree of Thoughts (ToT)', 'ReAct', 'Self-consistency'] },
-      { nome: 'No Córtex', items: ['System prompt por lobe', 'Contexto debate ronda1→2', 'Citações inline [Lobe X]'] },
-      { nome: 'Anti-patterns', items: ['Prompt injection', 'Jailbreak', 'Prompt leaking', 'Context overflow'] },
+      { nome: 'Básico', items: ['Zero-shot', 'Few-shot (exemplos)', 'Prompt de sistema vs utilizador', 'Prompt por papel'] },
+      { nome: 'Avançado', items: ['Chain-of-Thought (CoT)', 'Tree of Thoughts (ToT)', 'ReAct', 'Auto-consistência'] },
+      { nome: 'No Córtex', items: ['Prompt de sistema por lobo', 'Contexto debate ronda1→2', 'Citações inline [Lobo X]'] },
+      { nome: 'Anti-padrões', items: ['Injecção de prompt', 'Jailbreak', 'Fuga de prompt', 'Excesso de contexto'] },
     ]
   },
   {
@@ -83,15 +83,15 @@ const BLUEPRINTS = [
     titulo: 'Checklist Lançamento',
     emoji: '🚀',
     categorias: [
-      { nome: 'Performance', items: ['Load test (k6/Artillery)', 'Bundle size < 500kb', 'Lazy imports', 'CDN activo'] },
-      { nome: 'Segurança', items: ['Rate limiting', 'Input sanitization', 'CORS configurado', 'Keys no .env'] },
-      { nome: 'UX', items: ['Mobile-first testado', 'Error states visíveis', 'Loading states', 'Empty states'] },
-      { nome: 'Backend', items: ['Sessões stateless', 'Uploads em object storage', 'Filas para jobs longos', 'Logs estruturados'] },
+      { nome: 'Performance', items: ['Teste de carga (k6/Artillery)', 'Bundle < 500kb', 'Imports preguiçosos', 'CDN activo'] },
+      { nome: 'Segurança', items: ['Limitação de pedidos', 'Sanitização de input', 'CORS configurado', 'Chaves no .env'] },
+      { nome: 'UX', items: ['Mobile-first testado', 'Estados de erro visíveis', 'Estados de carregamento', 'Estados vazios'] },
+      { nome: 'Backend', items: ['Sessões sem estado', 'Uploads em armazenamento de objectos', 'Filas para jobs longos', 'Registos estruturados'] },
     ]
   },
   {
     id: 'openrouter',
-    titulo: 'OpenRouter Features',
+    titulo: 'Funcionalidades OpenRouter',
     emoji: '🔌',
     categorias: [
       {
@@ -99,8 +99,8 @@ const BLUEPRINTS = [
         items: [
           'file-parser PDF (cloudflare-ai grátis)',
           'response-healing (Rei — non-streaming)',
-          'web_search server tool (Analista + Generalista)',
-          'fusion fallback (Rei — pago, só em falha)',
+          'web_search como ferramenta de servidor (Analista + Generalista)',
+          'reserva Fusion (Rei — pago, só em falha)',
         ]
       },
       {
@@ -117,8 +117,8 @@ const BLUEPRINTS = [
       {
         nome: 'Obsoleto — não usar',
         items: [
-          'plugin { id: web } → usar server tool',
-          'sufixo :online → usar tools array',
+          'plugin { id: web } → usar ferramenta de servidor',
+          'sufixo :online → usar array tools',
           'pdfjs-dist → usar file-parser plugin',
           'Tavily → usar openrouter:web_search',
         ]
@@ -129,7 +129,7 @@ const BLUEPRINTS = [
           'Todos os lobos via OpenRouter (1 key)',
           'Rei com response-healing activo',
           'PDF sem bundle extra (cloudflare-ai)',
-          'Web search grátis via server tool',
+          'Pesquisa web via ferramenta de servidor',
         ]
       },
     ]

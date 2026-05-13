@@ -68,7 +68,7 @@ Processo:
 1. Desmonta a pergunta — premissas ocultas, evidências
    frágeis, riscos técnicos e éticos, pontos de rutura.
 2. Usa lógica fria. Frases curtas. Perguntas incómodas.
-3. Ronda 2: reage explicitamente a cada lobe pelo nome.
+3. Ronda 2: reage explicitamente a cada lobo pelo nome.
    Aponta contradições, excesso de optimismo ou falta
    de rigor. Reconhece argumentos sólidos sem hesitar.
 Regra hard: nunca usas 'pode ser que' sem evidência.
@@ -139,7 +139,7 @@ PT-PT. Máx 130 palavras.`,
 export function getBaseURL(provider) {
   if (provider === 'openrouter') return 'https://openrouter.ai/api/v1';
   if (provider === 'nim') return '/api/nim-proxy';
-  throw new Error(`Provider desconhecido: ${provider}`);
+  throw new Error(`Fornecedor desconhecido: ${provider}`);
 }
 
 function lerEnv(nome) {
@@ -210,7 +210,7 @@ function opcoesGeracaoLobe(lobe, options = {}) {
   return Number.isFinite(Number(temperatura)) ? { temperature: Number(temperatura) } : {};
 }
 
-// Lobos que usam web search via OpenRouter server tool.
+// Lobos que usam web search via ferramenta de servidor OpenRouter.
 // ATENÇÃO: cada chamada com web search tem custo ~$0.02 (via Exa),
 // mesmo nos modelos :free. Activa apenas onde dados externos são críticos.
 const LOBOS_COM_WEB_SEARCH = new Set([1, 4]); // Analista Crítico + Generalista Contextual
@@ -287,7 +287,7 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
     throw new Error(dados.error?.message || dados.error || `HTTP ${resposta.status}`);
   }
 
-  // Quando web search está activo, a resposta pode conter tool_calls em vez de content directo.
+  // Quando web search está activo, a resposta pode conter chamadas de ferramenta em vez de conteúdo directo.
   const texto =
     dados.choices?.[0]?.message?.content ||
     dados.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ||

@@ -3,8 +3,8 @@ import { useState } from "react";
 const initialTasks = [
   {
     id: "1",
-    title: "Research Project Requirements",
-    description: "Gather all necessary information about project scope and requirements",
+    title: "Recolher requisitos do projecto",
+    description: "Reunir a informação necessária sobre o âmbito e os requisitos do projecto",
     status: "in-progress",
     priority: "high",
     level: 0,
@@ -12,34 +12,34 @@ const initialTasks = [
     subtasks: [
       {
         id: "1.1",
-        title: "Interview stakeholders",
-        description: "Conduct interviews with key stakeholders to understand needs",
+        title: "Entrevistar intervenientes",
+        description: "Fazer entrevistas aos principais intervenientes para compreender necessidades",
         status: "completed",
         priority: "high",
-        tools: ["communication-agent", "meeting-scheduler"],
+        tools: ["agente-comunicacao", "agendador-reunioes"],
       },
       {
         id: "1.2",
-        title: "Review existing documentation",
-        description: "Go through all available documentation and extract requirements",
+        title: "Rever documentação existente",
+        description: "Analisar a documentação disponível e extrair requisitos",
         status: "in-progress",
         priority: "medium",
-        tools: ["file-system", "browser"],
+        tools: ["sistema-ficheiros", "navegador"],
       },
       {
         id: "1.3",
-        title: "Compile findings report",
-        description: "Create a comprehensive report of all gathered information",
+        title: "Compilar relatório de conclusões",
+        description: "Criar um relatório abrangente com a informação recolhida",
         status: "need-help",
         priority: "medium",
-        tools: ["file-system", "markdown-processor"],
+        tools: ["sistema-ficheiros", "processador-markdown"],
       },
     ],
   },
   {
     id: "2",
-    title: "Design System Architecture",
-    description: "Create the overall system architecture based on requirements",
+    title: "Desenhar arquitectura do sistema",
+    description: "Criar a arquitectura global do sistema com base nos requisitos",
     status: "in-progress",
     priority: "high",
     level: 0,
@@ -47,34 +47,34 @@ const initialTasks = [
     subtasks: [
       {
         id: "2.1",
-        title: "Define component structure",
-        description: "Map out all required components and their interactions",
+        title: "Definir estrutura de componentes",
+        description: "Mapear todos os componentes necessários e as suas interacções",
         status: "pending",
         priority: "high",
-        tools: ["architecture-planner", "diagramming-tool"],
+        tools: ["planeador-arquitectura", "ferramenta-diagramas"],
       },
       {
         id: "2.2",
-        title: "Create data flow diagrams",
-        description: "Design diagrams showing how data will flow through the system",
+        title: "Criar diagramas de fluxo de dados",
+        description: "Desenhar diagramas que mostram como os dados circulam pelo sistema",
         status: "pending",
         priority: "medium",
-        tools: ["diagramming-tool", "file-system"],
+        tools: ["ferramenta-diagramas", "sistema-ficheiros"],
       },
       {
         id: "2.3",
-        title: "Document API specifications",
-        description: "Write detailed specifications for all APIs in the system",
+        title: "Documentar especificações das APIs",
+        description: "Escrever especificações detalhadas para todas as APIs do sistema",
         status: "pending",
         priority: "high",
-        tools: ["api-designer", "openapi-generator"],
+        tools: ["desenhador-api", "gerador-openapi"],
       },
     ],
   },
   {
     id: "3",
-    title: "Implementation Planning",
-    description: "Create a detailed plan for implementing the system",
+    title: "Planear implementação",
+    description: "Criar um plano detalhado para implementar o sistema",
     status: "pending",
     priority: "medium",
     level: 1,
@@ -82,34 +82,34 @@ const initialTasks = [
     subtasks: [
       {
         id: "3.1",
-        title: "Resource allocation",
-        description: "Determine required resources and allocate them to tasks",
+        title: "Alocar recursos",
+        description: "Determinar os recursos necessários e distribuí-los pelas tarefas",
         status: "pending",
         priority: "medium",
-        tools: ["project-manager", "resource-calculator"],
+        tools: ["gestor-projecto", "calculadora-recursos"],
       },
       {
         id: "3.2",
-        title: "Timeline development",
-        description: "Create a timeline with milestones and deadlines",
+        title: "Desenvolver cronograma",
+        description: "Criar um cronograma com marcos e prazos",
         status: "pending",
         priority: "high",
-        tools: ["timeline-generator", "gantt-chart-creator"],
+        tools: ["gerador-cronograma", "criador-gantt"],
       },
       {
         id: "3.3",
-        title: "Risk assessment",
-        description: "Identify potential risks and develop mitigation strategies",
+        title: "Avaliar riscos",
+        description: "Identificar riscos potenciais e criar estratégias de mitigação",
         status: "pending",
         priority: "medium",
-        tools: ["risk-analyzer"],
+        tools: ["analisador-risco"],
       },
     ],
   },
   {
     id: "4",
-    title: "Development Environment Setup",
-    description: "Set up all necessary tools and environments for development",
+    title: "Preparar ambiente de desenvolvimento",
+    description: "Configurar todas as ferramentas e ambientes necessários ao desenvolvimento",
     status: "in-progress",
     priority: "high",
     level: 0,
@@ -117,34 +117,34 @@ const initialTasks = [
     subtasks: [
       {
         id: "4.1",
-        title: "Install development tools",
-        description: "Set up IDEs, version control, and other necessary development tools",
+        title: "Instalar ferramentas de desenvolvimento",
+        description: "Configurar IDEs, controlo de versões e outras ferramentas necessárias",
         status: "pending",
         priority: "high",
-        tools: ["shell", "package-manager"],
+        tools: ["shell", "gestor-pacotes"],
       },
       {
         id: "4.2",
-        title: "Configure CI/CD pipeline",
-        description: "Set up continuous integration and deployment pipelines",
+        title: "Configurar pipeline CI/CD",
+        description: "Configurar pipelines de integração e deploy contínuos",
         status: "pending",
         priority: "medium",
         tools: ["github-actions", "gitlab-ci", "jenkins-connector"],
       },
       {
         id: "4.3",
-        title: "Set up testing framework",
-        description: "Configure automated testing frameworks for the project",
+        title: "Configurar framework de testes",
+        description: "Configurar ferramentas de teste automatizado para o projecto",
         status: "pending",
         priority: "high",
-        tools: ["test-runner", "shell"],
+        tools: ["executor-testes", "shell"],
       },
     ],
   },
   {
     id: "5",
-    title: "Initial Development Sprint",
-    description: "Execute the first development sprint based on the plan",
+    title: "Sprint inicial de desenvolvimento",
+    description: "Executar a primeira sprint de desenvolvimento com base no plano",
     status: "pending",
     priority: "medium",
     level: 1,
@@ -152,27 +152,27 @@ const initialTasks = [
     subtasks: [
       {
         id: "5.1",
-        title: "Implement core features",
-        description: "Develop the essential features identified in the requirements",
+        title: "Implementar funcionalidades nucleares",
+        description: "Desenvolver as funcionalidades essenciais identificadas nos requisitos",
         status: "pending",
         priority: "high",
-        tools: ["code-assistant", "github", "file-system", "shell"],
+        tools: ["assistente-codigo", "github", "sistema-ficheiros", "shell"],
       },
       {
         id: "5.2",
-        title: "Perform unit testing",
-        description: "Create and execute unit tests for implemented features",
+        title: "Executar testes unitários",
+        description: "Criar e executar testes unitários para as funcionalidades implementadas",
         status: "pending",
         priority: "medium",
-        tools: ["test-runner", "code-coverage-analyzer"],
+        tools: ["executor-testes", "analisador-cobertura"],
       },
       {
         id: "5.3",
-        title: "Document code",
-        description: "Create documentation for the implemented code",
+        title: "Documentar código",
+        description: "Criar documentação para o código implementado",
         status: "pending",
         priority: "low",
-        tools: ["documentation-generator", "markdown-processor"],
+        tools: ["gerador-documentacao", "processador-markdown"],
       },
     ],
   },
@@ -182,35 +182,35 @@ const STATUS_SEQUENCE = ["completed", "in-progress", "pending", "need-help", "fa
 
 const STATUS_META = {
   completed: {
-    label: "completed",
+    label: "concluído",
     symbol: "✓",
     color: "#22c55e",
     bg: "rgba(34, 197, 94, 0.14)",
     border: "rgba(34, 197, 94, 0.28)",
   },
   "in-progress": {
-    label: "in-progress",
+    label: "em curso",
     symbol: "◌",
     color: "#3b82f6",
     bg: "rgba(59, 130, 246, 0.14)",
     border: "rgba(59, 130, 246, 0.28)",
   },
   "need-help": {
-    label: "need-help",
+    label: "precisa de ajuda",
     symbol: "!",
     color: "#eab308",
     bg: "rgba(234, 179, 8, 0.14)",
     border: "rgba(234, 179, 8, 0.28)",
   },
   failed: {
-    label: "failed",
+    label: "falhou",
     symbol: "×",
     color: "#ef4444",
     bg: "rgba(239, 68, 68, 0.14)",
     border: "rgba(239, 68, 68, 0.28)",
   },
   pending: {
-    label: "pending",
+    label: "pendente",
     symbol: "",
     color: "var(--text, #8a8aa0)",
     bg: "var(--social-bg, rgba(148, 163, 184, 0.12))",
@@ -735,7 +735,7 @@ export default function AgentPlan() {
   return (
     <div className="agent-plan">
       <style>{agentPlanStyles}</style>
-      <section className="agent-plan__card" aria-label="Agent plan">
+      <section className="agent-plan__card" aria-label="Plano do agente">
         <ul className="agent-plan__list">
           {tasks.map((task) => {
             const isExpanded = expandedTasks.includes(task.id);
@@ -752,8 +752,8 @@ export default function AgentPlan() {
                     type="button"
                     className="agent-plan__status-button"
                     onClick={() => toggleTaskStatus(task.id)}
-                    aria-label={`Change status for ${task.title}`}
-                    title={`Status: ${task.status}`}
+                    aria-label={`Alterar estado de ${task.title}`}
+                    title={`Estado: ${getStatusMeta(task.status).label}`}
                   >
                     <StatusIcon status={task.status} />
                   </button>
@@ -773,7 +773,7 @@ export default function AgentPlan() {
 
                     <span className="agent-plan__meta">
                       {task.dependencies.length > 0 && (
-                        <span className="agent-plan__deps" aria-label="Dependencies">
+                        <span className="agent-plan__deps" aria-label="Dependências">
                           {task.dependencies.map((dependency) => (
                             <span className="agent-plan__chip" key={dependency}>
                               {dependency}
@@ -811,8 +811,8 @@ export default function AgentPlan() {
                                 type="button"
                                 className="agent-plan__status-button"
                                 onClick={() => toggleSubtaskStatus(task.id, subtask.id)}
-                                aria-label={`Change status for ${subtask.title}`}
-                                title={`Status: ${subtask.status}`}
+                                aria-label={`Alterar estado de ${subtask.title}`}
+                                title={`Estado: ${getStatusMeta(subtask.status).label}`}
                               >
                                 <StatusIcon status={subtask.status} small />
                               </button>
@@ -844,7 +844,7 @@ export default function AgentPlan() {
                               <p className="agent-plan__description">{subtask.description}</p>
                               {subtask.tools?.length > 0 && (
                                 <div className="agent-plan__tools-wrap">
-                                  <span className="agent-plan__tools-label">MCP Servers:</span>
+                                  <span className="agent-plan__tools-label">Servidores MCP:</span>
                                   <span className="agent-plan__tools">
                                     {subtask.tools.map((tool) => (
                                       <span className="agent-plan__chip" key={tool}>

@@ -25,7 +25,7 @@ const LobeCard = React.memo(function LobeCard({
   const textoParcial = textosParciais?.[streamKey] || textosParciais?.[l.id] || "";
   const respostaVisivel = textoParcial || l.result || "";
   const corLobe = l.color || l.cor || "#10b981";
-  const nomeLobe = l.label || l.nome || l.id || "Lobe";
+  const nomeLobe = l.label || l.nome || l.id || "Lobo";
 
   return (
     <div
@@ -156,7 +156,7 @@ const LobeCard = React.memo(function LobeCard({
             );
             try {
               const mem = buildMem(brain);
-              const r = await invoke(l.id, P[l.id]?.(mem, q) || `Answer: ${q}`, q);
+              const r = await invoke(l.id, P[l.id]?.(mem, q) || `Resposta: ${q}`, q);
               setMsgs((prev) =>
                 prev.map((msg) => {
                   if (msg.id !== m.id) return msg;
@@ -193,7 +193,7 @@ const LobeCard = React.memo(function LobeCard({
             }
             setPhase(null);
           }}
-          title="Regenerar lobe"
+          title="Regenerar lobo"
           style={{
             width: 28,
             height: 28,
@@ -222,7 +222,7 @@ const LobeCard = React.memo(function LobeCard({
         }}
       >
         {l.isErr && (
-          <AlertaBanner tipo="erro" mensagem={`${nomeLobe} falhou — a usar fallback quando disponível.`} />
+          <AlertaBanner tipo="erro" mensagem={`${nomeLobe} falhou — a usar reserva quando disponível.`} />
         )}
 
         {l.regenerating || (!respostaVisivel && aStreaming) ? (

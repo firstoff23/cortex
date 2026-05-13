@@ -6,7 +6,7 @@ function valorLobe(item) {
   if (item.status === "fulfilled") return item.value;
   if (item.status === "rejected") {
     return {
-      nome: "Lobe indisponível",
+      nome: "Lobo indisponível",
       resposta: item.reason?.message || "Falha ao obter resposta.",
     };
   }
@@ -77,7 +77,7 @@ function RondaSection({ titulo, lobos, defaultOpen }) {
                   marginBottom: "4px",
                 }}
               >
-                {lobe.nome || `Lobe ${idx + 1}`}
+                {lobe.nome || `Lobo ${idx + 1}`}
               </strong>
               <p
                 style={{

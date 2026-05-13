@@ -1,6 +1,6 @@
 import React from "react";
 
-// LobeLoader.jsx — loader pequeno por lobe, só com CSS nativo.
+// LobeLoader.jsx — indicador pequeno por lobo, só com CSS nativo.
 export default function LobeLoader({ cor = "var(--accent, #10b981)", texto = "A pensar...", tamanho = 24 }) {
   return (
     <div

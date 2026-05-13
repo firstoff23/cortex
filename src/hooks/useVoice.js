@@ -25,7 +25,7 @@ export async function falarTexto(texto, opcoes = {}) {
     return audio
 
   } catch (erro) {
-    // Fallback para Web Speech API nativa
+    // Reserva para Web Speech API nativa
     console.warn('[TTS] OpenRouter falhou, usando SpeechSynthesis:', erro)
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(texto)
@@ -72,7 +72,7 @@ export async function ouvirMicrofone(setInput, setAviso) {
     return;
   }
 
-  // Fallback para OpenRouter Whisper
+  // Reserva para OpenRouter Whisper
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
@@ -98,7 +98,7 @@ export async function ouvirMicrofone(setInput, setAviso) {
     mediaRecorder.start();
     if (setAviso) setAviso("A ouvir (fala agora...)", "info");
     
-    // Pára automaticamente após 5 segundos para simplificar UX (já que não há toggle stop na UI original)
+    // Pára automaticamente após 5 segundos para simplificar a UX (não há botão de parar na UI original)
     setTimeout(() => {
       if (mediaRecorder.state === 'recording') mediaRecorder.stop();
     }, 5000);

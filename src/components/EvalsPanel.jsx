@@ -29,7 +29,7 @@ export default function EvalsPanel({ onClose }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
-          <strong style={{ fontSize: "0.95rem" }}>Evals</strong>
+          <strong style={{ fontSize: "0.95rem" }}>Avaliações</strong>
           <button
             onClick={onClose}
             style={{

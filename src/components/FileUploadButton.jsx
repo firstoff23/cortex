@@ -1,11 +1,11 @@
-// FileUploadButton.jsx — botão de upload com drag-and-drop e clique
+// FileUploadButton.jsx — botão de carregamento com arrastar-e-largar e clique
 import { useRef, useState } from 'react';
 
-// Extensões aceites pelo input file
+// Extensões aceites pelo input de ficheiro
 const ACCEPT = '.pdf,.docx,.txt,.md,.csv,.xlsx,.mp3,.wav';
 
 /**
- * Botão de upload de ficheiros com drag-and-drop.
+ * Botão de carregamento de ficheiros com arrastar-e-largar.
  * Usa CSS variables do projecto (sem Tailwind).
  * @param {{ onFicheiro: (File) => void, ficheiro: object|null, erro: string|null, onLimpar: () => void }} props
  */
@@ -29,7 +29,7 @@ export default function FileUploadButton({ onFicheiro, ficheiro, erro, onLimpar 
   function aoEscolher(e) {
     const file = e.target.files?.[0];
     processar(file);
-    // Limpar input para permitir re-upload do mesmo ficheiro
+    // Limpar input para permitir novo carregamento do mesmo ficheiro
     e.target.value = '';
   }
 
@@ -62,7 +62,7 @@ export default function FileUploadButton({ onFicheiro, ficheiro, erro, onLimpar 
       onDragLeave={() => setDrag(false)}
       onDrop={aoSoltar}
     >
-      {/* Input file escondido */}
+      {/* Input de ficheiro escondido */}
       <input
         ref={inputRef}
         type="file"

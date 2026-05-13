@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 
-// SidePanel.jsx — painel lateral direito com overlay e ESC.
+// SidePanel.jsx — painel lateral direito com sobreposição e ESC.
 export default function SidePanel({ aberto, onFechar, titulo, children, largura }) {
   useEffect(() => {
     if (!aberto) return undefined;

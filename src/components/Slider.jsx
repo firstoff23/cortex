@@ -1,6 +1,6 @@
 import React from "react";
 
-// Slider.jsx — range nativo para configuração por lobe.
+// Slider.jsx — controlo nativo de intervalo para configuração por lobo.
 export default function Slider({
   valor = 0.7,
   onChange,

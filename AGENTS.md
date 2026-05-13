@@ -133,6 +133,7 @@
 - ✅ TTS: OpenRouter /api/v1/audio/speech (openai/gpt-4o-mini-tts-2025-12-15) — Botão 🔊 no veredicto do Rei
 - ✅ Fallback de modelos — FEITO (array models por lobe)
 - ✅ STT fallback — FEITO (OpenRouter Whisper via api/stt.js)
+- ✅ F4-08 Multilinguismo PT-PT — FEITO
 - Persistência real com Supabase (substituir localStorage)
 - Conectores on-demand: Obsidian, Notion (ElevenLabs substituído por OpenRouter TTS)
 - Cloudflare: DNS + WAF + rate limiting + Turnstile

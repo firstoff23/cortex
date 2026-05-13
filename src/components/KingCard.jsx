@@ -347,14 +347,14 @@ const KingCard = React.memo(function KingCard({
           <div style={{ marginTop: -4, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <input
               type="password"
-              placeholder="Notion Integration Token"
+              placeholder="Token de integração Notion"
               value={notionToken}
               onChange={(e) => setNotionToken(e.target.value)}
               style={estiloInput}
             />
             <input
               type="text"
-              placeholder="Page ID"
+              placeholder="ID da página"
               value={notionPageId}
               onChange={(e) => setNotionPageId(e.target.value)}
               style={estiloInput}

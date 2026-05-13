@@ -80,13 +80,13 @@ const JudgeCard = React.memo(function JudgeCard({ judge, T = {}, compact = false
               {judge.nome || judge.juiz}
             </div>
             <div style={{ color: T.tf || "var(--text)", fontSize: 9 }}>
-              {judge.cache ? "cache" : judge.sucesso === false ? "fallback" : "avaliado"}
+              {judge.cache ? "em cache" : judge.sucesso === false ? "reserva" : "avaliado"}
             </div>
           </div>
         </div>
 
         <div
-          title={`Score ${pct}%`}
+          title={`Pontuação ${pct}%`}
           style={{
             width: compact ? 32 : 38,
             height: compact ? 32 : 38,

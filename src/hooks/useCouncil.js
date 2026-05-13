@@ -3,6 +3,7 @@ import { callOpenRouter, OR_MODELS } from "../lib/openrouter.js";
 import { calcularConsensoMatematico, runJudges } from "../api/judges.js";
 import { runKing } from "../api/king.js";
 import {
+  LOBOS,
   runDebate as runDebateApi,
   runDebateStream as runDebateStreamApi,
 } from "../api/council.js";
@@ -154,7 +155,8 @@ export default function useCouncil(msgs, setMsgs) {
       const isTimeout = /timeout/i.test(errMsg);
       if (isTimeout) toast?.(id + ": tempo esgotado", "error");
       else toast?.(id + ": " + errMsg.slice(0, 80));
-      return { result: "[Erro em " + id + "]", model: id, real: false };
+      const nomeLobe = LOBOS.find((lobe) => String(lobe.id) === String(id))?.nome || id;
+      return { result: `[Erro em ${nomeLobe}: ${errMsg || "serviço indisponível"}]`, model: id, real: false };
     } finally {
       if (controllersRef.current.get(id) === ctrl) controllersRef.current.delete(id);
     }
@@ -290,7 +292,7 @@ export default function useCouncil(msgs, setMsgs) {
     nextLobeResults
       .filter((l) => l.isErr)
       .slice(0, 2)
-      .forEach((l) => toast?.(`Lobe ${l.label || l.id} falhou — a usar fallback`, "aviso"));
+      .forEach((l) => toast?.(`Lobo ${l.label || l.id} falhou — a usar reserva`, "aviso"));
 
     const consenso = calcularConsensoMatematico(nextLobeResults);
     const juizesActivos = getJuizesParaPergunta(q);
@@ -350,7 +352,7 @@ export default function useCouncil(msgs, setMsgs) {
       const validLobes = nextLobeResults.filter((l) => !l.isErr && l.result?.length > 10);
       if (hC || hP)
         cR = await callClaude(
-          "Executive judge of a multi-AI council brain.",
+          "Juiz executivo de um cérebro de conselho multi-IA.",
           P.cortex(mem, q, validLobes.length ? validLobes : nextLobeResults),
           5400,
           keys.claude,
@@ -377,7 +379,7 @@ export default function useCouncil(msgs, setMsgs) {
     } else {
       try {
         cDecision = await callClaude(
-          "Judge of an 11-lobe AI council.",
+          "Juiz de um conselho de IA com 11 lobos.",
           P.judge(q, nextLobeResults),
           80,
           keys.claude,
@@ -391,7 +393,7 @@ export default function useCouncil(msgs, setMsgs) {
     const aMsg = {
       id: Date.now() + Math.random(),
       role: "assistant",
-      // Garante fallback quando o Córtex não devolve JSON estruturado.
+      // Garante reserva quando o Córtex não devolve JSON estruturado.
       content: (structured?.final || cR || "").trim(),
       structured,
       council,
