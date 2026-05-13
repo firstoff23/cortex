@@ -72,21 +72,21 @@ const MessageList = React.memo(function MessageList({
                   : null
               }
             >
-              {m.content}
               {m.anexo?.previewUrl && (
                 <img
                   src={m.anexo.previewUrl}
-                  alt={m.anexo.nome || "Imagem anexada"}
+                  alt="Imagem anexada"
                   style={{
                     display: "block",
-                    marginTop: 10,
                     maxWidth: "100%",
-                    maxHeight: 180,
-                    borderRadius: 10,
+                    maxHeight: 200,
+                    borderRadius: 8,
+                    marginBottom: 8,
                     objectFit: "cover",
                   }}
                 />
               )}
+              {m.content}
               {m.anexo && !m.anexo.previewUrl && (
                 <div
                   style={{

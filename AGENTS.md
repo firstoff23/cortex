@@ -35,6 +35,7 @@
 - Web search: `openrouter:web_search` server tool — activo em Analista Crítico (id=1) + Generalista (id=4); max_results 3, localização PT; custo ~$0.02/request via Exa; Rei não usa
 - Response Healing: plugin `{ id: "response-healing" }` activo no Rei via OpenRouter — corrige JSON malformado; Rei não usa streaming (non-streaming obrigatório para o plugin)
 - Rei fallback: `openrouter/fusion` (pago, Claude Opus + GPT) — activa apenas quando Llama 3.3 falha ou devolve vazio
+- F4-01 Upload imagens multimodal: ✅ FEITO — imagens seguem por `image_url` via OpenRouter content array; `imageDataUrl` é transitório, não persistido em histórico/localStorage; preview nativo aparece no chat
 - Upload de PDF remoto: Substituído `pdfjs-dist` (local) pelo OpenRouter `file-parser` plugin (`cloudflare-ai` engine) enviado em Base64 — reduz ~500kb do bundle size
 - Memória em `localStorage` (migração para Supabase planeada)
 - Constante de versão: `const MV = "cortex-v12"` no topo do ficheiro
@@ -62,7 +63,7 @@
 - `useCouncil.js` = orquestração do council, debate, juízes e Rei
 - `useStreaming.js` = estado parcial por lobe durante streaming SSE
 - `useAutoResize.js` = auto-resize do input principal do chat
-- `useFileUpload.js` = F4-02 upload universal com extracção de texto e previews
+- `useFileUpload.js` = F4-02 upload universal com extracção de texto, previews e `imageDataUrl` transitório para F4-01
 
 ## Componentes
 
@@ -92,6 +93,7 @@
 
 - ✅ Streaming SSE em `council.js` e chat — FEITO
 - ✅ Feature 19: chips de sugestões rápidas do Rei — FEITO
+- ✅ F4-01 Upload imagens multimodal — FEITO (`image_url` via OpenRouter content array; preview imagem no chat; `imageDataUrl` não persistido)
 - ✅ F4-02 Upload Universal — FEITO (`useFileUpload.js`, `FileUpload.jsx`)
 - ✅ Blueprints/Mapas — FEITO (`BlueprintsPanel.jsx`)
 - ✅ Routing/API keys — FEITO (`/api/chat` para OpenRouter, `/api/nim-proxy` para NIM)

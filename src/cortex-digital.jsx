@@ -839,6 +839,7 @@ function removerFicheiroAnexado() {
 
 async function send(query) {
   const q = (query || input).trim();
+  const imagemDataUrlEnvio = ficheiroAnexado?.imageDataUrl || null;
   const anexoUpload = ficheiroAnexado
     ? {
         nome: ficheiroAnexado.nome,
@@ -853,7 +854,7 @@ async function send(query) {
   if (ficheiroAnexado?.conteudo) {
     qComFicheiro = `[Ficheiro: ${ficheiroAnexado.nome}]\n[Conteúdo]:\n${ficheiroAnexado.conteudo.slice(0, 12000)}\n\nPergunta do utilizador: ${q}`;
   } else if (ficheiroAnexado?.previewUrl) {
-    qComFicheiro = `[Imagem: ${ficheiroAnexado.nome}]\n[Preview URL]: ${ficheiroAnexado.previewUrl}\n\nPergunta do utilizador: ${q}`;
+    qComFicheiro = `[Imagem anexada: ${ficheiroAnexado.nome}]\n\nPergunta do utilizador: ${q}`;
   }
   setFicheiroAnexado(null);
 
@@ -861,6 +862,7 @@ async function send(query) {
     input,
     displayQuery: q,
     anexoUpload,
+    imageDataUrl: imagemDataUrlEnvio,
     setInput,
     classifyQuery,
     saveMsgs,

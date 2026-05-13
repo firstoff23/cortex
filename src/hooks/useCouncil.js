@@ -203,6 +203,7 @@ export default function useCouncil(msgs, setMsgs) {
       streaming,
       displayQuery,
       anexoUpload,
+      imageDataUrl,
     } = ctx;
 
     const q = (query || input).trim();
@@ -275,6 +276,7 @@ export default function useCouncil(msgs, setMsgs) {
       debateResultado = await runDebateStream(qFinal, modoExecucao, {
         lobos: councilLobes,
         temperaturas,
+        imageDataUrl,
         onToken: streaming?.onToken,
       });
     } finally {

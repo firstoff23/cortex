@@ -496,7 +496,10 @@ describe('F4-02 integração no Cortex', () => {
 
     assert.match(fonte, /m\.anexo\?\.previewUrl/);
     assert.match(fonte, /<img/);
-    assert.match(fonte, /maxHeight: 180/);
+    assert.match(fonte, /alt="Imagem anexada"/);
+    assert.match(fonte, /maxHeight: 200/);
+    assert.match(fonte, /borderRadius: 8/);
+    assert.match(fonte, /marginBottom: 8/);
     assert.match(fonte, /objectFit: "cover"/);
   });
 });
@@ -624,5 +627,105 @@ describe('Prompts modulares — runtime e Rei', () => {
     assert.match(promptRei, /meta-llama\/llama-3\.3-70b-instruct:free/);
     assert.match(promptRei, /src\/api\/king\.js/);
     assert.doesNotMatch(promptRei, /Claude 3\.7 Sonnet|claude-3\.7-sonnet|Anthropic API|Opus 4\.7/i);
+  });
+});
+
+// ── Teste 23: F4-01 imagens multimodais via OpenRouter ──────
+describe('F4-01 imagens multimodais', () => {
+  it('useFileUpload extrai imageDataUrl sem persistir só o object URL', () => {
+    const fonte = readFileSync(new URL('../src/hooks/useFileUpload.js', import.meta.url), 'utf8');
+
+    assert.match(fonte, /function arrayBufferParaBase64/);
+    assert.match(fonte, /const CHUNK = 8192/);
+    assert.match(fonte, /async function extrairImagem/);
+    assert.match(fonte, /imageDataUrl: `data:\$\{tipo\};base64,\$\{base64\}`/);
+    assert.match(fonte, /const \[imageDataUrl, setImageDataUrl\] = useState\(null\)/);
+    assert.match(fonte, /setImageDataUrl\(extraido\.imageDataUrl \|\| null\)/);
+    assert.match(fonte, /imageDataUrl: novoFicheiro\.imageDataUrl/);
+    assert.match(fonte, /setImageDataUrl\(null\)/);
+  });
+
+  it('chamarLobe envia content array com text + image_url', async () => {
+    const { chamarLobe } = await import('../src/api/council.js');
+    const fetchAnterior = global.fetch;
+    const imagem = 'data:image/png;base64,abc123';
+    let body = null;
+
+    global.fetch = async (url, init) => {
+      assert.equal(url, '/api/chat');
+      body = JSON.parse(init.body);
+      return new Response(
+        JSON.stringify({ content: 'imagem analisada' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    };
+
+    try {
+      const resultado = await chamarLobe(
+        { id: 2, nome: 'Inovador Criativo', modelo: 'google/gemma-3-12b-it:free', provider: 'openrouter' },
+        'Descreve a imagem',
+        null,
+        { imageDataUrl: imagem },
+      );
+
+      assert.equal(resultado.resposta, 'imagem analisada');
+      assert.deepEqual(body.messages[0].content, [
+        { type: 'text', text: 'Descreve a imagem' },
+        { type: 'image_url', image_url: { url: imagem } },
+      ]);
+    } finally {
+      global.fetch = fetchAnterior;
+    }
+  });
+
+  it('runDebate e runDebateStream passam imagem só na ronda 1', async () => {
+    const { runDebate, runDebateStream } = await import('../src/api/council.js');
+    const imagem = 'data:image/jpeg;base64,xyz';
+    const lobos = [
+      { id: 2, nome: 'Inovador Criativo', modelo: 'google/gemma-3-12b-it:free', provider: 'openrouter' },
+    ];
+    const chamadasDebate = [];
+    const chamadasStream = [];
+
+    await runDebate('Pergunta com imagem', 'debate', {
+      lobos,
+      imageDataUrl: imagem,
+      chamarLobe: async (lobe, pergunta, contextoDebate, options = {}) => {
+        chamadasDebate.push({ contextoDebate, imageDataUrl: options.imageDataUrl });
+        return { id: lobe.id, nome: lobe.nome, resposta: contextoDebate ? 'ronda 2' : 'ronda 1' };
+      },
+    });
+
+    await runDebateStream('Pergunta com imagem', 'debate', {
+      lobos,
+      imageDataUrl: imagem,
+      chamarLobeStream: async (lobe, pergunta, contextoDebate, options = {}) => {
+        chamadasStream.push({ contextoDebate, imageDataUrl: options.imageDataUrl });
+        return { id: lobe.id, nome: lobe.nome, resposta: contextoDebate ? 'stream 2' : 'stream 1' };
+      },
+      chamarLobe: async () => {
+        throw new Error('fallback não devia ser chamado');
+      },
+    });
+
+    assert.equal(chamadasDebate[0].imageDataUrl, imagem);
+    assert.equal(chamadasDebate[1].imageDataUrl, undefined);
+    assert.equal(chamadasStream[0].imageDataUrl, imagem);
+    assert.equal(chamadasStream[1].imageDataUrl, undefined);
+    assert.ok(chamadasDebate[1].contextoDebate.includes('[Inovador Criativo]'));
+    assert.ok(chamadasStream[1].contextoDebate.includes('[Inovador Criativo]'));
+  });
+
+  it('useCouncil e Cortex encaminham imageDataUrl sem o guardar no histórico', () => {
+    const fonteCouncil = readFileSync(new URL('../src/hooks/useCouncil.js', import.meta.url), 'utf8');
+    const fonteCortex = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+    const blocoAnexo = fonteCortex.match(/const anexoUpload = ficheiroAnexado[\s\S]*?: null;/)?.[0] || '';
+
+    assert.match(fonteCouncil, /imageDataUrl,/);
+    assert.match(fonteCouncil, /runDebateStream\(qFinal, modoExecucao, \{[\s\S]*imageDataUrl,/);
+    assert.match(fonteCortex, /const imagemDataUrlEnvio = ficheiroAnexado\?\.imageDataUrl \|\| null/);
+    assert.match(fonteCortex, /imageDataUrl: imagemDataUrlEnvio/);
+    assert.doesNotMatch(blocoAnexo, /imageDataUrl/);
+    assert.doesNotMatch(fonteCortex, /Preview URL/);
   });
 });

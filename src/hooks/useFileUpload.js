@@ -21,19 +21,33 @@ async function lerComoArrayBuffer(file) {
   return await file.arrayBuffer();
 }
 
-// Extrai texto de PDF via OpenRouter file-parser plugin (cloudflare-ai).
-// Elimina a dependência local pdfjs-dist (~500kb bundle).
-// As anotações da resposta são devolvidas para cache pelo chamador.
-async function extrairPdfViaOpenRouter(file) {
-  const buffer = await file.arrayBuffer();
-  // btoa com chunks para evitar stack overflow em PDFs grandes
+function arrayBufferParaBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   let binStr = '';
   const CHUNK = 8192;
   for (let i = 0; i < bytes.length; i += CHUNK) {
     binStr += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
   }
-  const base64 = btoa(binStr);
+  return btoa(binStr);
+}
+
+async function extrairImagem(file) {
+  const tipo = file.type || 'image/jpeg';
+  const base64 = arrayBufferParaBase64(await file.arrayBuffer());
+  return {
+    conteudo: null,
+    imageDataUrl: `data:${tipo};base64,${base64}`,
+    previewUrl: URL.createObjectURL(file),
+    tipo,
+  };
+}
+
+// Extrai texto de PDF via OpenRouter file-parser plugin (cloudflare-ai).
+// Elimina a dependência local pdfjs-dist (~500kb bundle).
+// As anotações da resposta são devolvidas para cache pelo chamador.
+async function extrairPdfViaOpenRouter(file) {
+  const buffer = await file.arrayBuffer();
+  const base64 = arrayBufferParaBase64(buffer);
   const dataUrl = `data:application/pdf;base64,${base64}`;
 
   const resposta = await fetch('/api/chat', {
@@ -87,7 +101,7 @@ async function extrairConteudo(file) {
   const tipo = file.type || '';
 
   if (tipo.startsWith('image/')) {
-    return { conteudo: null, previewUrl: URL.createObjectURL(file) };
+    return extrairImagem(file);
   }
   if (tipo === 'application/pdf' || ext === 'pdf') {
     const { texto, anotacoes } = await extrairPdfViaOpenRouter(file);
@@ -107,6 +121,7 @@ async function extrairConteudo(file) {
 
 export function useFileUpload({ onUpload } = {}) {
   const [ficheiro, setFicheiro] = useState(null);
+  const [imageDataUrl, setImageDataUrl] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [erro, setErro] = useState(null);
   const [anotacoesPDF, setAnotacoesPDF] = useState({});
@@ -128,14 +143,16 @@ export function useFileUpload({ onUpload } = {}) {
     try {
       const extraido = await extrairConteudo(file);
       if (extraido.previewUrl) previewUrlRef.current = extraido.previewUrl;
+      setImageDataUrl(extraido.imageDataUrl || null);
 
       const novoFicheiro = {
         nome: file.name,
-        tipo: file.type || extensao(file),
+        tipo: extraido.tipo || file.type || extensao(file),
         tamanho: file.size,
         conteudo: extraido.conteudo ?? null,
         texto: extraido.conteudo ?? null,
         previewUrl: extraido.previewUrl || null,
+        imageDataUrl: extraido.imageDataUrl || null,
       };
 
       setFicheiro(novoFicheiro);
@@ -149,10 +166,12 @@ export function useFileUpload({ onUpload } = {}) {
         tamanho: novoFicheiro.tamanho,
         conteudo: novoFicheiro.conteudo,
         previewUrl: novoFicheiro.previewUrl,
+        imageDataUrl: novoFicheiro.imageDataUrl,
       });
     } catch (err) {
       setErro(err.message || 'Erro ao processar ficheiro.');
       setFicheiro(null);
+      setImageDataUrl(null);
     }
   }, [libertarPreview, onUpload]);
 
@@ -189,6 +208,7 @@ export function useFileUpload({ onUpload } = {}) {
   const handleRemove = useCallback(() => {
     libertarPreview();
     setFicheiro(null);
+    setImageDataUrl(null);
     setErro(null);
   }, [libertarPreview]);
 
@@ -198,6 +218,7 @@ export function useFileUpload({ onUpload } = {}) {
 
   return {
     ficheiro,
+    imageDataUrl,
     erro,
     isDragging,
     inputRef,

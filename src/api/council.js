@@ -156,6 +156,15 @@ Reage agora mantendo a tua personalidade.
 Cita os outros lobos pelo nome.`;
 }
 
+function construirConteudoUtilizador(pergunta, contextoDebate, imageDataUrl) {
+  const texto = mensagemUtilizador(pergunta, contextoDebate);
+  if (!imageDataUrl) return texto;
+  return [
+    { type: 'text', text: texto },
+    { type: 'image_url', image_url: { url: imageDataUrl } },
+  ];
+}
+
 function normalizarRespostaLobe(lobe, resposta, contextoDebate) {
   let texto = String(resposta || '').trim();
   if (contextoDebate && lobe.id === 5 && !/A questão que ninguém fez/i.test(texto)) {
@@ -191,7 +200,8 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
   if (!apiKey) throw new Error(`API key ausente para ${lobe.provider}`);
 
   const system = SYSTEM_PROMPTS[lobe.id];
-  const messages = [{ role: 'user', content: mensagemUtilizador(pergunta, contextoDebate) }];
+  const userContent = construirConteudoUtilizador(pergunta, contextoDebate, options.imageDataUrl);
+  const messages = [{ role: 'user', content: userContent }];
   const geracao = opcoesGeracaoLobe(lobe, options);
   const webSearchTools = LOBOS_COM_WEB_SEARCH.has(lobe.id) && lobe.provider === 'openrouter'
     ? {
@@ -279,7 +289,7 @@ export async function chamarLobeStream(lobe, pergunta, contextoDebate = null, op
       ...opcoesGeracaoLobe(lobe, options),
       messages: [
         { role: 'system', content: SYSTEM_PROMPTS[lobe.id] },
-        { role: 'user', content: mensagemUtilizador(pergunta, contextoDebate) },
+        { role: 'user', content: construirConteudoUtilizador(pergunta, contextoDebate, options.imageDataUrl) },
       ],
       max_tokens:
         options.max_tokens ||
@@ -341,6 +351,7 @@ async function chamarComMapa(lobe, pergunta, contextoDebate, mapa, chamar, optio
     const valor = await chamar(lobe, pergunta, contextoDebate, {
       signal: ctrl.signal,
       ...opcoesGeracaoLobe(lobe, options),
+      ...(options.imageDataUrl ? { imageDataUrl: options.imageDataUrl } : {}),
     });
     return normalizarValorLobe(lobe, valor, contextoDebate);
   } finally {
@@ -352,9 +363,11 @@ export async function runDebate(pergunta, modo = 'paralelo', options = {}) {
   const lobos = options.lobos || LOBOS;
   const chamar = options.chamarLobe || chamarLobe;
   const ronda1Map = new Map();
+  const { imageDataUrl, ...optionsSemImagem } = options;
+  const optionsRonda1 = imageDataUrl ? { ...optionsSemImagem, imageDataUrl } : optionsSemImagem;
 
   const ronda1 = await Promise.allSettled(
-    lobos.map((lobe) => chamarComMapa(lobe, pergunta, null, ronda1Map, chamar, options))
+    lobos.map((lobe) => chamarComMapa(lobe, pergunta, null, ronda1Map, chamar, optionsRonda1))
   );
 
   if (modo === 'paralelo') return { ronda1 };
@@ -366,7 +379,7 @@ export async function runDebate(pergunta, modo = 'paralelo', options = {}) {
 
   const ronda2Map = new Map();
   const ronda2 = await Promise.allSettled(
-    lobos.map((lobe) => chamarComMapa(lobe, pergunta, contextoDebate, ronda2Map, chamar, options))
+    lobos.map((lobe) => chamarComMapa(lobe, pergunta, contextoDebate, ronda2Map, chamar, optionsSemImagem))
   );
 
   return { ronda1, ronda2 };
@@ -382,10 +395,12 @@ async function chamarStreamComFallback(lobe, pergunta, contextoDebate, chamarStr
       signal: ctrl.signal,
       onToken,
       ...geracao,
+      ...(options.imageDataUrl ? { imageDataUrl: options.imageDataUrl } : {}),
     }).catch(() =>
       chamarFallback(lobe, pergunta, contextoDebate, {
         signal: ctrl.signal,
         ...geracao,
+        ...(options.imageDataUrl ? { imageDataUrl: options.imageDataUrl } : {}),
       }),
     );
   } finally {
@@ -397,10 +412,12 @@ export async function runDebateStream(pergunta, modo = 'paralelo', options = {})
   const lobos = options.lobos || LOBOS;
   const chamarStream = options.chamarLobeStream || chamarLobeStream;
   const chamarFallback = options.chamarLobe || chamarLobe;
+  const { imageDataUrl, ...optionsSemImagem } = options;
+  const optionsRonda1 = imageDataUrl ? { ...optionsSemImagem, imageDataUrl } : optionsSemImagem;
 
   const ronda1 = await Promise.allSettled(
     lobos.map((lobe) =>
-      chamarStreamComFallback(lobe, pergunta, null, chamarStream, chamarFallback, options.onToken, options)
+      chamarStreamComFallback(lobe, pergunta, null, chamarStream, chamarFallback, options.onToken, optionsRonda1)
     )
   );
 
@@ -420,7 +437,7 @@ export async function runDebateStream(pergunta, modo = 'paralelo', options = {})
         chamarStream,
         chamarFallback,
         options.onToken,
-        options
+        optionsSemImagem
       )
     )
   );
