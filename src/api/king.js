@@ -241,6 +241,39 @@ function normalizarResultadoRei(parseado, consensoMatematico, scoreJuizesMedio, 
   };
 }
 
+// FALLBACK PAGO — só em falha do Rei principal.
+// Fusion usa Claude Opus + GPT internamente; activa apenas quando Llama 3.3 falha ou devolve vazio.
+const JUIZ_FALLBACK = {
+  modelo: "openrouter/fusion",
+  provider: "openrouter",
+};
+
+async function chamarModeloRei(modelo, contexto, abortSignal) {
+  // response-healing corrige JSON malformado automaticamente (OpenRouter plugin).
+  // NÃO adicionar stream:true — response-healing exige non-streaming.
+  const resposta = await fetch("/api/chat", {
+    method: "POST",
+    signal: abortSignal,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: modelo,
+      system: SYSTEM_REI,
+      messages: [{ role: "user", content: contexto }],
+      plugins: [{ id: "response-healing" }],
+      response_format: { type: "json_object" },
+      max_tokens: 1500,
+    }),
+  });
+
+  const dados = await lerJsonResposta(resposta);
+  if (!resposta.ok || dados.error) throw new Error(dados.error || `HTTP ${resposta.status}`);
+
+  const textoRei = dados.choices?.[0]?.message?.content || dados.content || "";
+  const parseado = extrairJson(textoRei);
+  if (!parseado) throw new Error("Rei não devolveu JSON válido");
+  return parseado;
+}
+
 export async function runKing(
   pergunta,
   respostasLobos,
@@ -257,28 +290,14 @@ export async function runKing(
     );
     const scoreJuizesMedio = scoreMedioJuizes(veredictoJuizes);
 
-    // response-healing corrige JSON malformado automaticamente (OpenRouter plugin).
-    // NÃO adicionar stream:true — response-healing exige non-streaming.
-    const resposta = await fetch("/api/chat", {
-      method: "POST",
-      signal: abortSignal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: JUIZ_REI.modelo,
-        system: SYSTEM_REI,
-        messages: [{ role: "user", content: contexto }],
-        plugins: [{ id: "response-healing" }],
-        response_format: { type: "json_object" },
-        max_tokens: 1500,
-      }),
-    });
-
-    const dados = await lerJsonResposta(resposta);
-    if (!resposta.ok || dados.error) throw new Error(dados.error || `HTTP ${resposta.status}`);
-
-    const textoRei = dados.choices?.[0]?.message?.content || dados.content || "";
-    const parseado = extrairJson(textoRei);
-    if (!parseado) throw new Error("Rei não devolveu JSON válido");
+    let parseado;
+    try {
+      parseado = await chamarModeloRei(JUIZ_REI.modelo, contexto, abortSignal);
+    } catch (errPrimario) {
+      if (errPrimario.name === "AbortError") throw errPrimario;
+      // FALLBACK PAGO — só em falha do modelo principal.
+      parseado = await chamarModeloRei(JUIZ_FALLBACK.modelo, contexto, abortSignal);
+    }
 
     return normalizarResultadoRei(
       parseado,

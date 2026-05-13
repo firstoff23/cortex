@@ -596,7 +596,7 @@ describe('Prompts modulares — runtime e Rei', () => {
     assert.match(fonteKing, /modelo: "meta-llama\/llama-3\.3-70b-instruct:free"/);
     assert.match(fonteKing, /provider: "openrouter"/);
     assert.match(fonteKing, /fetch\("\/api\/chat"/);
-    assert.match(fonteKing, /model: JUIZ_REI\.modelo/);
+    assert.match(fonteKing, /chamarModeloRei\(JUIZ_REI\.modelo/);
     assert.doesNotMatch(fonteKing, /claude-3\.7-sonnet|Anthropic API|Opus 4\.7/i);
   });
 
