@@ -181,6 +181,11 @@ function opcoesGeracaoLobe(lobe, options = {}) {
   return Number.isFinite(Number(temperatura)) ? { temperature: Number(temperatura) } : {};
 }
 
+// Lobos que usam web search via OpenRouter server tool.
+// ATENÇÃO: cada chamada com web search tem custo ~$0.02 (via Exa),
+// mesmo nos modelos :free. Activa apenas onde dados externos são críticos.
+const LOBOS_COM_WEB_SEARCH = new Set([1, 4]); // Analista Crítico + Generalista Contextual
+
 export async function chamarLobe(lobe, pergunta, contextoDebate = null, options = {}) {
   const apiKey = getAPIKey(lobe.provider);
   if (!apiKey) throw new Error(`API key ausente para ${lobe.provider}`);
@@ -188,9 +193,13 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
   const system = SYSTEM_PROMPTS[lobe.id];
   const messages = [{ role: 'user', content: mensagemUtilizador(pergunta, contextoDebate) }];
   const geracao = opcoesGeracaoLobe(lobe, options);
+  const webSearchTools = LOBOS_COM_WEB_SEARCH.has(lobe.id) && lobe.provider === 'openrouter'
+    ? { tools: [{ type: 'openrouter:web_search' }] }
+    : {};
+
   const body =
     lobe.provider === 'openrouter'
-      ? { model: lobe.modelo, system, messages, max_tokens: options.max_tokens || 420, ...geracao }
+      ? { model: lobe.modelo, system, messages, max_tokens: options.max_tokens || 420, ...geracao, ...webSearchTools }
       : {
           model: lobe.modelo,
           messages: [
@@ -223,7 +232,12 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
     throw new Error(dados.error?.message || dados.error || `HTTP ${resposta.status}`);
   }
 
-  const texto = dados.choices?.[0]?.message?.content || dados.content || '';
+  // Quando web search está activo, a resposta pode conter tool_calls em vez de content directo.
+  const texto =
+    dados.choices?.[0]?.message?.content ||
+    dados.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ||
+    dados.content ||
+    '';
   return normalizarValorLobe(lobe, { resposta: texto }, contextoDebate);
 }
 

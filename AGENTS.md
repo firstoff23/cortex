@@ -32,6 +32,7 @@
   | Advogado do Diabo | `qwen/qwen3-14b:free` |
   | **Rei** | `meta-llama/llama-3.3-70b-instruct:free` |
 - Streaming SSE no council/chat: ✅ FEITO (`chamarLobeStream`, `runDebateStream`)
+- Web search: `openrouter:web_search` server tool — activo em Analista Crítico (id=1) + Generalista (id=4); custo ~$0.02/request via Exa; Rei não usa
 - Memória em `localStorage` (migração para Supabase planeada)
 - Constante de versão: `const MV = "cortex-v12"` no topo do ficheiro
 
@@ -97,6 +98,7 @@
 - ✅ Side panels — FEITO (Histórico, Blueprints, Modo Forense)
 - ✅ Modelos :free rápidos — FEITO (timeout 28s, 4 lobos substituídos 2026-05-13)
 - ✅ Fix parser Rei — FEITO (`choices[0].message.content` em `king.js`)
+- ✅ Web search — FEITO (`openrouter:web_search` em lobos 1+4, parser tool_calls, custo ~$0.02/req)
 - Persistência real com Supabase (substituir localStorage)
 - Conectores on-demand: Tavily, ElevenLabs, Obsidian, Notion
 - Cloudflare: DNS + WAF + rate limiting + Turnstile
