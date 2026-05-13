@@ -14,6 +14,7 @@ import useCouncil from './hooks/useCouncil';
 import { useAutoResize } from "./hooks/useAutoResize.js";
 import { useI18n } from "./hooks/useI18n.js";
 import { useStreaming } from "./hooks/useStreaming.js";
+import { ouvirMicrofone } from "./hooks/useVoice.js";
 import { LOBOS, runDebate, chamarRei, runDebateStream as runDebateStreamApi } from "./api/council.js";
 
 const MV="cortex-v12";
@@ -1722,13 +1723,8 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
   <div style={{display:"flex",gap:3,alignItems:"flex-end",flexShrink:0}}>
     {msgs.filter(m=>m.role==="user").length>0&&!phase&&
       <button onClick={regenerate} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title={t.chat.regenerate}>↺</button>}
-    <button onClick={()=>{
-      if(!("webkitSpeechRecognition" in window||"SpeechRecognition" in window)){toast(t.toasts.voiceUnsupported,"error");return;}
-      const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-      const sr=new SR();sr.lang=speechLang;sr.interimResults=false;sr.maxAlternatives=1;
-      sr.onresult=e=>{const t=e.results[0][0].transcript;setInput(p=>p?p+" "+t:t);};
-      sr.onerror=()=>toast(t.toasts.voiceError,"error");
-      sr.start();
+    <button onClick={() => {
+      ouvirMicrofone(setInput, (msg, type) => toast(msg, type));
     }} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.7}} onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0.7"} title={t.chat.voice}>🎙</button>
         {msgs.length>0&&
       <button onClick={exportConv} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.gemini;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title={t.chat.export}>↓</button>}

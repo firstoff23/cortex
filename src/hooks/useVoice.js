@@ -35,3 +35,75 @@ export async function falarTexto(texto, opcoes = {}) {
     }
   }
 }
+
+export async function transcreverWhisper(audioBlob) {
+  const buffer = await audioBlob.arrayBuffer()
+  const base64 = btoa(
+    String.fromCharCode(...new Uint8Array(buffer))
+  )
+
+  const resposta = await fetch('/api/stt', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      audio: base64,
+      formato: 'webm',
+      idioma: 'pt'
+    })
+  })
+
+  const dados = await resposta.json()
+  return dados.text || ''
+}
+
+export async function ouvirMicrofone(setInput, setAviso) {
+  if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const sr = new SR();
+    sr.lang = 'pt-PT';
+    sr.interimResults = false;
+    sr.maxAlternatives = 1;
+    sr.onresult = e => {
+      const t = e.results[0][0].transcript;
+      setInput(p => p ? p + " " + t : t);
+    };
+    sr.onerror = () => setAviso && setAviso("Erro na voz", "error");
+    sr.start();
+    return;
+  }
+
+  // Fallback para OpenRouter Whisper
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    const audioChunks = [];
+
+    mediaRecorder.ondataavailable = event => {
+      if (event.data.size > 0) audioChunks.push(event.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      if (setAviso) setAviso("A transcrever...", "info");
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      try {
+        const text = await transcreverWhisper(audioBlob);
+        if (text) setInput(p => p ? p + " " + text : text);
+      } catch (e) {
+        if (setAviso) setAviso("Erro ao transcrever com Whisper", "error");
+      } finally {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+
+    mediaRecorder.start();
+    if (setAviso) setAviso("A ouvir (fala agora...)", "info");
+    
+    // Pára automaticamente após 5 segundos para simplificar UX (já que não há toggle stop na UI original)
+    setTimeout(() => {
+      if (mediaRecorder.state === 'recording') mediaRecorder.stop();
+    }, 5000);
+
+  } catch (err) {
+    if (setAviso) setAviso("Acesso ao microfone negado", "error");
+  }
+}

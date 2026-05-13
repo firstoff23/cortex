@@ -107,6 +107,8 @@
 - ✅ Fix parser Rei — FEITO (`choices[0].message.content` em `king.js`)
 - ✅ Web search — FEITO (`openrouter:web_search` em lobos 1+4, parser tool_calls, custo ~$0.02/req)
 - ✅ TTS: OpenRouter /api/v1/audio/speech (openai/gpt-4o-mini-tts-2025-12-15) — Botão 🔊 no veredicto do Rei
+- ✅ Fallback de modelos — FEITO (array models por lobe)
+- ✅ STT fallback — FEITO (OpenRouter Whisper via api/stt.js)
 - Persistência real com Supabase (substituir localStorage)
 - Conectores on-demand: Tavily, Obsidian, Notion
 - Cloudflare: DNS + WAF + rate limiting + Turnstile

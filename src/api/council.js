@@ -6,21 +6,33 @@ export const LOBOS = [
   {
     id: 1,
     nome: 'Analista Crítico',
-    modelo: 'qwen/qwen3-next-80b-a3b-instruct:free',
+    modelo: 'deepseek/deepseek-r1-distill-llama-70b:free',
+    fallbacks: [
+      'meta-llama/llama-3.1-8b-instruct:free',
+      'qwen/qwen3-14b:free'
+    ],
     provider: 'openrouter',
     cor: '#ef4444',
   },
   {
     id: 2,
     nome: 'Inovador Criativo',
-    modelo: 'google/gemma-4-31b-it:free',
+    modelo: 'google/gemma-3-12b-it:free',
+    fallbacks: [
+      'meta-llama/llama-3.1-8b-instruct:free',
+      'qwen/qwen3-14b:free'
+    ],
     provider: 'openrouter',
     cor: '#22c55e',
   },
   {
     id: 3,
     nome: 'Pragmático Técnico',
-    modelo: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+    modelo: 'microsoft/phi-4-reasoning-plus:free',
+    fallbacks: [
+      'meta-llama/llama-3.1-8b-instruct:free',
+      'qwen/qwen3-14b:free'
+    ],
     provider: 'openrouter',
     cor: '#3b82f6',
   },
@@ -28,13 +40,21 @@ export const LOBOS = [
     id: 4,
     nome: 'Generalista Contextual',
     modelo: 'openai/gpt-oss-120b:free',
+    fallbacks: [
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'qwen/qwen3-14b:free'
+    ],
     provider: 'openrouter',
     cor: '#eab308',
   },
   {
     id: 5,
     nome: 'Advogado do Diabo',
-    modelo: 'nousresearch/hermes-3-llama-3.1-405b:free',
+    modelo: 'qwen/qwen3-14b:free',
+    fallbacks: [
+      'meta-llama/llama-3.1-8b-instruct:free',
+      'google/gemma-3-12b-it:free'
+    ],
     provider: 'openrouter',
     cor: '#6b7280',
   },
@@ -229,7 +249,7 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
 
   const body =
     lobe.provider === 'openrouter'
-      ? { model: lobe.modelo, system, messages, max_tokens: options.max_tokens || 420, ...geracao, ...lobeTools }
+      ? { model: lobe.modelo, models: lobe.fallbacks ? [lobe.modelo, ...lobe.fallbacks] : undefined, system, messages, max_tokens: options.max_tokens || 420, ...geracao, ...lobeTools }
       : {
           model: lobe.modelo,
           messages: [
@@ -293,6 +313,7 @@ export async function chamarLobeStream(lobe, pergunta, contextoDebate = null, op
     },
     body: JSON.stringify({
       model: lobe.modelo,
+      models: lobe.fallbacks ? [lobe.modelo, ...lobe.fallbacks] : undefined,
       stream: true,
       ...opcoesGeracaoLobe(lobe, options),
       messages: [
