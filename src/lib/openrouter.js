@@ -109,7 +109,7 @@ export async function callOpenRouter(
 
     // ✅ ALTERAÇÃO 2 — remove CoT visível do Qwen e outros
     const cleaned = text
-      .replace(/<think>[sS]*?</think>/g, "")
+      .replace(\/<think>[\s\S]*?</think>/g, "")
       .trim();
     return cleaned;
 
