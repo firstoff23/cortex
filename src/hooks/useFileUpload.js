@@ -21,23 +21,50 @@ async function lerComoArrayBuffer(file) {
   return await file.arrayBuffer();
 }
 
-async function extrairPdf(file) {
-  const pdfjs = await import('pdfjs-dist');
-  if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.min.mjs',
-      import.meta.url,
-    ).toString();
+// Extrai texto de PDF via OpenRouter file-parser plugin (cloudflare-ai).
+// Elimina a dependência local pdfjs-dist (~500kb bundle).
+// As anotações da resposta são devolvidas para cache pelo chamador.
+async function extrairPdfViaOpenRouter(file) {
+  const buffer = await file.arrayBuffer();
+  // btoa com chunks para evitar stack overflow em PDFs grandes
+  const bytes = new Uint8Array(buffer);
+  let binStr = '';
+  const CHUNK = 8192;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binStr += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
   }
+  const base64 = btoa(binStr);
+  const dataUrl = `data:application/pdf;base64,${base64}`;
 
-  const pdf = await pdfjs.getDocument({ data: await lerComoArrayBuffer(file) }).promise;
-  const partes = [];
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber);
-    const content = await page.getTextContent();
-    partes.push(content.items.map((item) => item.str || '').join(' '));
-  }
-  return partes.join('\n\n').trim();
+  const resposta = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'meta-llama/llama-3.3-70b-instruct:free',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Extrai todo o texto deste PDF. Devolve só o texto, sem comentários.',
+            },
+            {
+              type: 'file',
+              file: { filename: file.name, file_data: dataUrl },
+            },
+          ],
+        },
+      ],
+      plugins: [{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }],
+      max_tokens: 4000,
+    }),
+  });
+
+  const dados = await resposta.json();
+  const texto = dados.choices?.[0]?.message?.content || '';
+  const anotacoes = dados.choices?.[0]?.message?.annotations ?? null;
+  return { texto, anotacoes };
 }
 
 async function extrairDocx(file) {
@@ -62,7 +89,10 @@ async function extrairConteudo(file) {
   if (tipo.startsWith('image/')) {
     return { conteudo: null, previewUrl: URL.createObjectURL(file) };
   }
-  if (tipo === 'application/pdf' || ext === 'pdf') return { conteudo: await extrairPdf(file) };
+  if (tipo === 'application/pdf' || ext === 'pdf') {
+    const { texto, anotacoes } = await extrairPdfViaOpenRouter(file);
+    return { conteudo: texto, anotacoes };
+  }
   if (ext === 'docx') return { conteudo: await extrairDocx(file) };
   if (tipo === 'text/plain' || ext === 'txt' || ext === 'md') {
     return { conteudo: (await lerComoTexto(file)).trim() };
@@ -79,6 +109,7 @@ export function useFileUpload({ onUpload } = {}) {
   const [ficheiro, setFicheiro] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [erro, setErro] = useState(null);
+  const [anotacoesPDF, setAnotacoesPDF] = useState({});
   const inputRef = useRef(null);
   const previewUrlRef = useRef(null);
 
@@ -108,6 +139,10 @@ export function useFileUpload({ onUpload } = {}) {
       };
 
       setFicheiro(novoFicheiro);
+      // Guarda anotações do PDF para reutilização sem re-parsear
+      if (extraido.anotacoes) {
+        setAnotacoesPDF((prev) => ({ ...prev, [file.name]: extraido.anotacoes }));
+      }
       onUpload?.({
         nome: novoFicheiro.nome,
         tipo: novoFicheiro.tipo,
@@ -174,6 +209,7 @@ export function useFileUpload({ onUpload } = {}) {
     handleDragEnter,
     handleDragLeave,
     handleRemove,
+    anotacoesPDF,
     carregar: processar,
     limpar: handleRemove,
   };

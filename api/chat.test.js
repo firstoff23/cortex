@@ -1,4 +1,4 @@
-// api/chat.test.js — testes F4-02 Upload Universal
+﻿// api/chat.test.js — testes F4-02 Upload Universal
 // Corre com: node --experimental-vm-modules node_modules/.bin/jest api/chat.test.js
 // (ou: npx vitest run api/chat.test.js)
 
@@ -441,14 +441,16 @@ describe('F4-02 useFileUpload universal', () => {
     assert.match(fonte, /URL\.revokeObjectURL/);
   });
 
-  it('carrega pdfjs-dist, mammoth e xlsx por import dinâmico', () => {
+  it('usa OpenRouter file-parser para PDF e imports dinamicos para mammoth/xlsx', () => {
     const fonte = readFileSync(new URL('../src/hooks/useFileUpload.js', import.meta.url), 'utf8');
 
-    assert.match(fonte, /import\(['"]pdfjs-dist/);
+    assert.match(fonte, /extrairPdfViaOpenRouter/);
+    assert.match(fonte, /file-parser/);
+    assert.match(fonte, /cloudflare-ai/);
+    assert.doesNotMatch(fonte, /import\(['"]pdfjs-dist/);
     assert.match(fonte, /import\(['"]mammoth['"]\)/);
     assert.match(fonte, /import\(['"]xlsx['"]\)/);
-    assert.match(fonte, /\[áudio: processamento pendente\]/);
-    assert.doesNotMatch(fonte, /from ['"]pdfjs-dist/);
+    assert.match(fonte, /AUDIO_PLACEHOLDER/);
     assert.doesNotMatch(fonte, /from ['"]mammoth['"]/);
     assert.doesNotMatch(fonte, /from ['"]xlsx['"]/);
   });
