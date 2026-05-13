@@ -254,7 +254,11 @@ async function chamarModeloRei(modelo, contexto, abortSignal) {
   const resposta = await fetch("/api/chat", {
     method: "POST",
     signal: abortSignal,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-OpenRouter-Cache": "true",
+      "X-OpenRouter-Cache-TTL": "600",
+    },
     body: JSON.stringify({
       model: modelo,
       system: SYSTEM_REI,
@@ -266,6 +270,9 @@ async function chamarModeloRei(modelo, contexto, abortSignal) {
   });
 
   const dados = await lerJsonResposta(resposta);
+  const cacheStatus = resposta.headers?.get("X-OpenRouter-Cache-Status");
+  if (cacheStatus) console.log(`[Cache] Rei (${modelo}): ${cacheStatus}`);
+
   if (!resposta.ok || dados.error) throw new Error(dados.error || `HTTP ${resposta.status}`);
 
   const textoRei = dados.choices?.[0]?.message?.content || dados.content || "";

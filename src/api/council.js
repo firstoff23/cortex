@@ -247,6 +247,8 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
     signal: options.signal,
     headers: {
       'Content-Type': 'application/json',
+      'X-OpenRouter-Cache': contextoDebate ? 'false' : 'true',
+      'X-OpenRouter-Cache-TTL': '300',
       ...(lobe.provider !== 'nim' &&
         apiKey !== 'proxy-gerido-pelo-servidor' && {
           Authorization: `Bearer ${apiKey}`,
@@ -258,6 +260,9 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
   });
 
   const dados = await lerJsonResposta(resposta);
+  const cacheStatus = resposta.headers?.get('X-OpenRouter-Cache-Status');
+  if (cacheStatus) console.log(`[Cache] ${lobe.nome}: ${cacheStatus}`);
+
   if (!resposta.ok || dados.error) {
     throw new Error(dados.error?.message || dados.error || `HTTP ${resposta.status}`);
   }

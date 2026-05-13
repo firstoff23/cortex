@@ -40,7 +40,7 @@ async function lerJsonSeguro(upstream) {
   }
 }
 
-async function chamarOpenRouterUmaVez(model, payload, apiKey) {
+async function chamarOpenRouterUmaVez(model, payload, apiKey, customHeaders) {
   const upstream = await fetch(OPENROUTER_URL, {
     method: "POST",
     headers: {
@@ -48,6 +48,7 @@ async function chamarOpenRouterUmaVez(model, payload, apiKey) {
       Authorization: `Bearer ${apiKey}`,
       "HTTP-Referer": PROD_ORIGIN,
       "X-Title": "Córtex Digital",
+      ...customHeaders
     },
     body: JSON.stringify({ ...payload, model }),
   });
@@ -55,11 +56,12 @@ async function chamarOpenRouterUmaVez(model, payload, apiKey) {
   return {
     status: upstream.status,
     ok: upstream.ok,
+    cacheStatus: upstream.headers.get("X-OpenRouter-Cache-Status"),
     dados: await lerJsonSeguro(upstream),
   };
 }
 
-async function chamarOpenRouter({ model, system, messages, max_tokens }) {
+async function chamarOpenRouter({ model, system, messages, max_tokens, customHeaders, ...rest }) {
   const apiKey = lerOpenRouterKey();
   if (!apiKey) {
     return {
@@ -71,6 +73,7 @@ async function chamarOpenRouter({ model, system, messages, max_tokens }) {
   const payload = {
     max_tokens: max_tokens || 420,
     messages: system ? [{ role: "system", content: system }, ...messages] : messages,
+    ...rest
   };
 
   // Modelos gratuitos costumam desaparecer; o proxy tenta alternativas no servidor.
@@ -81,15 +84,17 @@ async function chamarOpenRouter({ model, system, messages, max_tokens }) {
   let ultimoErro = null;
   let ultimoStatus = 502;
   for (const modeloAtual of modelos) {
-    const { status, ok, dados } = await chamarOpenRouterUmaVez(modeloAtual, payload, apiKey);
+    const { status, ok, cacheStatus, dados } = await chamarOpenRouterUmaVez(modeloAtual, payload, apiKey, customHeaders);
     ultimoStatus = status;
     ultimoErro = dados;
     if (ok && !dados.error && dados.choices?.[0]) {
       const choice = dados.choices[0];
       return {
         status: 200,
+        cacheStatus,
         body: {
           content: choice.message?.content || "",
+          tool_calls: choice.message?.tool_calls,
           model: dados.model || modeloAtual,
           provider: "openrouter",
           usage: dados.usage || {
@@ -120,10 +125,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Método não permitido" });
   }
 
-  const { model, messages, system, max_tokens } = req.body || {};
+  const { model, messages, system, max_tokens, ...rest } = req.body || {};
   if (typeof model !== "string" || !model.trim() || !Array.isArray(messages)) {
     return erroCamposObrigatorios(res);
   }
+
+  // Extrair headers de cache vindos do frontend
+  const customHeaders = {};
+  if (req.headers['x-openrouter-cache']) customHeaders['X-OpenRouter-Cache'] = req.headers['x-openrouter-cache'];
+  if (req.headers['x-openrouter-cache-ttl']) customHeaders['X-OpenRouter-Cache-TTL'] = req.headers['x-openrouter-cache-ttl'];
 
   try {
     const resultado = await chamarOpenRouter({
@@ -131,8 +141,13 @@ export default async function handler(req, res) {
       system,
       messages,
       max_tokens,
+      customHeaders,
+      ...rest
     });
 
+    if (resultado.cacheStatus) {
+      res.setHeader('X-OpenRouter-Cache-Status', resultado.cacheStatus);
+    }
     return res.status(resultado.status).json(resultado.body);
   } catch (err) {
     return res.status(500).json({ error: err.message });
