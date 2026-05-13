@@ -106,6 +106,7 @@
 - ✅ Modelos :free rápidos — FEITO (timeout 28s, 4 lobos substituídos 2026-05-13)
 - ✅ Fix parser Rei — FEITO (`choices[0].message.content` em `king.js`)
 - ✅ Web search — FEITO (`openrouter:web_search` em lobos 1+4, parser tool_calls, custo ~$0.02/req)
+- ✅ TTS: OpenRouter /api/v1/audio/speech (openai/gpt-4o-mini-tts-2025-12-15) — Botão 🔊 no veredicto do Rei
 - Persistência real com Supabase (substituir localStorage)
-- Conectores on-demand: Tavily, ElevenLabs, Obsidian, Notion
+- Conectores on-demand: Tavily, Obsidian, Notion
 - Cloudflare: DNS + WAF + rate limiting + Turnstile

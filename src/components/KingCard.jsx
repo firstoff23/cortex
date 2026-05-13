@@ -1,6 +1,7 @@
 import React from "react";
 import ChatBubble from "./ChatBubble.jsx";
 import JudgeCard from "./JudgeCard";
+import { falarTexto } from "../hooks/useVoice.js";
 
 function pct(valor) {
   if (typeof valor !== "number") return null;
@@ -135,6 +136,22 @@ const KingCard = React.memo(function KingCard({
 
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           <CopyBtn text={textoPrincipal} T={T} />
+
+          <button
+            onClick={() => falarTexto(textoPrincipal)}
+            title="Ouvir veredicto"
+            style={{
+              background: "transparent",
+              border: `1px solid ${T.b1 || "var(--border)"}`,
+              borderRadius: 5,
+              padding: "2px 7px",
+              color: T.tf || "var(--text)",
+              fontSize: 9,
+              cursor: "pointer",
+            }}
+          >
+            🔊
+          </button>
 
           <button
             onClick={async () => {
