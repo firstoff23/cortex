@@ -203,10 +203,10 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
   const userContent = construirConteudoUtilizador(pergunta, contextoDebate, options.imageDataUrl);
   const messages = [{ role: 'user', content: userContent }];
   const geracao = opcoesGeracaoLobe(lobe, options);
-  const webSearchTools = LOBOS_COM_WEB_SEARCH.has(lobe.id) && lobe.provider === 'openrouter'
+  const lobeTools = lobe.provider === 'openrouter'
     ? {
         tools: [
-          {
+          ...(LOBOS_COM_WEB_SEARCH.has(lobe.id) ? [{
             type: 'openrouter:web_search',
             parameters: {
               engine: 'auto',
@@ -218,15 +218,18 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
                 timezone: 'Europe/Lisbon'
               }
             }
-          },
-          { type: 'datetime' }
+          }] : []),
+          {
+            type: 'openrouter:datetime',
+            parameters: { timezone: 'Europe/Lisbon' }
+          }
         ]
       }
     : {};
 
   const body =
     lobe.provider === 'openrouter'
-      ? { model: lobe.modelo, system, messages, max_tokens: options.max_tokens || 420, ...geracao, ...webSearchTools }
+      ? { model: lobe.modelo, system, messages, max_tokens: options.max_tokens || 420, ...geracao, ...lobeTools }
       : {
           model: lobe.modelo,
           messages: [
