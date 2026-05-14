@@ -81,6 +81,44 @@ export function getLastSessionContext() {
 }
 
 /**
+ * Decide se o banner de continuação deve aparecer.
+ *
+ * @param {Object} estado - Estado mínimo da UI
+ * @returns {boolean} true se deve mostrar o banner
+ */
+export function shouldShowMemoryBanner({ page, dismissed, context, messages }) {
+  const lista = Array.isArray(messages) ? messages : [];
+  return page === "chat" &&
+    dismissed !== true &&
+    !!context &&
+    !lista.some((m) => m.role === "user");
+}
+
+/**
+ * Injecta contexto anterior como primeira mensagem de sistema.
+ *
+ * @param {Array} messages - Mensagens actuais da conversa
+ * @param {string} context - Contexto formatado da sessão anterior
+ * @param {Function} criarId - Gerador opcional de ID para testes
+ * @returns {Array} Mensagens com contexto ou array original se já houver utilizador
+ */
+export function injectSessionContext(messages, context, criarId = () => Date.now() + Math.random()) {
+  if (!context) return messages;
+  const lista = Array.isArray(messages) ? messages : [];
+  if (lista.some((m) => m.role === "user")) return messages;
+
+  const mensagemSistema = {
+    id: criarId(),
+    role: "system",
+    content: context,
+    systemNote: true,
+    memoryContext: true,
+  };
+
+  return [mensagemSistema, ...lista.filter((m) => !m.memoryContext)];
+}
+
+/**
  * Limpa toda a memória guardada.
  */
 export function clearMemory() {

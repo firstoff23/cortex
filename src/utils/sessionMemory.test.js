@@ -3,8 +3,10 @@ import {
   buildMemoryEntry,
   clearMemory,
   getLastSessionContext,
+  injectSessionContext,
   loadMemoryEntries,
   saveMemoryEntry,
+  shouldShowMemoryBanner,
 } from "./sessionMemory.js";
 
 function criarLocalStorageFake() {
@@ -75,5 +77,71 @@ describe("sessionMemory", () => {
 
     expect(loadMemoryEntries()).toEqual([]);
     expect(getLastSessionContext()).toBeNull();
+  });
+
+  it("retorna null quando ainda não existe contexto anterior", () => {
+    expect(getLastSessionContext()).toBeNull();
+  });
+
+  it("não quebra quando localStorage está indisponível", () => {
+    delete globalThis.localStorage;
+
+    expect(() => saveMemoryEntry({ id: "conv-sem-storage" })).not.toThrow();
+    expect(() => clearMemory()).not.toThrow();
+    expect(loadMemoryEntries()).toEqual([]);
+    expect(getLastSessionContext()).toBeNull();
+  });
+
+  it("decide mostrar banner só em chat novo com contexto disponível", () => {
+    expect(shouldShowMemoryBanner({
+      page: "chat",
+      dismissed: false,
+      context: "Contexto anterior",
+      messages: [],
+    })).toBe(true);
+
+    expect(shouldShowMemoryBanner({
+      page: "chat",
+      dismissed: false,
+      context: null,
+      messages: [],
+    })).toBe(false);
+
+    expect(shouldShowMemoryBanner({
+      page: "chat",
+      dismissed: false,
+      context: "Contexto anterior",
+      messages: [{ role: "user", content: "olá" }],
+    })).toBe(false);
+
+    expect(shouldShowMemoryBanner({
+      page: "settings",
+      dismissed: false,
+      context: "Contexto anterior",
+      messages: [],
+    })).toBe(false);
+  });
+
+  it("injecta contexto como primeira mensagem de sistema sem duplicar contexto", () => {
+    const resultado = injectSessionContext(
+      [{ role: "assistant", content: "nota antiga", memoryContext: true }],
+      "Contexto da sessão anterior",
+      () => "mem-1"
+    );
+
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0]).toMatchObject({
+      id: "mem-1",
+      role: "system",
+      content: "Contexto da sessão anterior",
+      systemNote: true,
+      memoryContext: true,
+    });
+  });
+
+  it("não injecta contexto quando já existe mensagem do utilizador", () => {
+    const mensagens = [{ role: "user", content: "já comecei" }];
+
+    expect(injectSessionContext(mensagens, "Contexto", () => "mem-1")).toBe(mensagens);
   });
 });

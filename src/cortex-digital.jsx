@@ -20,7 +20,11 @@ import { LOBOS, runDebateStream as runDebateStreamApi, SYSTEM_PROMPTS_CODE } fro
 import { getUserId } from "./lib/auth.js";
 import { generateChips } from "./utils/generateChips.js";
 import { gerarChipsLocais } from "./utils/generateChips.js";
-import { clearMemory } from "./utils/sessionMemory.js";
+import {
+  clearMemory,
+  injectSessionContext,
+  shouldShowMemoryBanner,
+} from "./utils/sessionMemory.js";
 
 const MV="cortex-v12";
 const MAX_BUF=8;
@@ -795,17 +799,9 @@ function switchConv(conv) {
 
 function usarContextoSessaoAnterior() {
   if (!contextoSessaoAnterior) return;
-  const mensagemSistema = {
-    id: Date.now() + Math.random(),
-    role: "system",
-    content: contextoSessaoAnterior,
-    systemNote: true,
-    memoryContext: true,
-  };
-
   setMsgs((prev) => {
     if (prev.some((m) => m.role === "user")) return prev;
-    const actualizadas = [mensagemSistema, ...prev.filter((m) => !m.memoryContext)];
+    const actualizadas = injectSessionContext(prev, contextoSessaoAnterior);
     saveMsgs(actualizadas);
     return actualizadas;
   });
@@ -1087,10 +1083,12 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
 
   if(!loaded)return <Splash/>;
   const cur=phase?phases[phase]:null;
-  const mostrarMemoryBanner = page === "chat" &&
-    !memoryBannerDismissed &&
-    !!contextoSessaoAnterior &&
-    !msgs.some((m) => m.role === "user");
+  const mostrarMemoryBanner = shouldShowMemoryBanner({
+    page,
+    dismissed: memoryBannerDismissed,
+    context: contextoSessaoAnterior,
+    messages: msgs,
+  });
   if (pagina === 'blueprints') return (
     <BlueprintsPanel onVoltar={() => setPagina('chat')} />
   );

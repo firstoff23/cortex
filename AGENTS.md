@@ -95,6 +95,7 @@
 - `ChatBubble.jsx` = bolhas nativas para utilizador, lobos e Rei
 - `AlertaBanner.jsx` = alertas inline de erro, aviso, info e sucesso
 - `Toast.jsx` = notificações nativas com hook `useToast()`
+- `MemoryBanner.jsx` = banner de continuação entre sessões com opção de injectar contexto anterior
 - `LobeLoader.jsx` = loader pequeno por lobe com cor própria
 - `EstadoVazio.jsx` = ecrã inicial sem histórico com sugestões clicáveis
 - `SidePanel.jsx` = painel lateral direito deslizante para histórico, Blueprints e Modo Forense
@@ -137,6 +138,7 @@
 - ✅ STT fallback — FEITO (OpenRouter Whisper via api/stt.js)
 - ✅ F4-08 Multilinguismo PT-PT — FEITO
 - ✅ F4-09 Truncagem de Histórico (12 msgs) — FEITO (trimHistory.js, indicador visual)
+- ✅ Memória entre sessões — FEITO (`sessionMemory.js`, `MemoryBanner.jsx`, localStorage `cortex_session_memory`)
 - ✅ Loop refinamento ronda 3 (score < 50%) — FEITO
 - ✅ Modo Code Agent com system prompts override — FEITO
 - ✅ Detecção de Frustração — FEITO
