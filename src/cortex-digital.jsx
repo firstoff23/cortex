@@ -15,7 +15,7 @@ import useCouncil from './hooks/useCouncil';
 import { useAutoResize } from "./hooks/useAutoResize.js";
 import { useStreaming } from "./hooks/useStreaming.js";
 import { ouvirMicrofone } from "./hooks/useVoice.js";
-import { LOBOS, runDebate, chamarRei, runDebateStream as runDebateStreamApi, SYSTEM_PROMPTS_CODE } from "./api/council.js";
+import { LOBOS, runDebateStream as runDebateStreamApi, SYSTEM_PROMPTS_CODE } from "./api/council.js";
 import { getUserId } from "./lib/auth.js";
 import { generateChips } from "./utils/generateChips.js";
 import { gerarChipsLocais } from "./utils/generateChips.js";
@@ -83,7 +83,6 @@ const DEV_MODE = localStorage.getItem("cortex-dev-bypass") === "1";
 const LOBE_ICONS = ["◉", "◈", "◐", "◑", "◒"];
 const lobeLabel = (l) => l.label || l.nome || String(l.id);
 const lobeColor = (l) => l.color || l.cor || AC.claude;
-const lobeIcon = (l, index) => l.icon || LOBE_ICONS[index] || "◌";
 const MODELS = LOBOS.map((l) => ({
   id: l.id,
   name: l.nome,
@@ -349,31 +348,6 @@ async function fetchWithTimeout(url, opts={}, ms=30000){
   }
 }
 
-async function callGrok(sys,msg,key){
-  return callProxyChat("x-ai/grok-3", sys, msg, 420);
-}
-async function callGemini(sys,msg,key){
-  return callProxyChat("google/gemini-2.5-flash", sys, msg, 420);
-}
-async function callPerp(sys,msg,key){
-  return callProxyChat("perplexity/sonar", sys, msg, 420);
-}
-async function callOpenAI(sys,msg,key){
-  return callProxyChat("openai/gpt-4o", sys, msg, 420);
-}
-async function callDeepSeek(sys,msg,key){
-  return callProxyChat("deepseek/deepseek-chat", sys, msg, 420);
-}
-async function callGroq(sys,msg,key){
-  return callProxyChat("meta-llama/llama-3.3-70b-instruct:free", sys, msg, 420);
-}
-async function callMistral(sys,msg,key){
-  return callProxyChat("mistralai/mistral-large-latest", sys, msg, 420);
-}
-async function callNemotron(sys,msg,key){
-  return callProxyChat("nvidia/nemotron-4-340b-instruct", sys, msg, 420);
-}
-
 // ── MARKDOWN ─────────────────────────────────────────────────
 function Markdown({text,color,faint}){
   const lines=text.split("\n");
@@ -615,7 +589,7 @@ export default function Cortex(){
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
-  const { send: runCouncil, invoke: runInvoke, lobeResults, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel } = useCouncil(msgs, setMsgs);
+  const { send: runCouncil, invoke: runInvoke, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel } = useCouncil(msgs, setMsgs);
   const [input,setInput]     = useState("");
   const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
@@ -637,7 +611,6 @@ export default function Cortex(){
   const [showImport,setShowImport] = useState(false);
   const [importTxt,setImportTxt]   = useState("");
   const [importErr,setImportErr]   = useState("");
-  const [exportKind,setExportKind] = useState("brain"); // cérebro | conversa actual | cópia completa
   const [showSeed,setShowSeed]     = useState(false);
   const [seedP,setSeedP] = useState("");
   const [seedC,setSeedC] = useState("");
@@ -656,8 +629,8 @@ export default function Cortex(){
   const [pinInput,setPinInput]       = useState("");
   const [pinErr,setPinErr]           = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
-  const [focusMode, setFocusMode] = useState(false);
-  const [focusLobes, setFocusLobes] = useState(new Set(LOBOS.map(l=>l.id)));
+  const [focusMode] = useState(false);
+  const [focusLobes] = useState(new Set(LOBOS.map(l=>l.id)));
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [ficheiroAnexado, setFicheiroAnexado] = useState(null);
   const [frustrationDismissed, setFrustrationDismissed] = useState(false);
@@ -672,11 +645,7 @@ export default function Cortex(){
   const uploadPreviewUrlsRef = useRef(new Set());
   const T = THEMES[theme];
 
-  const hG=keys.grok?.trim().length>10, hGm=keys.gemini?.trim().length>10;
   const hP=keys.perp?.trim().length>10, hC=keys.claude?.trim().length>10;
-  const hO=keys.openai?.trim().length>10, hD=keys.deepseek?.trim().length>10;
-  const hL=keys.llama?.trim().length>10, hM=keys.mistral?.trim().length>10;
-  const hN=keys.nemotron?.trim().length>10;
   const inputChars = input.length;
   const inputTokens = Math.round(inputChars / 4);
   const inputCounterWarn = inputChars > 2000;
@@ -866,7 +835,7 @@ async function send(query) {
   }
   setFicheiroAnexado(null);
 
-  return runCouncil(qComFicheiro, {
+  const resultado = await runCouncil(qComFicheiro, {
     input,
     displayQuery: q,
     anexoUpload,
@@ -905,13 +874,13 @@ async function send(query) {
     currentConvId,
     taRef: inputRef,
     lobeConfidenceScore,
-    callOllama,
     modoDebate: modoDebate ? "debate" : "paralelo",
     systemPrompts: modoCode && modoDebate ? SYSTEM_PROMPTS_CODE : undefined,
     runDebateStream: runDebateStreamApi,
     streaming: { textosParciais, aStreaming, onToken, iniciar, terminar },
   });
   ajustar(true);
+  return resultado;
   }
 
   function aplicarSugestaoRei(sugestao) {
@@ -991,7 +960,7 @@ const extractJsonBlock = (text) => {
     if (parsed) return parsed;
   }
 
-  const genericFence = text.match(/```[\s\S]*?([\{\[][\\s\\S]*[\}\]])[\s\S]*?```/);
+  const genericFence = text.match(/```[\s\S]*?((?:\x7b|\x5b)[\s\S]*(?:\x7d|\x5d))[\s\S]*?```/);
   if (genericFence?.[1]) {
     const parsed = safeParseJson(genericFence[1], null);
     if (parsed) return parsed;
@@ -1388,7 +1357,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       <span><b style={{color:AC.gemini}}>{brain.sessions}</b> sess</span>
       <span><b style={{color:AC.grok}}>{buf.length}/{MAX_BUF}</b> buf</span>
       <span><b style={{color:T.ts}}>{msgs.filter(m=>m.role==="user").length}</b> msg</span>
-      <span title="Respostas em cache"><b style={{color:AC.perp}}>{_cache.size}</b>⚡</span>
+      <span title="Respostas em cache"><b style={{color:AC.perp}}>{cacheSize}</b>⚡</span>
     </div>
   </div>
 )}

@@ -11,6 +11,7 @@ import { runGraders } from "../utils/graders.js";
 import { getJuizesParaPergunta } from "../utils/orchestrator.js";
 import { detectFrustration } from "../utils/detectFrustration.js";
 import { classifyError } from "../utils/errorMessages.js";
+import { GENERATION_STATES } from "../utils/generationStates.js";
 
 // Cache curta de respostas dos lobos para evitar chamadas repetidas.
 const responseCache = new Map();
@@ -97,6 +98,8 @@ export async function runDebateStream(pergunta, modo = "paralelo", options = {})
 export default function useCouncil(msgs, setMsgs) {
   const [phase, setPhase] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationState, setGenerationState] = useState(GENERATION_STATES.IDLE);
+  const [generationTime, setGenerationTime] = useState(0);
   const [lobeResults, setLobeResults] = useState([]);
   const [judgeResults, setJudgeResults] = useState([]);
   const [kingResult, setKingResult] = useState(null);
@@ -112,9 +115,10 @@ export default function useCouncil(msgs, setMsgs) {
   const interruptedMessageAddedRef = useRef(false);
 
   useEffect(() => {
+    const controllers = controllersRef.current;
     return () => {
-      controllersRef.current.forEach((ctrl) => ctrl.abort());
-      controllersRef.current.clear();
+      controllers.forEach((ctrl) => ctrl.abort());
+      controllers.clear();
       abortControllerRef.current?.abort();
     };
   }, []);
@@ -157,6 +161,7 @@ export default function useCouncil(msgs, setMsgs) {
     controllersRef.current.clear();
     adicionarMensagemInterrompida();
     setIsGenerating(false);
+    setGenerationState(GENERATION_STATES.STOPPED);
     setPhase(null);
   }
 
@@ -258,7 +263,6 @@ export default function useCouncil(msgs, setMsgs) {
       currentConvId,
       taRef,
       lobeConfidenceScore,
-      callOllama,
       modoDebate = "paralelo",
       runDebateStream = runDebateStreamApi,
       streaming,
@@ -277,6 +281,9 @@ export default function useCouncil(msgs, setMsgs) {
     interruptedMessageAddedRef.current = false;
     saveMsgsRef.current = saveMsgs;
     setIsGenerating(true);
+    setGenerationState(GENERATION_STATES.THINKING);
+    setGenerationTime(0);
+    const startTime = Date.now();
 
     setJudgeResults([]);
     setKingResult(null);
@@ -353,7 +360,7 @@ export default function useCouncil(msgs, setMsgs) {
 
     let debateResultado = null;
     let nextLobeResults = [];
-    
+
     let activeTemps = temperaturas;
     if (frLevel === "high") {
       activeTemps = { ...temperaturas };
@@ -362,6 +369,7 @@ export default function useCouncil(msgs, setMsgs) {
 
     const modoExecucao = modoDebate === "debate" ? "debate" : "paralelo";
     const onTokenParcial = (delta, textoTotal, lobe) => {
+      setGenerationState(s => (s === GENERATION_STATES.THINKING ? GENERATION_STATES.WRITING : s));
       partialTextRef.current[lobe.id] = textoTotal;
       streaming?.onToken?.(delta, textoTotal, lobe);
     };
@@ -432,6 +440,13 @@ export default function useCouncil(msgs, setMsgs) {
     } finally {
       if (controllersRef.current.get("rei") === ctrlRei) controllersRef.current.delete("rei");
     }
+
+    if (!stopRequestedRef.current) {
+      setGenerationState(GENERATION_STATES.DONE);
+      setGenerationTime(Math.round((Date.now() - startTime) / 1000));
+      setTimeout(() => setGenerationState(GENERATION_STATES.IDLE), 2000);
+    }
+
     if (devePararGeracao()) return;
 
     const graders = runGraders(resultadoRei || {});
@@ -533,8 +548,6 @@ export default function useCouncil(msgs, setMsgs) {
         ? [...brain.episodic, resumoEpisodico].slice(-MAX_EPISODIC)
         : brain.episodic,
     };
-    let reflexOk = false;
-
     if (buf2.length >= MAX_BUF && nb.sessions >= 1) {
       setPhase("reflex");
       try {
@@ -556,7 +569,6 @@ export default function useCouncil(msgs, setMsgs) {
           procedural: { ...nb.procedural, ...(ext.procedural_update || {}) },
           lastReflect: new Date().toISOString(),
         };
-        reflexOk = !!(ext.new_semantic?.length || ext.new_patterns?.length || ext.session_summary);
       } catch {
         toast("Falha na reflexão subconsciente.");
       }
@@ -598,11 +610,14 @@ export default function useCouncil(msgs, setMsgs) {
     gradersResult,
     consensusScore,
     debateResult,
+    cacheSize: responseCache.size,
     phase,
     setPhase,
     stopGeneration,
     isGenerating,
     frustrationLevel,
     setFrustrationLevel,
+    generationState,
+    generationTime
   };
 }
