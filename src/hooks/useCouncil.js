@@ -57,11 +57,12 @@ function erroSettled(resultado) {
   return resultado?.status === "rejected" ? resultado.reason?.message || "Serviço indisponível" : null;
 }
 
-function lobeDebateParaUI(lobe, index, ronda1, ronda2, lobeConfidenceScore) {
+function lobeDebateParaUI(lobe, index, ronda1, ronda2, ronda3, lobeConfidenceScore) {
   const primeira = valorSettled(ronda1?.[index], {});
   const segunda = valorSettled(ronda2?.[index], primeira);
-  const erro = erroSettled(ronda2?.[index]) || erroSettled(ronda1?.[index]);
-  const result = erro ? `[Erro em ${lobe.nome}: ${erro}]` : segunda.resposta || primeira.resposta || "";
+  const terceira = valorSettled(ronda3?.[index], segunda);
+  const erro = erroSettled(ronda3?.[index]) || erroSettled(ronda2?.[index]) || erroSettled(ronda1?.[index]);
+  const result = erro ? `[Erro em ${lobe.nome}: ${erro}]` : terceira.resposta || segunda.resposta || primeira.resposta || "";
   const isErr = !!erro || !result || result.startsWith("[Erro");
 
   return {
@@ -75,10 +76,11 @@ function lobeDebateParaUI(lobe, index, ronda1, ronda2, lobeConfidenceScore) {
     result,
     ronda1: primeira.resposta || "",
     ronda2: segunda.resposta || "",
+    ronda3: terceira.resposta || "",
     srcModel: lobe.modelo,
     srcReal: !isErr,
     isErr,
-    latency: segunda.latency || primeira.latency || null,
+    latency: terceira.latency || segunda.latency || primeira.latency || null,
     confidence: lobeConfidenceScore(result, isErr),
   };
 }
@@ -208,6 +210,7 @@ export default function useCouncil(msgs, setMsgs) {
       displayQuery,
       anexoUpload,
       imageDataUrl,
+      systemPrompts,
     } = ctx;
 
     const q = (query || input).trim();
@@ -294,6 +297,7 @@ export default function useCouncil(msgs, setMsgs) {
         lobos: councilLobes,
         temperaturas: activeTemps,
         imageDataUrl,
+        systemPrompts,
         onToken: streaming?.onToken,
       });
     } finally {
@@ -301,7 +305,7 @@ export default function useCouncil(msgs, setMsgs) {
     }
     setDebateResult(modoExecucao === "debate" ? debateResultado : null);
     nextLobeResults = councilLobes.map((l, i) =>
-      lobeDebateParaUI(l, i, debateResultado.ronda1, debateResultado.ronda2, lobeConfidenceScore)
+      lobeDebateParaUI(l, i, debateResultado.ronda1, debateResultado.ronda2, debateResultado.ronda3, lobeConfidenceScore)
     );
     setLobeResults(nextLobeResults);
     nextLobeResults

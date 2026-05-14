@@ -53,6 +53,8 @@
 - Web search: `openrouter:web_search` server tool — activo em Analista Crítico (id=1) + Generalista (id=4); max_results 3, localização PT; custo ~$0.02/request via Exa; Rei não usa
 - DateTime tool: activo em todos os lobos (Europe/Lisbon)
 - Response Cache activo: lobos TTL 300s, Rei TTL 600s. Ronda 2: cache desactivado.
+- Loop refinamento ronda 3 (score < 50%) activo apenas em modo debate.
+- Modo Code Agent com `SYSTEM_PROMPTS_CODE` como override condicional dos prompts dos lobos.
 - Response Healing: plugin `{ id: "response-healing" }` activo no Rei via OpenRouter — corrige JSON malformado; Rei não usa streaming (non-streaming obrigatório para o plugin)
 - Rei fallback: `openrouter/fusion` (pago, Claude Opus + GPT) — activa apenas quando Llama 3.3 falha ou devolve vazio
 - F4-01 Upload imagens multimodal: ✅ FEITO — imagens seguem por `image_url` via OpenRouter content array; `imageDataUrl` é transitório, não persistido em histórico/localStorage; preview nativo aparece no chat
@@ -134,6 +136,8 @@
 - ✅ Fallback de modelos — FEITO (array models por lobe)
 - ✅ STT fallback — FEITO (OpenRouter Whisper via api/stt.js)
 - ✅ F4-08 Multilinguismo PT-PT — FEITO
+- ✅ Loop refinamento ronda 3 (score < 50%) — FEITO
+- ✅ Modo Code Agent com system prompts override — FEITO
 - ✅ Detecção de Frustração — FEITO
 - Persistência real com Supabase (substituir localStorage)
 - Conectores on-demand: Obsidian, Notion (ElevenLabs substituído por OpenRouter TTS)

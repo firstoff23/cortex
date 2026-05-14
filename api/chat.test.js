@@ -578,6 +578,8 @@ describe('UI v12 — componentes 21st.dev adaptados', () => {
     assert.match(fonteTimeline, /defaultActiva="veredicto"/);
     assert.match(fonteTimeline, /titulo: "Ronda 1"/);
     assert.match(fonteTimeline, /titulo: "Ronda 2"/);
+    assert.match(fonteTimeline, /ronda3/);
+    assert.match(fonteTimeline, /titulo: "Ronda 3"/);
     assert.match(fonteCortex, /const \[temperaturas,setTemperaturas\]/);
     assert.match(fonteCortex, /saveTemperaturas/);
     assert.match(fonteCortex, /<Slider/);
@@ -822,5 +824,108 @@ describe('F4-03 Export Word/Excel/Notion', () => {
     assert.match(fonteAgents, /F4-03 Export Word\/Excel\/Notion — FEITO/);
     assert.match(fonteAgents, /useExport\.js/);
     assert.match(fonteAgents, /api\/notion-export\.js/);
+  });
+});
+
+// ── Teste 25: Modo Code Agent ───────────────────────────────
+describe('Modo Code Agent', () => {
+  it('exporta SYSTEM_PROMPTS_CODE e chamarLobe usa override por lobe', async () => {
+    const { SYSTEM_PROMPTS_CODE, chamarLobe } = await import('../src/api/council.js');
+    const fetchAnterior = global.fetch;
+    let body = null;
+
+    global.fetch = async (url, init) => {
+      assert.equal(url, '/api/chat');
+      body = JSON.parse(init.body);
+      return new Response(
+        JSON.stringify({ content: 'análise de código' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    };
+
+    try {
+      assert.match(SYSTEM_PROMPTS_CODE[1], /Analista de Código do Córtex/);
+
+      const resultado = await chamarLobe(
+        { id: 1, nome: 'Analista Crítico', modelo: 'deepseek/deepseek-r1', provider: 'openrouter' },
+        'Revê src/cortex-digital.jsx',
+        null,
+        { systemPrompts: SYSTEM_PROMPTS_CODE },
+      );
+
+      assert.equal(resultado.resposta, 'análise de código');
+      assert.equal(body.system, SYSTEM_PROMPTS_CODE[1]);
+    } finally {
+      global.fetch = fetchAnterior;
+    }
+  });
+
+  it('Cortex expõe o pill Código e só passa prompts code em modo debate', () => {
+    const fonte = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+
+    assert.match(fonte, /SYSTEM_PROMPTS_CODE/);
+    assert.match(fonte, /const \[modoCode,\s*setModoCode\]\s*=\s*useState\(false\)/);
+    assert.match(fonte, /setModoCode\(\(m\) => !m\)|setModoCode\(m=>!m\)/);
+    assert.match(fonte, /💻 Código/);
+    assert.match(fonte, /systemPrompts:\s*modoCode && modoDebate \? SYSTEM_PROMPTS_CODE : undefined/);
+  });
+});
+
+// ── Teste 26: loop de refinamento ───────────────────────────
+describe('runDebate — ronda 3 condicional', () => {
+  it('executa ronda3 apenas em modo debate quando o consenso provisório é baixo', async () => {
+    const { runDebate } = await import('../src/api/council.js');
+    const lobos = [
+      { id: 1, nome: 'Analista Crítico', modelo: 'm1', provider: 'openrouter' },
+      { id: 2, nome: 'Inovador Criativo', modelo: 'm2', provider: 'openrouter' },
+    ];
+    const chamadas = [];
+
+    const resultado = await runDebate('Pergunta teste', 'debate', {
+      lobos,
+      chamarLobe: async (lobe, pergunta, contextoDebate) => {
+        chamadas.push({ lobeId: lobe.id, pergunta, contextoDebate });
+        if (!contextoDebate) {
+          return {
+            id: lobe.id,
+            nome: lobe.nome,
+            resposta: lobe.id === 1 ? 'React estado hook componente' : 'SQL índice tabela consulta',
+          };
+        }
+        if (pergunta.includes('O conselho não convergiu.')) {
+          return { id: lobe.id, nome: lobe.nome, resposta: `Ronda 3 ${lobe.nome}` };
+        }
+        return {
+          id: lobe.id,
+          nome: lobe.nome,
+          resposta: lobe.id === 1 ? 'CSS layout grelha scroll' : 'OAuth token sessão servidor',
+        };
+      },
+    });
+
+    assert.equal(resultado.ronda1.length, 2);
+    assert.equal(resultado.ronda2.length, 2);
+    assert.equal(resultado.ronda3.length, 2);
+    assert.equal(chamadas.filter((c) => c.pergunta.includes('O conselho não convergiu.')).length, 2);
+    assert.match(chamadas[4].contextoDebate, /\[Analista Crítico\]: React estado hook componente/);
+    assert.match(chamadas[4].contextoDebate, /\[Inovador Criativo\]: OAuth token sessão servidor/);
+  });
+
+  it('não executa ronda3 em modo paralelo', async () => {
+    const { runDebate } = await import('../src/api/council.js');
+    const chamadas = [];
+
+    const resultado = await runDebate('Pergunta teste', 'paralelo', {
+      lobos: [{ id: 1, nome: 'Analista Crítico', modelo: 'm1', provider: 'openrouter' }],
+      chamarLobe: async (lobe, pergunta, contextoDebate) => {
+        chamadas.push({ pergunta, contextoDebate });
+        return { id: lobe.id, nome: lobe.nome, resposta: 'Resposta isolada' };
+      },
+    });
+
+    assert.equal(resultado.ronda1.length, 1);
+    assert.equal('ronda2' in resultado, false);
+    assert.equal('ronda3' in resultado, false);
+    assert.equal(chamadas.length, 1);
   });
 });

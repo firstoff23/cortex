@@ -15,7 +15,7 @@ import useCouncil from './hooks/useCouncil';
 import { useAutoResize } from "./hooks/useAutoResize.js";
 import { useStreaming } from "./hooks/useStreaming.js";
 import { ouvirMicrofone } from "./hooks/useVoice.js";
-import { LOBOS, runDebate, chamarRei, runDebateStream as runDebateStreamApi } from "./api/council.js";
+import { LOBOS, runDebate, chamarRei, runDebateStream as runDebateStreamApi, SYSTEM_PROMPTS_CODE } from "./api/council.js";
 
 const MV="cortex-v12";
 const MAX_BUF=8;
@@ -651,6 +651,7 @@ export default function Cortex(){
   const [temperaturas,setTemperaturas] = useState(Object.fromEntries(MODELS.map(m=>[m.id,0.7])));
   const [lobeConfigAberto,setLobeConfigAberto] = useState(null);
   const [modoDebate, setModoDebate] = useState(false);
+  const [modoCode, setModoCode] = useState(false);
 
   // modais
   const [showGuide,setShowGuide]   = useState(false);
@@ -900,6 +901,7 @@ async function send(query) {
     lobeConfidenceScore,
     callOllama,
     modoDebate: modoDebate ? "debate" : "paralelo",
+    systemPrompts: modoCode && modoDebate ? SYSTEM_PROMPTS_CODE : undefined,
     runDebateStream: runDebateStreamApi,
     streaming: { textosParciais, aStreaming, onToken, iniciar, terminar },
   });
@@ -1269,6 +1271,17 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
     )}
 
     {!isMobile && (
+      <button
+        type="button"
+        onClick={() => setModoCode((m) => !m)}
+        style={{background:modoCode?"var(--accent)":"transparent",border:`1px solid ${modoCode?"var(--accent)":T.b1}`,borderRadius:12,minHeight:42,padding:"8px 13px",transition:"all 220ms cubic-bezier(0.4,0,0.2,1)",boxShadow:modoCode?"0 0 16px var(--accent-bg)":"none",color:modoCode?"white":"var(--text-secondary, #8a8aa0)",cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:modoCode?800:600,display:"flex",alignItems:"center",gap:7,flexShrink:0}}
+        title={"Modo Code Agent"}
+      >
+        {"💻 Código"}
+      </button>
+    )}
+
+    {!isMobile && (
       <>
         <button type="button" onClick={()=>setShowModels(true)} style={{...navBtn(T),minWidth:42,minHeight:42,background:T.s2}} title={"Lobos"}>◈</button>
         <button type="button" onClick={()=>setShowTP(true)} style={{...navBtn(T),minWidth:42,minHeight:42,background:T.s2}} title={"Tema"}>{THEMES[theme].emoji}</button>
@@ -1474,6 +1487,13 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               label:"Mapas",
               active:showBlueprintsPanel,
               onClick:()=>{setShowBlueprintsPanel(true);setPagina("chat");setPage("chat");setFabOpen(false);}
+            },
+            {
+              key:"code",
+              icon:"💻",
+              label:"Código",
+              active:modoCode,
+              onClick:()=>{setModoCode((m) => !m);setFabOpen(false);}
             }
           ].map((item,idx)=>(
             <button

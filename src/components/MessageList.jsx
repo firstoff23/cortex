@@ -135,6 +135,7 @@ const MessageList = React.memo(function MessageList({
                   <BeforeVerdictComponent
                     ronda1={m.debate?.ronda1}
                     ronda2={m.debate?.ronda2}
+                    ronda3={m.debate?.ronda3}
                     modoDebate={m.modoDebate}
                   />
                 ) : null

@@ -1,6 +1,7 @@
 // council.js — lobos v2.0 e debate multi-ronda
 
 import { runKing } from './king.js';
+import { calcularConsensoMatematico } from './judges.js';
 
 export const LOBOS = [
   {
@@ -136,6 +137,39 @@ Regra hard: cada resposta termina OBRIGATORIAMENTE com —
 PT-PT. Máx 130 palavras.`,
 };
 
+export const SYSTEM_PROMPTS_CODE = {
+  1: `És o Analista de Código do Córtex.
+Foca em: bugs, code smells, segurança,
+performance e anti-patterns.
+Cita linha e ficheiro quando possível.
+PT-PT. Máx 200 palavras.`,
+
+  2: `És o Arquitecto Criativo do Córtex.
+Propõe refactorings, padrões alternativos
+e soluções elegantes.
+Mostra código concreto.
+PT-PT. Máx 200 palavras.`,
+
+  3: `És o Implementador do Córtex.
+Stack: React/Vite/JSX/Vercel/OpenRouter.
+Formato obrigatório:
+  Ficheiro: [caminho]
+  Alteração: [código]
+  Comando: [se aplicável]
+PT-PT. Máx 200 palavras.`,
+
+  4: `És o Contextualizador do Córtex.
+Liga o código ao roadmap, padrões do projecto
+e boas práticas do stack actual.
+PT-PT. Máx 200 palavras.`,
+
+  5: `És o Revisor Crítico do Córtex.
+Aponta: edge cases, falhas de segurança,
+problemas de performance e o que pode partir.
+Cada problema com solução proposta.
+PT-PT. Máx 200 palavras.`,
+};
+
 export function getBaseURL(provider) {
   if (provider === 'openrouter') return 'https://openrouter.ai/api/v1';
   if (provider === 'nim') return '/api/nim-proxy';
@@ -219,7 +253,7 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
   const apiKey = getAPIKey(lobe.provider);
   if (!apiKey) throw new Error(`API key ausente para ${lobe.provider}`);
 
-  const system = SYSTEM_PROMPTS[lobe.id];
+  const system = options.systemPrompts?.[lobe.id] || SYSTEM_PROMPTS[lobe.id];
   const userContent = construirConteudoUtilizador(pergunta, contextoDebate, options.imageDataUrl);
   const messages = [{ role: 'user', content: userContent }];
   const geracao = opcoesGeracaoLobe(lobe, options);
@@ -301,6 +335,7 @@ export async function chamarLobeStream(lobe, pergunta, contextoDebate = null, op
 
   const apiKey = lerEnv('VITE_OPENROUTER_KEY');
   if (!apiKey) throw new Error(`API key ausente para ${lobe.provider}`);
+  const system = options.systemPrompts?.[lobe.id] || SYSTEM_PROMPTS[lobe.id];
 
   const resposta = await fetch(`${getBaseURL(lobe.provider)}/chat/completions`, {
     method: 'POST',
@@ -317,7 +352,7 @@ export async function chamarLobeStream(lobe, pergunta, contextoDebate = null, op
       stream: true,
       ...opcoesGeracaoLobe(lobe, options),
       messages: [
-        { role: 'system', content: SYSTEM_PROMPTS[lobe.id] },
+        { role: 'system', content: system },
         { role: 'user', content: construirConteudoUtilizador(pergunta, contextoDebate, options.imageDataUrl) },
       ],
       max_tokens:
@@ -381,11 +416,34 @@ async function chamarComMapa(lobe, pergunta, contextoDebate, mapa, chamar, optio
       signal: ctrl.signal,
       ...opcoesGeracaoLobe(lobe, options),
       ...(options.imageDataUrl ? { imageDataUrl: options.imageDataUrl } : {}),
+      ...(options.systemPrompts ? { systemPrompts: options.systemPrompts } : {}),
     });
     return normalizarValorLobe(lobe, valor, contextoDebate);
   } finally {
     if (mapa.get(lobe.id) === ctrl) mapa.delete(lobe.id);
   }
+}
+
+export function calcularScoreConsenso(ronda1 = [], ronda2 = []) {
+  const respostas = [...ronda1, ...ronda2]
+    .filter((r) => r.status === 'fulfilled')
+    .map((r) => r.value);
+  return Math.round(calcularConsensoMatematico(respostas) * 100);
+}
+
+function contextoDasRondas(ronda1 = [], ronda2 = []) {
+  return [...ronda1, ...ronda2]
+    .filter((r) => r.status === 'fulfilled')
+    .map((r) => `[${r.value.nome}]: ${r.value.resposta}`)
+    .join('\n\n');
+}
+
+function pedidoRefinamento(scoreProvisorio) {
+  return `O conselho não convergiu.
+Consenso actual: ${scoreProvisorio}%.
+Reconsidera a tua posição com base
+no debate completo acima.
+Sê mais preciso e directo.`;
 }
 
 export async function runDebate(pergunta, modo = 'paralelo', options = {}) {
@@ -411,6 +469,18 @@ export async function runDebate(pergunta, modo = 'paralelo', options = {}) {
     lobos.map((lobe) => chamarComMapa(lobe, pergunta, contextoDebate, ronda2Map, chamar, optionsSemImagem))
   );
 
+  const scoreProvisorio = calcularScoreConsenso(ronda1, ronda2);
+  if (scoreProvisorio < 50) {
+    const contextoRefinamento = contextoDasRondas(ronda1, ronda2);
+    const ronda3Map = new Map();
+    const ronda3 = await Promise.allSettled(
+      lobos.map((lobe) =>
+        chamarComMapa(lobe, pedidoRefinamento(scoreProvisorio), contextoRefinamento, ronda3Map, chamar, optionsSemImagem)
+      )
+    );
+    return { ronda1, ronda2, ronda3 };
+  }
+
   return { ronda1, ronda2 };
 }
 
@@ -425,11 +495,13 @@ async function chamarStreamComFallback(lobe, pergunta, contextoDebate, chamarStr
       onToken,
       ...geracao,
       ...(options.imageDataUrl ? { imageDataUrl: options.imageDataUrl } : {}),
+      ...(options.systemPrompts ? { systemPrompts: options.systemPrompts } : {}),
     }).catch(() =>
       chamarFallback(lobe, pergunta, contextoDebate, {
         signal: ctrl.signal,
         ...geracao,
         ...(options.imageDataUrl ? { imageDataUrl: options.imageDataUrl } : {}),
+        ...(options.systemPrompts ? { systemPrompts: options.systemPrompts } : {}),
       }),
     );
   } finally {
@@ -470,6 +542,25 @@ export async function runDebateStream(pergunta, modo = 'paralelo', options = {})
       )
     )
   );
+
+  const scoreProvisorio = calcularScoreConsenso(ronda1, ronda2);
+  if (scoreProvisorio < 50) {
+    const contextoRefinamento = contextoDasRondas(ronda1, ronda2);
+    const ronda3 = await Promise.allSettled(
+      lobos.map((lobe) =>
+        chamarStreamComFallback(
+          lobe,
+          pedidoRefinamento(scoreProvisorio),
+          contextoRefinamento,
+          chamarStream,
+          chamarFallback,
+          options.onToken,
+          optionsSemImagem
+        )
+      )
+    );
+    return { ronda1, ronda2, ronda3 };
+  }
 
   return { ronda1, ronda2 };
 }
