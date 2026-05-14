@@ -929,3 +929,74 @@ describe('runDebate — ronda 3 condicional', () => {
     assert.equal(chamadas.length, 1);
   });
 });
+
+// ── Teste 27: chips contextuais locais ──────────────────────
+describe('Prompt 3 — chips contextuais', () => {
+  it('gera exactamente 4 chips para cada modo local', async () => {
+    const { gerarChipsLocais } = await import('../src/utils/generateChips.js');
+    const modos = ['tecnico', 'criativo', 'analitico', 'casual', 'urgente'];
+
+    for (const modo of modos) {
+      const chips = gerarChipsLocais(modo);
+      assert.equal(chips.length, 4);
+      assert.ok(chips.every((chip) => chip.modo === modo));
+      assert.ok(chips.every((chip) => typeof chip.texto === 'string' && chip.texto.length > 0));
+    }
+  });
+
+  it('prioriza urgente e usa casual quando o texto está vazio', async () => {
+    const { detectarModoChips, generateChips } = await import('../src/utils/generateChips.js');
+
+    assert.equal(detectarModoChips('O build de React está bloqueado com erro', 'high'), 'urgente');
+    assert.equal(detectarModoChips('', 'none'), 'casual');
+
+    const chips = await generateChips({ texto: '', frustrationLevel: 'none', userId: 'anon' });
+    assert.equal(chips.length, 4);
+    assert.ok(chips.every((chip) => chip.modo === 'casual'));
+  });
+
+  it('mantém Supabase desligado por flag local e sem .env', () => {
+    const fonteGerador = readFileSync(new URL('../src/utils/generateChips.js', import.meta.url), 'utf8');
+    const fonteService = readFileSync(new URL('../src/services/chipsService.js', import.meta.url), 'utf8');
+    const fonteEnvExample = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
+
+    assert.match(fonteGerador, /const CHIPS_SUPABASE_ENABLED = false/);
+    assert.match(fonteGerador, /CHIPS_SUPABASE_ENABLED && userId/);
+    assert.match(fonteService, /@param \{string\} userId/);
+    assert.doesNotMatch(fonteEnvExample, /VITE_CHIPS_SUPABASE_ENABLED/);
+    assert.equal(existsSync(new URL(`../src/services/chipsService.${'t'}${'s'}`, import.meta.url)), false);
+  });
+
+  it('EstadoVazio trunca chips, mantém tooltip e destaca urgente', () => {
+    const fonte = readFileSync(new URL('../src/components/EstadoVazio.jsx', import.meta.url), 'utf8');
+
+    assert.match(fonte, /normalizarSugestao/);
+    assert.match(fonte, /slice\(0, 40\)/);
+    assert.match(fonte, /title=\{chip\.texto\}/);
+    assert.match(fonte, /animation: `fade-in-chip/);
+    assert.match(fonte, /chip\.modo === "urgente"/);
+  });
+
+  it('Cortex usa generateChips e remove sugestões aleatórias legadas', () => {
+    const fonte = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+
+    assert.match(fonte, /import \{ generateChips \}/);
+    assert.match(fonte, /import \{ getUserId \}/);
+    assert.match(fonte, /generateChips\(\{\s*texto: input,/);
+    assert.doesNotMatch(fonte, /ALL_SUGGESTIONS/);
+    assert.doesNotMatch(fonte, /getRandomSuggestions/);
+  });
+
+  it('inclui migração Supabase preparada com RLS', () => {
+    const migrationPath = new URL('../supabase/migrations/20260514000000_create_chips.sql', import.meta.url);
+    const fonte = readFileSync(migrationPath, 'utf8');
+
+    assert.match(fonte, /create table if not exists public\.chips/);
+    assert.match(fonte, /user_id uuid not null references auth\.users\(id\)/);
+    assert.match(fonte, /mode text not null/);
+    assert.match(fonte, /usage_count integer not null default 0/);
+    assert.match(fonte, /enable row level security/);
+    assert.match(fonte, /to authenticated/);
+    assert.doesNotMatch(fonte, /service_role/i);
+  });
+});

@@ -2,6 +2,14 @@ import React from "react";
 
 // EstadoVazio.jsx — ecrã inicial para sessões sem mensagens.
 export default function EstadoVazio({ titulo, subtitulo, sugestoes = [], onSugestao }) {
+  const normalizarSugestao = (item) => {
+    if (typeof item === "string") return { texto: item, modo: "casual" };
+    return {
+      texto: item?.texto || "",
+      modo: item?.modo || "casual",
+    };
+  };
+
   return (
     <section
       aria-label="Estado vazio"
@@ -47,27 +55,45 @@ export default function EstadoVazio({ titulo, subtitulo, sugestoes = [], onSuges
 
       {sugestoes.length > 0 && (
         <div style={{ display: "grid", gap: 7, width: "100%", maxWidth: 520, marginTop: 4 }}>
-          {sugestoes.map((item, idx) => (
-            <button
-              key={`estado-vazio-${idx}-${String(item).slice(0, 14)}`}
-              type="button"
-              onClick={() => onSugestao?.(item)}
-              style={{
-                background: "var(--social-bg, rgba(255,255,255,0.04))",
-                border: "1px solid var(--border, rgba(255,255,255,0.12))",
-                borderRadius: 12,
-                padding: "10px 13px",
-                color: "var(--text, #c9c9d8)",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                textAlign: "left",
-                fontSize: 12,
-                lineHeight: 1.35,
-              }}
-            >
-              {item}
-            </button>
-          ))}
+          <style>
+            {`@keyframes fade-in-chip {
+              from { opacity: 0; transform: translateY(4px); }
+              to { opacity: 1; transform: translateY(0); }
+            }`}
+          </style>
+          {sugestoes.map((item, idx) => {
+            const chip = normalizarSugestao(item);
+            const textoVisivel = chip.texto.length > 40 ? `${chip.texto.slice(0, 40)}...` : chip.texto;
+
+            return (
+              <button
+                key={`estado-vazio-${idx}-${chip.modo}-${chip.texto.slice(0, 14)}`}
+                type="button"
+                title={chip.texto}
+                onClick={() => onSugestao?.(chip.texto)}
+                style={{
+                  background: "var(--social-bg, rgba(255,255,255,0.04))",
+                  border: chip.modo === "urgente"
+                    ? "1px solid var(--danger, #ef4444)"
+                    : "1px solid var(--border, rgba(255,255,255,0.12))",
+                  borderRadius: 12,
+                  padding: "10px 13px",
+                  color: "var(--text, #c9c9d8)",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  textAlign: "left",
+                  fontSize: 12,
+                  lineHeight: 1.35,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  animation: `fade-in-chip 180ms ease ${idx * 45}ms both`,
+                }}
+              >
+                {textoVisivel}
+              </button>
+            );
+          })}
         </div>
       )}
     </section>

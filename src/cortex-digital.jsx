@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import KingCard from './components/KingCard';
 import MessageList from './components/MessageList';
 import DebateTimeline from './components/DebateTimeline';
@@ -16,6 +16,9 @@ import { useAutoResize } from "./hooks/useAutoResize.js";
 import { useStreaming } from "./hooks/useStreaming.js";
 import { ouvirMicrofone } from "./hooks/useVoice.js";
 import { LOBOS, runDebate, chamarRei, runDebateStream as runDebateStreamApi, SYSTEM_PROMPTS_CODE } from "./api/council.js";
+import { getUserId } from "./lib/auth.js";
+import { generateChips } from "./utils/generateChips.js";
+import { gerarChipsLocais } from "./utils/generateChips.js";
 
 const MV="cortex-v12";
 const MAX_BUF=8;
@@ -87,33 +90,6 @@ const MODELS = LOBOS.map((l) => ({
   version: l.modelo,
   color: l.cor,
 }));
-
-const ALL_SUGGESTIONS = [
-  "Explica memória vetorial em sistemas de IA",
-  "Melhores ferramentas de produtividade com IA em 2026?",
-  "Como otimizar um workflow de desenvolvimento com IA?",
-  "Diferenças práticas entre os principais modelos de linguagem",
-  "O que é RAG e como funciona na prática?",
-  "Como criar um agente de IA com LangChain?",
-  "Melhores práticas para engenharia de prompts",
-  "Como funciona o fine-tuning de modelos LLM?",
-  "Diferenças entre embeddings e tokens",
-  "O que é o modelo Transformer e como surgiu?",
-  "Como integrar uma API de IA num projeto Python?",
-  "Explicar o conceito de temperatura em modelos de linguagem",
-  "Quais são os melhores LLMs open-source em 2026?",
-  "Como funciona a pesquisa semântica com vetores?",
-  "O que é Chain-of-Thought prompting?",
-  "Como implementar autenticação com JWT em Node.js?",
-  "Diferenças entre REST API e GraphQL",
-  "Como funciona o Docker para desenvolvimento?",
-  "Melhores extensões VS Code para produtividade",
-  "O que é CI/CD e como configurar um pipeline?",
-  "Como usar Python para análise de dados industriais?",
-  "Introdução ao Git: comandos essenciais",
-]
-function shuffleArray(arr){const s=[...arr];for(let i=s.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[s[i],s[j]]=[s[j],s[i]];}return s;}
-function getRandomSuggestions(n=4){return shuffleArray(ALL_SUGGESTIONS).slice(0,n);};
 
 const defaultBrain={episodic:[],semantic:[],patterns:[],procedural:{format:"conciso",lang:"pt",level:"médio"},sessions:0,lastReflect:null};
 const defaultKeys = {
@@ -652,6 +628,8 @@ export default function Cortex(){
   const [lobeConfigAberto,setLobeConfigAberto] = useState(null);
   const [modoDebate, setModoDebate] = useState(false);
   const [modoCode, setModoCode] = useState(false);
+  const [userId, setUserId] = useState("anon");
+  const [sugestoesIniciais, setSugestoesIniciais] = useState(() => gerarChipsLocais("casual"));
 
   // modais
   const [showGuide,setShowGuide]   = useState(false);
@@ -704,6 +682,34 @@ export default function Cortex(){
   const inputCounterWarn = inputChars > 2000;
 
   useEffect(()=>{load();},[]);
+  useEffect(()=>{
+    let cancelado = false;
+    getUserId()
+      .then((id) => {
+        if (!cancelado) setUserId(id || "anon");
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  },[]);
+  useEffect(()=>{
+    let cancelado = false;
+    generateChips({
+      texto: input,
+      frustrationLevel,
+      userId,
+    })
+      .then((chips) => {
+        if (!cancelado) setSugestoesIniciais(chips);
+      })
+      .catch(() => {
+        if (!cancelado) setSugestoesIniciais(gerarChipsLocais("casual"));
+      });
+    return () => {
+      cancelado = true;
+    };
+  },[input, frustrationLevel, userId]);
   useEffect(()=>() => {
     uploadPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     uploadPreviewUrlsRef.current.clear();
@@ -909,7 +915,9 @@ async function send(query) {
   }
 
   function aplicarSugestaoRei(sugestao) {
-    setInput(sugestao);
+    const texto = typeof sugestao === "string" ? sugestao : sugestao?.texto || "";
+    if (!texto) return;
+    setInput(texto);
     requestAnimationFrame(() => {
       ajustar();
       inputRef.current?.focus();
@@ -966,8 +974,6 @@ async function send(query) {
     reflex: {label:"Reflexão", color:AC.reflex, pct:"100%"},
   };
 
-  const sugestoesIniciais = useMemo(() => getRandomSuggestions(4), []);
-  
 const safeParseJson = (value, fallback = null) => {
   try {
     return JSON.parse(value);
