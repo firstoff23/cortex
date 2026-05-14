@@ -1,0 +1,122 @@
+[
+  {
+    "id": "f4-001-upload-pdf-resumo",
+    "query": "Resume este PDF anexado e destaca decisões técnicas accionáveis.",
+    "expected_contains": ["PDF", "resumo", "decisões", "acções"],
+    "lobe_target": "Pragmático Técnico"
+  },
+  {
+    "id": "f4-002-upload-pdf-risco",
+    "query": "Analisa o PDF anexado e encontra riscos, ambiguidades e dados em falta.",
+    "expected_contains": ["riscos", "ambiguidades", "dados em falta", "confidence"],
+    "lobe_target": "Analista Crítico"
+  },
+  {
+    "id": "f4-003-timeout-vercel",
+    "query": "Como devo lidar com timeouts em Vercel Serverless Functions no Córtex?",
+    "expected_contains": ["timeout", "Vercel", "serverless", "fallback"],
+    "lobe_target": "Pragmático Técnico"
+  },
+  {
+    "id": "f4-004-timeout-degradado",
+    "query": "Se um lobo falhar por timeout, o sistema deve parar ou continuar?",
+    "expected_contains": ["Promise.allSettled", "continuar", "falha", "restantes"],
+    "lobe_target": "Analista Crítico"
+  },
+  {
+    "id": "f4-005-rag-base",
+    "query": "Explica como implementar RAG no Córtex sem quebrar a arquitectura actual.",
+    "expected_contains": ["RAG", "chunk", "embed", "retrieve"],
+    "lobe_target": "Generalista"
+  },
+  {
+    "id": "f4-006-rag-cag",
+    "query": "Compara RAG e CAG para memória entre sessões no Córtex.",
+    "expected_contains": ["RAG", "CAG", "memória", "trade-off"],
+    "lobe_target": "Generalista"
+  },
+  {
+    "id": "f4-007-supabase-schema",
+    "query": "Desenha uma tabela Supabase para telemetria de lobos, custo e latência.",
+    "expected_contains": ["Supabase", "telemetria", "latência", "custo"],
+    "lobe_target": "Pragmático Técnico"
+  },
+  {
+    "id": "f4-008-supabase-riscos",
+    "query": "Que riscos de segurança existem ao guardar memória do Córtex no Supabase?",
+    "expected_contains": ["RLS", "PII", "segurança", "dados"],
+    "lobe_target": "Advogado do Diabo"
+  },
+  {
+    "id": "f4-009-debate-paralelo",
+    "query": "Quando devo usar modo debate em vez de modo paralelo?",
+    "expected_contains": ["debate", "paralelo", "latência", "consenso"],
+    "lobe_target": "Generalista"
+  },
+  {
+    "id": "f4-010-debate-ronda2",
+    "query": "Avalia se a Ronda 2 melhora realmente a qualidade das respostas dos lobos.",
+    "expected_contains": ["Ronda 2", "qualidade", "divergência", "consenso"],
+    "lobe_target": "Analista Crítico"
+  },
+  {
+    "id": "f4-011-hitl-baixa-confianca",
+    "query": "O que deve acontecer quando o consensus_score fica abaixo de 50%?",
+    "expected_contains": ["não sei", "confidence", "HiTL", "perguntar"],
+    "lobe_target": "Advogado do Diabo"
+  },
+  {
+    "id": "f4-012-hitl-edicao",
+    "query": "Como permitir que o utilizador edite o plano antes dos lobos continuarem?",
+    "expected_contains": ["utilizador", "editar", "aprovar", "HiTL"],
+    "lobe_target": "Inovador Criativo"
+  },
+  {
+    "id": "f4-013-custo-euros",
+    "query": "Como mostrar custo em euros por sessão sem confundir o utilizador?",
+    "expected_contains": ["custo", "€", "sessão", "transparência"],
+    "lobe_target": "Generalista"
+  },
+  {
+    "id": "f4-014-custo-optimizar",
+    "query": "Propõe formas de reduzir custo de modelos mantendo qualidade aceitável.",
+    "expected_contains": ["cache", "modelos :free", "routing", "qualidade"],
+    "lobe_target": "Pragmático Técnico"
+  },
+  {
+    "id": "f4-015-confidence-ring",
+    "query": "Como deve funcionar o Confidence Ring em cada lobo durante streaming SSE?",
+    "expected_contains": ["Confidence Ring", "SSE", "verde", "vermelho"],
+    "lobe_target": "Inovador Criativo"
+  },
+  {
+    "id": "f4-016-confidence-baixa",
+    "query": "O que deve o Rei fazer quando os lobos têm confiança alta mas discordam entre si?",
+    "expected_contains": ["Rei", "discordam", "confiança", "dissent"],
+    "lobe_target": "Analista Crítico"
+  },
+  {
+    "id": "f4-017-modelos-free",
+    "query": "Escolhe modelos :free rápidos para os cinco lobos sem usar Anthropic directo.",
+    "expected_contains": ["OpenRouter", ":free", "5 lobos", "Rei"],
+    "lobe_target": "Pragmático Técnico"
+  },
+  {
+    "id": "f4-018-modelos-fallback",
+    "query": "Como desenhar fallback de modelos quando um provider gratuito fica indisponível?",
+    "expected_contains": ["fallback", "provider", "indisponível", "Promise.allSettled"],
+    "lobe_target": "Advogado do Diabo"
+  },
+  {
+    "id": "f4-019-fase5-rag",
+    "query": "Planeia a Fase 5 para RAG completo com Qdrant sem migrar tudo de uma vez.",
+    "expected_contains": ["Fase 5", "Qdrant", "incremental", "RAG"],
+    "lobe_target": "Generalista"
+  },
+  {
+    "id": "f4-020-fase5-memoria",
+    "query": "Define critérios de aceitação para memória persistente entre sessões na Fase 5.",
+    "expected_contains": ["memória", "sessões", "critérios", "aceitação"],
+    "lobe_target": "Pragmático Técnico"
+  }
+]
