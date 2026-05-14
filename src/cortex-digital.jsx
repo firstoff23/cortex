@@ -12,6 +12,7 @@ import Slider from './components/Slider.jsx';
 import MemoryBanner from './components/MemoryBanner.jsx';
 import Toast, { useToast } from './components/Toast.jsx';
 import FrustrationBanner from './components/FrustrationBanner.jsx';
+import CouncilGrid from './components/CouncilGrid.jsx';
 import useCouncil from './hooks/useCouncil';
 import { useAutoResize } from "./hooks/useAutoResize.js";
 import { useStreaming } from "./hooks/useStreaming.js";
@@ -595,7 +596,7 @@ export default function Cortex(){
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
-  const { send: runCouncil, invoke: runInvoke, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, getLastSessionContext } = useCouncil(msgs, setMsgs);
+  const { send: runCouncil, invoke: runInvoke, lobeResults, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, getLastSessionContext } = useCouncil(msgs, setMsgs);
   const [input,setInput]     = useState("");
   const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
@@ -1654,27 +1655,16 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                         <div style={{display:"flex",gap:2}}>{LOBOS.map((l,index)=><div key={`lobe-${l.id}-${index}`} style={{width:5,height:5,borderRadius:"50%",background:lobeColor(l),opacity:phase==="council"?1:0.08,transition:"opacity 0.5s"}} className={phase==="council"?"pulse":""}/>)}</div>
                         <span style={{fontSize:10,color:cur.color,fontWeight:600,letterSpacing:1}}>{cur.label}</span>
                       </div>
-                      {/* Streaming parcial ou esqueleto */}
-                      {aStreaming && Object.keys(textosParciais).length>0 ? (
-                        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                          {LOBOS.filter(l=>textosParciais[l.id]).map(l=>(
-                            <div key={`stream-${l.id}`} style={{border:`1px solid ${l.cor}33`,background:`${l.cor}10`,borderRadius:10,padding:"8px 10px"}}>
-                              <div style={{fontSize:9,fontWeight:800,color:l.cor,letterSpacing:0.3,marginBottom:4}}>{l.nome}</div>
-                              <div style={{fontSize:11,lineHeight:1.55,color:T.tx,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
-                                {textosParciais[l.id]}
-                                <span style={{
-                                  display:"inline-block",
-                                  width:"2px",
-                                  height:"1em",
-                                  background:l.cor,
-                                  marginLeft:"2px",
-                                  animation:"piscar 1s step-end infinite",
-                                  verticalAlign:"-0.12em",
-                                }} />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                      {/* CouncilGrid para Streaming em tempo real */}
+                      {(aStreaming || phase === 'council' || phase === 'judges') ? (
+                        <CouncilGrid
+                          lobos={LOBOS}
+                          resultados={lobeResults}
+                          parciais={textosParciais}
+                          fase={phase}
+                          aStreaming={aStreaming}
+                          isMobile={isMobile}
+                        />
                       ) : (
                         <div style={{display:"flex",flexDirection:"column",gap:6}}>
                           <div className="skeleton" style={{height:10,width:"90%"}}/>
