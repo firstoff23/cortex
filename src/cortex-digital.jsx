@@ -9,6 +9,7 @@ import AlertaBanner from './components/AlertaBanner.jsx';
 import EstadoVazio from './components/EstadoVazio.jsx';
 import SidePanel from './components/SidePanel.jsx';
 import Slider from './components/Slider.jsx';
+import MemoryBanner from './components/MemoryBanner.jsx';
 import Toast, { useToast } from './components/Toast.jsx';
 import FrustrationBanner from './components/FrustrationBanner.jsx';
 import useCouncil from './hooks/useCouncil';
@@ -19,6 +20,7 @@ import { LOBOS, runDebateStream as runDebateStreamApi, SYSTEM_PROMPTS_CODE } fro
 import { getUserId } from "./lib/auth.js";
 import { generateChips } from "./utils/generateChips.js";
 import { gerarChipsLocais } from "./utils/generateChips.js";
+import { clearMemory } from "./utils/sessionMemory.js";
 
 const MV="cortex-v12";
 const MAX_BUF=8;
@@ -589,7 +591,7 @@ export default function Cortex(){
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
-  const { send: runCouncil, invoke: runInvoke, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel } = useCouncil(msgs, setMsgs);
+  const { send: runCouncil, invoke: runInvoke, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, getLastSessionContext } = useCouncil(msgs, setMsgs);
   const [input,setInput]     = useState("");
   const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
@@ -634,6 +636,8 @@ export default function Cortex(){
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [ficheiroAnexado, setFicheiroAnexado] = useState(null);
   const [frustrationDismissed, setFrustrationDismissed] = useState(false);
+  const [contextoSessaoAnterior, setContextoSessaoAnterior] = useState(null);
+  const [memoryBannerDismissed, setMemoryBannerDismissed] = useState(false);
   const { textosParciais, aStreaming, onToken, iniciar, terminar } = useStreaming();
   const { ref: inputRef, ajustar } = useAutoResize({
     minHeight: 52,
@@ -642,6 +646,7 @@ export default function Cortex(){
 
   const botRef  = useRef(null);
   const chatRef = useRef(null);
+  const sessionMemoryRef = useRef({ msgs: [], currentConvId: null });
   const uploadPreviewUrlsRef = useRef(new Set());
   const T = THEMES[theme];
 
@@ -694,6 +699,28 @@ export default function Cortex(){
     ajustar();
   },[input, ajustar]);
 
+  useEffect(()=>{
+    sessionMemoryRef.current = { msgs, currentConvId };
+  },[msgs, currentConvId]);
+
+  useEffect(()=>{
+    if (!loaded) return;
+    if (msgs.some((m)=>m.role==="user")) return;
+    setContextoSessaoAnterior(getLastSessionContext());
+  },[loaded, currentConvId, getLastSessionContext, msgs]);
+
+  useEffect(()=>{
+    const guardarAntesDeSair = () => {
+      const actual = sessionMemoryRef.current;
+      guardarMemoriaSessao(actual.msgs, actual.currentConvId);
+    };
+    window.addEventListener("beforeunload", guardarAntesDeSair);
+    return () => {
+      guardarAntesDeSair();
+      window.removeEventListener("beforeunload", guardarAntesDeSair);
+    };
+  },[guardarMemoriaSessao]);
+
   // Bloqueio automático das chaves ao navegar para outra página
   useEffect(()=>{if(page!=="keys"&&!DEV_MODE)setDevUnlocked(false);},[page]);
 
@@ -738,22 +765,57 @@ const saveConvs = c => safePut(MV+"-convs", c.slice(0,50));
   const saveModels = mo => safePut(MV+"-models", mo);
   const saveTemperaturas = temps => safePut(MV+"-temperaturas", temps);
 function newChat() {
-  if (msgs.length>0) autoSaveConv(msgs, currentConvId);
+  if (msgs.length>0) {
+    autoSaveConv(msgs, currentConvId);
+    guardarMemoriaSessao(msgs, currentConvId);
+  }
   setCurrentConvId(Date.now());
   setMsgs([]); saveMsgs([]); setBuf([]);
+  setContextoSessaoAnterior(getLastSessionContext());
+  setMemoryBannerDismissed(false);
   setShowSidebar(false);
   setFrustrationDismissed(false);
   setFrustrationLevel("none");
 }
 
 function switchConv(conv) {
-  if (msgs.length>0) autoSaveConv(msgs, currentConvId);
+  if (msgs.length>0) {
+    autoSaveConv(msgs, currentConvId);
+    guardarMemoriaSessao(msgs, currentConvId);
+  }
   setMsgs(conv.msgs);
   setCurrentConvId(conv.id);
   setBuf([]);
+  setContextoSessaoAnterior(null);
+  setMemoryBannerDismissed(true);
   setShowSidebar(false);
   setFrustrationDismissed(false);
   setFrustrationLevel("none");
+}
+
+function usarContextoSessaoAnterior() {
+  if (!contextoSessaoAnterior) return;
+  const mensagemSistema = {
+    id: Date.now() + Math.random(),
+    role: "system",
+    content: contextoSessaoAnterior,
+    systemNote: true,
+    memoryContext: true,
+  };
+
+  setMsgs((prev) => {
+    if (prev.some((m) => m.role === "user")) return prev;
+    const actualizadas = [mensagemSistema, ...prev.filter((m) => !m.memoryContext)];
+    saveMsgs(actualizadas);
+    return actualizadas;
+  });
+  setMemoryBannerDismissed(true);
+  toast("Contexto anterior adicionado.", "sucesso");
+}
+
+function ignorarContextoSessaoAnterior() {
+  setMemoryBannerDismissed(true);
+  setContextoSessaoAnterior(null);
 }
 
 function deleteConv(convId, e) {
@@ -816,6 +878,7 @@ function removerFicheiroAnexado() {
 
 async function send(query) {
   const q = (query || input).trim();
+  if (q) setMemoryBannerDismissed(true);
   const imagemDataUrlEnvio = ficheiroAnexado?.imageDataUrl || null;
   const anexoUpload = ficheiroAnexado
     ? {
@@ -1024,6 +1087,10 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
 
   if(!loaded)return <Splash/>;
   const cur=phase?phases[phase]:null;
+  const mostrarMemoryBanner = page === "chat" &&
+    !memoryBannerDismissed &&
+    !!contextoSessaoAnterior &&
+    !msgs.some((m) => m.role === "user");
   if (pagina === 'blueprints') return (
     <BlueprintsPanel onVoltar={() => setPagina('chat')} />
   );
@@ -1530,6 +1597,12 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
 )}
 
           <div ref={chatRef} onScroll={e=>{const el=e.currentTarget;setAtBottom(el.scrollHeight-el.scrollTop-el.clientHeight<60);}} style={{flex:1,overflowY:"auto",padding:"13px 12px 7px",position:"relative"}}>
+            {mostrarMemoryBanner && (
+              <MemoryBanner
+                onUsarContexto={usarContextoSessaoAnterior}
+                onIgnorar={ignorarContextoSessaoAnterior}
+              />
+            )}
             {!atBottom&&msgs.length>0&&(
               <button onClick={()=>{botRef.current?.scrollIntoView({behavior:"smooth"});setAtBottom(true);}} style={{position:"sticky",bottom:10,left:"50%",transform:"translateX(-50%)",zIndex:10,display:"flex",alignItems:"center",gap:5,background:T.s1,border:`1px solid ${AC.claude}55`,borderRadius:18,padding:"5px 13px",color:AC.claude,fontSize:10,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${T.b2}88`,marginBottom:4}}>{"Descer"}</button>
             )}
@@ -1845,6 +1918,27 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                 <div style={{fontSize:11,fontWeight:800,color:card.color,marginTop:12}}>{card.action} →</div>
               </button>
             ))}
+          </div>
+
+          <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:16,padding:14,boxShadow:`0 8px 24px ${T.b2}55`,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+            <div style={{minWidth:220,flex:1}}>
+              <div style={{fontSize:14,fontWeight:900,color:T.tx}}>{"Memória de sessões anteriores"}</div>
+              <div style={{fontSize:11,color:T.ts,lineHeight:1.5,marginTop:4}}>
+                {"O Córtex guarda um resumo das últimas conversas para oferecer continuidade."}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={()=>{
+                clearMemory();
+                setContextoSessaoAnterior(null);
+                setMemoryBannerDismissed(true);
+                toast("Memória apagada.", "sucesso");
+              }}
+              style={btn(T,"#ef4444")}
+            >
+              {"Apagar memória"}
+            </button>
           </div>
 
           <div style={{background:T.s1,border:`1px solid ${T.b1}`,borderRadius:16,padding:14,boxShadow:`0 8px 24px ${T.b2}55`}}>

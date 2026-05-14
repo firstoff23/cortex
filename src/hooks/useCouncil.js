@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { callOpenRouter, OR_MODELS } from "../lib/openrouter.js";
 import { calcularConsensoMatematico, runJudges } from "../api/judges.js";
 import { runKing } from "../api/king.js";
@@ -13,6 +13,11 @@ import { detectFrustration } from "../utils/detectFrustration.js";
 import { classifyError } from "../utils/errorMessages.js";
 import { GENERATION_STATES } from "../utils/generationStates.js";
 import { trimHistory, HISTORY_LIMIT } from "../utils/trimHistory.js";
+import {
+  buildMemoryEntry,
+  saveMemoryEntry,
+  getLastSessionContext,
+} from "../utils/sessionMemory.js";
 
 // Cache curta de respostas dos lobos para evitar chamadas repetidas.
 const responseCache = new Map();
@@ -169,6 +174,19 @@ export default function useCouncil(msgs, setMsgs) {
   function devePararGeracao() {
     return stopRequestedRef.current || abortControllerRef.current?.signal?.aborted;
   }
+
+  const guardarMemoriaSessao = useCallback((historicoAnterior, conversationIdAnterior) => {
+    if (!Array.isArray(historicoAnterior) || historicoAnterior.length === 0) return;
+    const temUtilizador = historicoAnterior.some((m) => m.role === "user");
+    const temAssistente = historicoAnterior.some((m) => m.role === "assistant");
+    if (!temUtilizador || !temAssistente) return;
+
+    const entry = buildMemoryEntry(
+      historicoAnterior,
+      conversationIdAnterior || `sessao-${Date.now()}`
+    );
+    saveMemoryEntry(entry);
+  }, []);
 
   async function invoke(id, sys, msg, ctx = {}) {
     const { toast, callOllama } = ctx;
@@ -623,6 +641,8 @@ export default function useCouncil(msgs, setMsgs) {
     frustrationLevel,
     setFrustrationLevel,
     generationState,
-    generationTime
+    generationTime,
+    guardarMemoriaSessao,
+    getLastSessionContext
   };
 }
