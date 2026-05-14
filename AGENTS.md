@@ -134,6 +134,7 @@
 - ✅ Fallback de modelos — FEITO (array models por lobe)
 - ✅ STT fallback — FEITO (OpenRouter Whisper via api/stt.js)
 - ✅ F4-08 Multilinguismo PT-PT — FEITO
+- ✅ Detecção de Frustração — FEITO
 - Persistência real com Supabase (substituir localStorage)
 - Conectores on-demand: Obsidian, Notion (ElevenLabs substituído por OpenRouter TTS)
 - Cloudflare: DNS + WAF + rate limiting + Turnstile

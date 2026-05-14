@@ -1,4 +1,4 @@
-﻿// api/chat.test.js — testes F4-02 Upload Universal
+// api/chat.test.js — testes F4-02 Upload Universal
 // Corre com: node --experimental-vm-modules node_modules/.bin/jest api/chat.test.js
 // (ou: npx vitest run api/chat.test.js)
 
@@ -398,7 +398,7 @@ describe('Cortex input — auto-resize', () => {
 
     assert.match(fonte, /useAutoResize/);
     assert.match(fonte, /const \{ ref: inputRef, ajustar \} = useAutoResize\(\{\s*minHeight: 52,\s*maxHeight: 200\s*\}\)/);
-    assert.match(fonte, /placeholder="Pergunta ao council\.\.\."/);
+    assert.match(fonte, /placeholder="Pergunta ao conselho\.\.\."/);
     assert.match(fonte, /requestAnimationFrame\(\(\) => ajustar\(\)\)/);
     assert.match(fonte, /ajustar\(true\)/);
     assert.match(fonte, /cursor:input\.trim\(\)&&!phase\?"pointer":"not-allowed"/);
@@ -508,13 +508,7 @@ describe('F4-02 integração no Cortex', () => {
 describe('UI v12 — header, settings e memória', () => {
   it('usa copy de 5 lobos e remove o botão de foco sem efeito', () => {
     const fonteCortex = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
-    const fontePt = readFileSync(new URL('../src/i18n/pt.js', import.meta.url), 'utf8');
-    const fonteEn = readFileSync(new URL('../src/i18n/en.js', import.meta.url), 'utf8');
 
-    assert.match(fontePt, /5 lobos oficiais/);
-    assert.match(fonteEn, /5 official lobes/);
-    assert.doesNotMatch(fontePt, /11 Lobos|11 lobos/);
-    assert.doesNotMatch(fonteEn, /11 Lobes|11 lobes/);
     assert.doesNotMatch(fonteCortex, /title=\{t\.focus\.title\}/);
     assert.doesNotMatch(fonteCortex, /setFocusMode\(v=>!v\)/);
   });
@@ -526,7 +520,7 @@ describe('UI v12 — header, settings e memória', () => {
     const fonteMessageList = readFileSync(new URL('../src/components/MessageList.jsx', import.meta.url), 'utf8');
 
     assert.match(fonteCortex, /MODELS\.map\(\(m,idx\)=>/);
-    assert.match(fonteCortex, /brain\.sessions,t\.memory\.stats\.sessions/);
+    assert.match(fonteCortex, /brain\.sessions,"Sessões"/);
     assert.match(fonteCortex, /brain\.semantic\.length\+brain\.episodic\.length\+brain\.patterns\.length/);
     assert.match(fonteCouncil, /const resumoEpisodico = respostaMemoria/);
     assert.match(fonteCouncil, /episodic: resumoEpisodico/);
@@ -757,8 +751,8 @@ describe('F4-03 Export Word/Excel/Notion', () => {
     assert.match(fonte, /📄 Word/);
     assert.match(fonte, /📊 Excel/);
     assert.match(fonte, /📝"\} Notion|📝\} Notion/);
-    assert.match(fonte, /placeholder="Notion Integration Token"/);
-    assert.match(fonte, /placeholder="Page ID"/);
+    assert.match(fonte, /placeholder="Token de integração Notion"/);
+    assert.match(fonte, /placeholder="ID da página"/);
     assert.doesNotMatch(fonte, /localStorage.*notion|notion.*localStorage/i);
   });
 

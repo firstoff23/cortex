@@ -10,6 +10,7 @@ import EstadoVazio from './components/EstadoVazio.jsx';
 import SidePanel from './components/SidePanel.jsx';
 import Slider from './components/Slider.jsx';
 import Toast, { useToast } from './components/Toast.jsx';
+import FrustrationBanner from './components/FrustrationBanner.jsx';
 import useCouncil from './hooks/useCouncil';
 import { useAutoResize } from "./hooks/useAutoResize.js";
 import { useStreaming } from "./hooks/useStreaming.js";
@@ -638,7 +639,7 @@ export default function Cortex(){
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
-  const { send: runCouncil, invoke: runInvoke, lobeResults, phase, setPhase } = useCouncil(msgs, setMsgs);
+  const { send: runCouncil, invoke: runInvoke, lobeResults, phase, setPhase, frustrationLevel, setFrustrationLevel } = useCouncil(msgs, setMsgs);
   const [input,setInput]     = useState("");
   const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
@@ -680,6 +681,7 @@ export default function Cortex(){
   const [focusLobes, setFocusLobes] = useState(new Set(LOBOS.map(l=>l.id)));
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [ficheiroAnexado, setFicheiroAnexado] = useState(null);
+  const [frustrationDismissed, setFrustrationDismissed] = useState(false);
   const { textosParciais, aStreaming, onToken, iniciar, terminar } = useStreaming();
   const { ref: inputRef, ajustar } = useAutoResize({
     minHeight: 52,
@@ -764,6 +766,8 @@ function newChat() {
   setCurrentConvId(Date.now());
   setMsgs([]); saveMsgs([]); setBuf([]);
   setShowSidebar(false);
+  setFrustrationDismissed(false);
+  setFrustrationLevel("none");
 }
 
 function switchConv(conv) {
@@ -772,6 +776,8 @@ function switchConv(conv) {
   setCurrentConvId(conv.id);
   setBuf([]);
   setShowSidebar(false);
+  setFrustrationDismissed(false);
+  setFrustrationLevel("none");
 }
 
 function deleteConv(convId, e) {
@@ -1649,6 +1655,21 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                   <button type="button" onClick={()=>setShowFileUpload(false)} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:8,color:T.ts,cursor:"pointer",fontSize:12,padding:"4px 9px",fontFamily:"inherit"}}>Fechar</button>
                 </div>
                 <FileUpload onUpload={handleFileUpload} />
+              </div>
+            )}
+            {frustrationLevel === "high" && !phase && !frustrationDismissed && (
+              <div style={{maxWidth:820,margin:"0 auto"}}>
+                <FrustrationBanner 
+                  onRetry={() => {
+                    setFrustrationDismissed(true);
+                    regenerate(); 
+                  }}
+                  onDismiss={() => {
+                    setFrustrationDismissed(true);
+                    setFrustrationLevel("none");
+                  }}
+                  T={T}
+                />
               </div>
             )}
             <div style={{display:"flex",gap:8,maxWidth:820,margin:"0 auto",alignItems:"flex-end"}}>

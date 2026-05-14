@@ -9,6 +9,7 @@ import {
 } from "../api/council.js";
 import { runGraders } from "../utils/graders.js";
 import { getJuizesParaPergunta } from "../utils/orchestrator.js";
+import { detectFrustration } from "../utils/detectFrustration.js";
 
 // Cache curta de respostas dos lobos para evitar chamadas repetidas.
 const responseCache = new Map();
@@ -98,6 +99,7 @@ export default function useCouncil(msgs, setMsgs) {
   const [gradersResult, setGradersResult] = useState(null);
   const [consensusScore, setConsensusScore] = useState(0);
   const [debateResult, setDebateResult] = useState(null);
+  const [frustrationLevel, setFrustrationLevel] = useState("none");
   const controllersRef = useRef(new Map());
 
   useEffect(() => {
@@ -230,6 +232,9 @@ export default function useCouncil(msgs, setMsgs) {
     setMsgs(nm);
     saveMsgs(nm);
 
+    const frLevel = detectFrustration(nm);
+    setFrustrationLevel(frLevel);
+
     const { buf: bufComprimido, compressed, before, after } = await compressContext(
       [...buf, `USER: ${q}`],
       keys.claude,
@@ -254,6 +259,10 @@ export default function useCouncil(msgs, setMsgs) {
     }
 
     let qFinal = q;
+    if (frLevel === "low" || frLevel === "high") {
+      qFinal += "\n\n[System Note: The user seems frustrated. Please adopt an extremely empathetic, clear, and helpful tone.]";
+    }
+
     setPhase("council");
     try {
       const refined = await callOpenRouter("gemini", P.refine(q), q, 120, 3500);
@@ -264,20 +273,26 @@ export default function useCouncil(msgs, setMsgs) {
         !refined.includes("{") &&
         !refined.includes("```")
       )
-        qFinal = refined.trim();
+        qFinal = refined.trim() + (frLevel !== "none" ? "\n\n[System Note: The user seems frustrated. Please adopt an extremely empathetic, clear, and helpful tone.]" : "");
     } catch {
       // Falha silenciosa.
     }
 
     let debateResultado = null;
     let nextLobeResults = [];
+    
+    let activeTemps = temperaturas;
+    if (frLevel === "high") {
+      activeTemps = { ...temperaturas };
+      Object.keys(activeTemps).forEach(k => activeTemps[k] = 0.2);
+    }
 
     const modoExecucao = modoDebate === "debate" ? "debate" : "paralelo";
     streaming?.iniciar?.();
     try {
       debateResultado = await runDebateStream(qFinal, modoExecucao, {
         lobos: councilLobes,
-        temperaturas,
+        temperaturas: activeTemps,
         imageDataUrl,
         onToken: streaming?.onToken,
       });
@@ -492,5 +507,7 @@ export default function useCouncil(msgs, setMsgs) {
     debateResult,
     phase,
     setPhase,
+    frustrationLevel,
+    setFrustrationLevel,
   };
 }
