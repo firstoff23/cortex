@@ -2,6 +2,7 @@ import React from "react";
 import LobeCard from "./LobeCard";
 import ClaudeCard from "./ClaudeCard";
 import ChatBubble from "./ChatBubble";
+import { HISTORY_LIMIT } from "../utils/trimHistory";
 
 const GENERIC_ERROR_SUGGESTIONS = new Set([
   "Tenta reformular a pergunta",
@@ -37,6 +38,9 @@ const MessageList = React.memo(function MessageList({
   return (
     <>
       {msgs.map((m, i) => {
+        // Separador de contexto truncado
+        const showContextSeparator = i === msgs.length - HISTORY_LIMIT && msgs.length > HISTORY_LIMIT;
+        
         const sugestoesRei = [
           ...(m.king?.suggestions || []),
           ...(m.sugestoes || []),
@@ -47,8 +51,26 @@ const MessageList = React.memo(function MessageList({
           .slice(0, 3);
 
         return (
-          <div
-          key={`msg-${i}-${m.id || m.role || "sem-id"}`}
+          <React.Fragment key={`msg-group-${i}`}>
+            {showContextSeparator && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  margin: "24px 0",
+                  opacity: 0.6,
+                }}
+              >
+                <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, transparent, var(--ts), transparent)" }} />
+                <span style={{ fontSize: "10px", color: "var(--ts)", letterSpacing: "1px", textTransform: "lowercase" }}>
+                  · · · contexto activo a partir daqui · · ·
+                </span>
+                <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, transparent, var(--ts), transparent)" }} />
+              </div>
+            )}
+            <div
+              key={`msg-${i}-${m.id || m.role || "sem-id"}`}
           className="msg-in"
           style={{
             alignSelf: m.role === "user" ? "flex-end" : "stretch",
@@ -215,6 +237,7 @@ const MessageList = React.memo(function MessageList({
             </ClaudeCardView>
           )}
         </div>
+          </React.Fragment>
         );
       })}
     </>

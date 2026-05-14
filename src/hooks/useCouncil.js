@@ -12,6 +12,7 @@ import { getJuizesParaPergunta } from "../utils/orchestrator.js";
 import { detectFrustration } from "../utils/detectFrustration.js";
 import { classifyError } from "../utils/errorMessages.js";
 import { GENERATION_STATES } from "../utils/generationStates.js";
+import { trimHistory, HISTORY_LIMIT } from "../utils/trimHistory.js";
 
 // Cache curta de respostas dos lobos para evitar chamadas repetidas.
 const responseCache = new Map();
@@ -304,6 +305,9 @@ export default function useCouncil(msgs, setMsgs) {
     setMsgs(nm);
     saveMsgs(nm);
 
+    // Trunca o histórico enviado ao modelo (preserva estado local completo)
+    const messagesParaEnviar = trimHistory(nm, HISTORY_LIMIT);
+
     const frLevel = detectFrustration(nm);
     setFrustrationLevel(frLevel);
 
@@ -380,6 +384,7 @@ export default function useCouncil(msgs, setMsgs) {
         temperaturas: activeTemps,
         imageDataUrl,
         systemPrompts,
+        messages: messagesParaEnviar, // <--- ADICIONADO
         signal: abortControllerRef.current.signal,
         onToken: onTokenParcial,
       });
@@ -430,7 +435,7 @@ export default function useCouncil(msgs, setMsgs) {
     const ctrlRei = new AbortController();
     controllersRef.current.set("rei", ctrlRei);
     try {
-      resultadoRei = await runKing(q, nextLobeResults, veredictoJuizes, consenso, ctrlRei.signal);
+      resultadoRei = await runKing(q, nextLobeResults, veredictoJuizes, consenso, ctrlRei.signal, { messages: messagesParaEnviar });
       setKingResult(resultadoRei);
     } catch (e) {
       if (!devePararGeracao()) {

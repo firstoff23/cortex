@@ -136,6 +136,7 @@
 - ✅ Fallback de modelos — FEITO (array models por lobe)
 - ✅ STT fallback — FEITO (OpenRouter Whisper via api/stt.js)
 - ✅ F4-08 Multilinguismo PT-PT — FEITO
+- ✅ F4-09 Truncagem de Histórico (12 msgs) — FEITO (trimHistory.js, indicador visual)
 - ✅ Loop refinamento ronda 3 (score < 50%) — FEITO
 - ✅ Modo Code Agent com system prompts override — FEITO
 - ✅ Detecção de Frustração — FEITO

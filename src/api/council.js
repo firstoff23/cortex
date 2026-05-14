@@ -268,7 +268,8 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
 
   const system = options.systemPrompts?.[lobe.id] || SYSTEM_PROMPTS[lobe.id];
   const userContent = construirConteudoUtilizador(pergunta, contextoDebate, options.imageDataUrl);
-  const messages = [{ role: 'user', content: userContent }];
+  const history = options.messages || [];
+  const messages = [...history, { role: "user", content: userContent }];
   const geracao = opcoesGeracaoLobe(lobe, options);
   const lobeTools = lobe.provider === 'openrouter'
     ? {
@@ -365,8 +366,12 @@ export async function chamarLobeStream(lobe, pergunta, contextoDebate = null, op
       stream: true,
       ...opcoesGeracaoLobe(lobe, options),
       messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: construirConteudoUtilizador(pergunta, contextoDebate, options.imageDataUrl) },
+        { role: "system", content: system },
+        ...(options.messages || []),
+        {
+          role: "user",
+          content: construirConteudoUtilizador(pergunta, contextoDebate, options.imageDataUrl),
+        },
       ],
       max_tokens:
         options.max_tokens ||
@@ -429,10 +434,9 @@ async function chamarComMapa(lobe, pergunta, contextoDebate, mapa, chamar, optio
   mapa.set(lobe.id, ctrl);
   try {
     const valor = await chamar(lobe, pergunta, contextoDebate, {
+      ...options,
       signal: ctrl.signal,
       ...opcoesGeracaoLobe(lobe, options),
-      ...(options.imageDataUrl ? { imageDataUrl: options.imageDataUrl } : {}),
-      ...(options.systemPrompts ? { systemPrompts: options.systemPrompts } : {}),
     });
     return normalizarValorLobe(lobe, valor, contextoDebate);
   } finally {
@@ -511,18 +515,16 @@ async function chamarStreamComFallback(lobe, pergunta, contextoDebate, chamarStr
 
   try {
     return await chamarStream(lobe, pergunta, contextoDebate, {
+      ...options,
       signal: ctrl.signal,
       onToken,
       ...geracao,
-      ...(options.imageDataUrl ? { imageDataUrl: options.imageDataUrl } : {}),
-      ...(options.systemPrompts ? { systemPrompts: options.systemPrompts } : {}),
     }).catch((erro) => {
       if (ctrl.signal.aborted || erro?.name === 'AbortError') throw erro;
       return chamarFallback(lobe, pergunta, contextoDebate, {
+        ...options,
         signal: ctrl.signal,
         ...geracao,
-        ...(options.imageDataUrl ? { imageDataUrl: options.imageDataUrl } : {}),
-        ...(options.systemPrompts ? { systemPrompts: options.systemPrompts } : {}),
       });
     });
   } finally {

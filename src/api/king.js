@@ -247,9 +247,18 @@ const JUIZ_FALLBACK = {
   provider: "openrouter",
 };
 
-async function chamarModeloRei(modelo, contexto, abortSignal) {
+async function chamarModeloRei(modelo, contexto, abortSignal, options = {}) {
   // response-healing corrige JSON malformado automaticamente (OpenRouter plugin).
   // NÃO adicionar stream:true — response-healing exige non-streaming.
+  
+  // Trunca e constrói o histórico se existirem mensagens prévias
+  const messages = options.messages || [];
+  const payloadMessages = [
+    { role: "system", content: SYSTEM_REI },
+    ...messages,
+    { role: "user", content: contexto }
+  ];
+
   const resposta = await fetch("/api/chat", {
     method: "POST",
     signal: abortSignal,
@@ -260,8 +269,7 @@ async function chamarModeloRei(modelo, contexto, abortSignal) {
     },
     body: JSON.stringify({
       model: modelo,
-      system: SYSTEM_REI,
-      messages: [{ role: "user", content: contexto }],
+      messages: payloadMessages,
       plugins: [{ id: "response-healing" }],
       response_format: { type: "json_object" },
       max_tokens: 1500,
@@ -286,6 +294,7 @@ export async function runKing(
   veredictoJuizes,
   consensoMatematico,
   abortSignal,
+  options = {},
 ) {
   try {
     const contexto = formatarContextoRei(
@@ -298,11 +307,11 @@ export async function runKing(
 
     let parseado;
     try {
-      parseado = await chamarModeloRei(JUIZ_REI.modelo, contexto, abortSignal);
+      parseado = await chamarModeloRei(JUIZ_REI.modelo, contexto, abortSignal, options);
     } catch (errPrimario) {
       if (errPrimario.name === "AbortError") throw errPrimario;
       // FALLBACK PAGO — só em falha do modelo principal.
-      parseado = await chamarModeloRei(JUIZ_FALLBACK.modelo, contexto, abortSignal);
+      parseado = await chamarModeloRei(JUIZ_FALLBACK.modelo, contexto, abortSignal, options);
     }
 
     return normalizarResultadoRei(
