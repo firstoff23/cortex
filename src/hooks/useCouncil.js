@@ -10,6 +10,7 @@ import {
 import { runGraders } from "../utils/graders.js";
 import { getJuizesParaPergunta } from "../utils/orchestrator.js";
 import { detectFrustration } from "../utils/detectFrustration.js";
+import { classifyError } from "../utils/errorMessages.js";
 
 // Cache curta de respostas dos lobos para evitar chamadas repetidas.
 const responseCache = new Map();
@@ -95,6 +96,7 @@ export async function runDebateStream(pergunta, modo = "paralelo", options = {})
 
 export default function useCouncil(msgs, setMsgs) {
   const [phase, setPhase] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [lobeResults, setLobeResults] = useState([]);
   const [judgeResults, setJudgeResults] = useState([]);
   const [kingResult, setKingResult] = useState(null);
@@ -102,14 +104,65 @@ export default function useCouncil(msgs, setMsgs) {
   const [consensusScore, setConsensusScore] = useState(0);
   const [debateResult, setDebateResult] = useState(null);
   const [frustrationLevel, setFrustrationLevel] = useState("none");
+  const abortControllerRef = useRef(null);
   const controllersRef = useRef(new Map());
+  const stopRequestedRef = useRef(false);
+  const partialTextRef = useRef({});
+  const saveMsgsRef = useRef(null);
+  const interruptedMessageAddedRef = useRef(false);
 
   useEffect(() => {
     return () => {
       controllersRef.current.forEach((ctrl) => ctrl.abort());
       controllersRef.current.clear();
+      abortControllerRef.current?.abort();
     };
   }, []);
+
+  function textoParcialActual() {
+    return Object.entries(partialTextRef.current)
+      .map(([id, texto]) => `**Lobo ${id}:** ${texto}`)
+      .filter((linha) => linha.trim().length > 12)
+      .join("\n\n");
+  }
+
+  function adicionarMensagemInterrompida() {
+    if (interruptedMessageAddedRef.current) return;
+    interruptedMessageAddedRef.current = true;
+
+    const textoParcial = textoParcialActual();
+    const content = `${textoParcial ? `${textoParcial}\n\n` : ""}Geração interrompida.`;
+    const msg = {
+      id: Date.now() + Math.random(),
+      role: "assistant",
+      content,
+      structured: { final: content },
+      interrupted: true,
+      councilDecision: "Geração interrompida pelo utilizador.",
+    };
+
+    setMsgs((prev) => {
+      const actualizadas = [...prev, msg];
+      saveMsgsRef.current?.(actualizadas);
+      return actualizadas;
+    });
+  }
+
+  function stopGeneration() {
+    stopRequestedRef.current = true;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    controllersRef.current.forEach((ctrl) => ctrl.abort());
+    controllersRef.current.clear();
+    adicionarMensagemInterrompida();
+    setIsGenerating(false);
+    setPhase(null);
+  }
+
+  function devePararGeracao() {
+    return stopRequestedRef.current || abortControllerRef.current?.signal?.aborted;
+  }
 
   async function invoke(id, sys, msg, ctx = {}) {
     const { toast, callOllama } = ctx;
@@ -155,10 +208,12 @@ export default function useCouncil(msgs, setMsgs) {
       cacheSet(id, msg, r);
       return r;
     } catch (e) {
+      if (e.name === "AbortError") {
+        return { result: "Geração interrompida.", model: id, real: false };
+      }
       const errMsg = e.message || "";
-      const isTimeout = /timeout/i.test(errMsg);
-      if (isTimeout) toast?.(id + ": tempo esgotado", "error");
-      else toast?.(id + ": " + errMsg.slice(0, 80));
+      const erro = classifyError(e);
+      toast?.(`${id}: ${erro.mensagem} ${erro.accao}.`, "erro");
       const nomeLobe = LOBOS.find((lobe) => String(lobe.id) === String(id))?.nome || id;
       return { result: `[Erro em ${nomeLobe}: ${errMsg || "serviço indisponível"}]`, model: id, real: false };
     } finally {
@@ -216,6 +271,13 @@ export default function useCouncil(msgs, setMsgs) {
     const q = (query || input).trim();
     if (!q || phase) return;
 
+    abortControllerRef.current = new AbortController();
+    stopRequestedRef.current = false;
+    partialTextRef.current = {};
+    interruptedMessageAddedRef.current = false;
+    saveMsgsRef.current = saveMsgs;
+    setIsGenerating(true);
+
     setJudgeResults([]);
     setKingResult(null);
     setGradersResult(null);
@@ -268,7 +330,9 @@ export default function useCouncil(msgs, setMsgs) {
 
     setPhase("council");
     try {
-      const refined = await callOpenRouter("gemini", P.refine(q), q, 120, 3500);
+      const refined = await callOpenRouter("gemini", P.refine(q), q, 120, 3500, {
+        signal: abortControllerRef.current.signal,
+      });
       if (
         refined &&
         refined.trim().length > 10 &&
@@ -277,9 +341,15 @@ export default function useCouncil(msgs, setMsgs) {
         !refined.includes("```")
       )
         qFinal = refined.trim() + (frLevel !== "none" ? "\n\n[System Note: The user seems frustrated. Please adopt an extremely empathetic, clear, and helpful tone.]" : "");
-    } catch {
+    } catch (e) {
+      if (devePararGeracao() || e.name === "AbortError") {
+        setIsGenerating(false);
+        setPhase(null);
+        return;
+      }
       // Falha silenciosa.
     }
+    if (devePararGeracao()) return;
 
     let debateResultado = null;
     let nextLobeResults = [];
@@ -291,6 +361,10 @@ export default function useCouncil(msgs, setMsgs) {
     }
 
     const modoExecucao = modoDebate === "debate" ? "debate" : "paralelo";
+    const onTokenParcial = (delta, textoTotal, lobe) => {
+      partialTextRef.current[lobe.id] = textoTotal;
+      streaming?.onToken?.(delta, textoTotal, lobe);
+    };
     streaming?.iniciar?.();
     try {
       debateResultado = await runDebateStream(qFinal, modoExecucao, {
@@ -298,11 +372,13 @@ export default function useCouncil(msgs, setMsgs) {
         temperaturas: activeTemps,
         imageDataUrl,
         systemPrompts,
-        onToken: streaming?.onToken,
+        signal: abortControllerRef.current.signal,
+        onToken: onTokenParcial,
       });
     } finally {
       streaming?.terminar?.();
     }
+    if (devePararGeracao()) return;
     setDebateResult(modoExecucao === "debate" ? debateResultado : null);
     nextLobeResults = councilLobes.map((l, i) =>
       lobeDebateParaUI(l, i, debateResultado.ronda1, debateResultado.ronda2, debateResultado.ronda3, lobeConfidenceScore)
@@ -332,10 +408,14 @@ export default function useCouncil(msgs, setMsgs) {
       veredictoJuizes = dedupeJudges(veredictoJuizes);
       setJudgeResults(veredictoJuizes);
     } catch (e) {
-      toast(`Juízes: ${e.message}`);
+      if (!devePararGeracao()) {
+        const erro = classifyError(e);
+        toast?.(`Juízes: ${erro.mensagem} ${erro.accao}.`, "erro");
+      }
     } finally {
       if (controllersRef.current.get("judges") === ctrlJuizes) controllersRef.current.delete("judges");
     }
+    if (devePararGeracao()) return;
 
     setPhase("rei");
     let resultadoRei = null;
@@ -345,10 +425,14 @@ export default function useCouncil(msgs, setMsgs) {
       resultadoRei = await runKing(q, nextLobeResults, veredictoJuizes, consenso, ctrlRei.signal);
       setKingResult(resultadoRei);
     } catch (e) {
-      toast(`Rei: ${e.message}`);
+      if (!devePararGeracao()) {
+        const erro = classifyError(e);
+        toast?.(`Rei: ${erro.mensagem} ${erro.accao}.`, "erro");
+      }
     } finally {
       if (controllersRef.current.get("rei") === ctrlRei) controllersRef.current.delete("rei");
     }
+    if (devePararGeracao()) return;
 
     const graders = runGraders(resultadoRei || {});
     setGradersResult(graders);
@@ -386,11 +470,13 @@ export default function useCouncil(msgs, setMsgs) {
       }
     } catch (e) {
       cR = nextLobeResults.map((l) => `**${l.label}:** ${l.result}`).join("\n\n");
-      toast(`Córtex: ${e.message}`);
+      const erro = classifyError(e);
+      toast?.(`Córtex: ${erro.mensagem} ${erro.accao}.`, "erro");
     }
 
       structured = normalizeCouncilPayload(cR, typeof cR === "string" ? cR : "");
     }
+    if (devePararGeracao()) return;
 
     let cDecision = heuristicDecision(q);
     if (resultadoRei) {
@@ -406,6 +492,7 @@ export default function useCouncil(msgs, setMsgs) {
         );
       } catch {}
     }
+    if (devePararGeracao()) return;
 
     const council = Object.fromEntries(nextLobeResults.map((l) => [l.id, l.result]));
 
@@ -497,6 +584,8 @@ export default function useCouncil(msgs, setMsgs) {
 
     autoSaveConv(fm, currentConvId);
     if (resultadoRei) toast?.("Rei terminou o veredicto", "sucesso");
+    setIsGenerating(false);
+    abortControllerRef.current = null;
     setTimeout(() => taRef.current?.focus(), 80);
   }
 
@@ -511,6 +600,8 @@ export default function useCouncil(msgs, setMsgs) {
     debateResult,
     phase,
     setPhase,
+    stopGeneration,
+    isGenerating,
     frustrationLevel,
     setFrustrationLevel,
   };

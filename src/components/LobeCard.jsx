@@ -1,6 +1,6 @@
 import React from "react";
-import AlertaBanner from "./AlertaBanner";
 import ChatBubble from "./ChatBubble";
+import ErrorMessage from "./ErrorMessage.jsx";
 import LobeLoader from "./LobeLoader";
 
 const LobeCard = React.memo(function LobeCard({
@@ -224,7 +224,7 @@ const LobeCard = React.memo(function LobeCard({
         }}
       >
         {l.isErr && (
-          <AlertaBanner tipo="erro" mensagem={`${nomeLobe} falhou — a usar reserva quando disponível.`} />
+          <ErrorMessage error={`${nomeLobe} falhou — a usar reserva quando disponível.`} />
         )}
 
         {l.regenerating || (!respostaVisivel && aStreaming) ? (

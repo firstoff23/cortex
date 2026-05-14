@@ -1,5 +1,6 @@
 // FileUploadButton.jsx — botão de carregamento com arrastar-e-largar e clique
 import { useRef, useState } from 'react';
+import ErrorMessage from './ErrorMessage.jsx';
 
 // Extensões aceites pelo input de ficheiro
 const ACCEPT = '.pdf,.docx,.txt,.md,.csv,.xlsx,.mp3,.wav';
@@ -124,18 +125,12 @@ export default function FileUploadButton({ onFicheiro, ficheiro, erro, onLimpar 
             position:   'absolute',
             bottom:     '110%',
             left:       0,
-            background: '#2a0a0a',
-            border:     '1px solid #5a1a1a',
-            borderRadius: 8,
-            padding:    '6px 10px',
-            fontSize:   10,
-            color:      '#fca5a5',
             whiteSpace: 'nowrap',
             zIndex:     100,
             boxShadow:  '0 4px 12px rgba(0,0,0,0.5)',
           }}
         >
-          ⚠ {erro}
+          <ErrorMessage error={erro} />
         </div>
       )}
     </div>

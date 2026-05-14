@@ -46,8 +46,14 @@ export async function callOpenRouter(
   system,
   userMsg,
   maxTokens = 420,
-  signal = null
+  timeoutOrSignal = 25_000,
+  options = {}
 ) {
+  const timeoutMs = typeof timeoutOrSignal === "number" ? timeoutOrSignal : 25_000;
+  const signal =
+    timeoutOrSignal && typeof timeoutOrSignal.addEventListener === "function"
+      ? timeoutOrSignal
+      : options.signal || null;
   const key = import.meta.env.VITE_OPENROUTER_API_KEY || "";
 
   if (!key || key.length < 10) {
@@ -66,7 +72,7 @@ export async function callOpenRouter(
   const isJsonLobe = JSON_LOBES.includes(lobeIdOrModel);
 
   const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 25_000);
+  const tid = setTimeout(() => ctrl.abort(), timeoutMs);
   const mergedSignal = signal ? mergeSignals(signal, ctrl.signal) : ctrl.signal;
 
   const payload = {
@@ -176,6 +182,11 @@ function mergeSignals(s1, s2) {
   const ctrl = new AbortController();
 
   const abort = () => ctrl.abort();
+
+  if (s1.aborted || s2.aborted) {
+    ctrl.abort();
+    return ctrl.signal;
+  }
 
   s1.addEventListener("abort", abort, { once: true });
   s2.addEventListener("abort", abort, { once: true });

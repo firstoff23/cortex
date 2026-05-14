@@ -410,6 +410,9 @@ export function chamarRei(...args) {
 
 async function chamarComMapa(lobe, pergunta, contextoDebate, mapa, chamar, options = {}) {
   const ctrl = new AbortController();
+  const abortarPorPai = () => ctrl.abort();
+  if (options.signal?.aborted) ctrl.abort();
+  else options.signal?.addEventListener?.('abort', abortarPorPai, { once: true });
   mapa.set(lobe.id, ctrl);
   try {
     const valor = await chamar(lobe, pergunta, contextoDebate, {
@@ -420,6 +423,7 @@ async function chamarComMapa(lobe, pergunta, contextoDebate, mapa, chamar, optio
     });
     return normalizarValorLobe(lobe, valor, contextoDebate);
   } finally {
+    options.signal?.removeEventListener?.('abort', abortarPorPai);
     if (mapa.get(lobe.id) === ctrl) mapa.delete(lobe.id);
   }
 }
@@ -486,6 +490,9 @@ export async function runDebate(pergunta, modo = 'paralelo', options = {}) {
 
 async function chamarStreamComFallback(lobe, pergunta, contextoDebate, chamarStream, chamarFallback, onToken, options = {}) {
   const ctrl = new AbortController();
+  const abortarPorPai = () => ctrl.abort();
+  if (options.signal?.aborted) ctrl.abort();
+  else options.signal?.addEventListener?.('abort', abortarPorPai, { once: true });
   const timeout = setTimeout(() => ctrl.abort(new Error('Timeout de 28s excedido')), 28000);
   const geracao = opcoesGeracaoLobe(lobe, options);
 
@@ -496,15 +503,17 @@ async function chamarStreamComFallback(lobe, pergunta, contextoDebate, chamarStr
       ...geracao,
       ...(options.imageDataUrl ? { imageDataUrl: options.imageDataUrl } : {}),
       ...(options.systemPrompts ? { systemPrompts: options.systemPrompts } : {}),
-    }).catch(() =>
-      chamarFallback(lobe, pergunta, contextoDebate, {
+    }).catch((erro) => {
+      if (ctrl.signal.aborted || erro?.name === 'AbortError') throw erro;
+      return chamarFallback(lobe, pergunta, contextoDebate, {
         signal: ctrl.signal,
         ...geracao,
         ...(options.imageDataUrl ? { imageDataUrl: options.imageDataUrl } : {}),
         ...(options.systemPrompts ? { systemPrompts: options.systemPrompts } : {}),
-      }),
-    );
+      });
+    });
   } finally {
+    options.signal?.removeEventListener?.('abort', abortarPorPai);
     clearTimeout(timeout);
   }
 }

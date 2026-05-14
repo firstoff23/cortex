@@ -3,6 +3,7 @@ import ChatBubble from "./ChatBubble.jsx";
 import JudgeCard from "./JudgeCard";
 import { exportarExcel, exportarNotion, exportarWord } from "../hooks/useExport.js";
 import { falarTexto } from "../hooks/useVoice.js";
+import { classifyError } from "../utils/errorMessages.js";
 
 function pct(valor) {
   if (typeof valor !== "number") return null;
@@ -146,7 +147,8 @@ const KingCard = React.memo(function KingCard({
       toast?.(tipo === "notion" ? "Exportado para Notion" : "Relatório exportado", "sucesso");
     } catch (e) {
       console.error("[Export]", e);
-      toast?.(e.message || "Export falhou", "erro");
+      const erro = classifyError(e);
+      toast?.(`${erro.mensagem} ${erro.accao}.`, "erro");
     } finally {
       setExportando(false);
     }

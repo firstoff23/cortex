@@ -615,7 +615,7 @@ export default function Cortex(){
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
-  const { send: runCouncil, invoke: runInvoke, lobeResults, phase, setPhase, frustrationLevel, setFrustrationLevel } = useCouncil(msgs, setMsgs);
+  const { send: runCouncil, invoke: runInvoke, lobeResults, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel } = useCouncil(msgs, setMsgs);
   const [input,setInput]     = useState("");
   const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
@@ -1744,14 +1744,23 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       <button onClick={exportConv} style={{background:"transparent",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:13,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.18s",opacity:0.75}} onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.color=AC.gemini;}} onMouseLeave={e=>{e.currentTarget.style.opacity="0.75";e.currentTarget.style.color=T.ts;}} title={"Exportar"}>↓</button>}
   </div>
 </div>
-              {/* botão enviar */}
-              <button
-                onClick={()=>{send();ajustar(true);}}
-                disabled={!!phase||!input.trim()}
-                style={{background:input.trim()&&!phase?"var(--accent)":"#333",border:"none",borderRadius:14,width:44,height:44,cursor:input.trim()&&!phase?"pointer":"not-allowed",fontSize:16,color:"#fff",transition:"background 0.2s, box-shadow 0.2s, opacity 0.2s",opacity:phase?0.4:1,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:input.trim()&&!phase?"0 0 16px rgba(168,85,247,0.45)":"none",flexShrink:0}}
-                onMouseEnter={e=>{if(input.trim()&&!phase)e.currentTarget.style.background="#7e22ce";}}
-                onMouseLeave={e=>{if(input.trim()&&!phase)e.currentTarget.style.background="var(--accent)";}}
-              >▶</button>
+              {/* botão enviar / parar */}
+              {isGenerating ? (
+                <button
+                  type="button"
+                  onClick={stopGeneration}
+                  title="Parar geração"
+                  style={{background:"rgba(239,68,68,0.18)",border:"1px solid rgba(239,68,68,0.44)",borderRadius:14,minWidth:72,height:44,cursor:"pointer",fontSize:12,fontWeight:800,color:"#fecaca",transition:"background 0.2s, box-shadow 0.2s, opacity 0.2s",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 0 16px rgba(239,68,68,0.25)",flexShrink:0,fontFamily:"inherit"}}
+                >■ Parar</button>
+              ) : (
+                <button
+                  onClick={()=>{send();ajustar(true);}}
+                  disabled={!!phase||!input.trim()}
+                  style={{background:input.trim()&&!phase?"var(--accent)":"#333",border:"none",borderRadius:14,width:44,height:44,cursor:input.trim()&&!phase?"pointer":"not-allowed",fontSize:16,color:"#fff",transition:"background 0.2s, box-shadow 0.2s, opacity 0.2s",opacity:phase?0.4:1,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:input.trim()&&!phase?"0 0 16px rgba(168,85,247,0.45)":"none",flexShrink:0}}
+                  onMouseEnter={e=>{if(input.trim()&&!phase)e.currentTarget.style.background="#7e22ce";}}
+                  onMouseLeave={e=>{if(input.trim()&&!phase)e.currentTarget.style.background="var(--accent)";}}
+                >▶</button>
+              )}
               {/* botão nova conversa */}
               <button onClick={newChat} title={"Nova Conversa"} style={{background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,width:44,height:44,cursor:"pointer",fontSize:16,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=AC.claude+"66";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.b1;e.currentTarget.style.color=T.ts;}}>+</button>
             </div>

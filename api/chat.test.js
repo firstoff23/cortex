@@ -1000,3 +1000,97 @@ describe('Prompt 3 — chips contextuais', () => {
     assert.doesNotMatch(fonte, /service_role/i);
   });
 });
+
+// ── Teste 28: botão Parar geração ───────────────────────────
+describe('Botão Parar Geração', () => {
+  it('useCouncil expõe stopGeneration e isGenerating com AbortController principal', () => {
+    const fonte = readFileSync(new URL('../src/hooks/useCouncil.js', import.meta.url), 'utf8');
+
+    assert.match(fonte, /const abortControllerRef = useRef\(null\)/);
+    assert.match(fonte, /const \[isGenerating, setIsGenerating\] = useState\(false\)/);
+    assert.match(fonte, /function stopGeneration\(\)/);
+    assert.match(fonte, /abortControllerRef\.current\.abort\(\)/);
+    assert.match(fonte, /stopGeneration,/);
+    assert.match(fonte, /isGenerating,/);
+  });
+
+  it('Cortex substitui o botão de envio por Parar durante geração', () => {
+    const fonte = readFileSync(new URL('../src/cortex-digital.jsx', import.meta.url), 'utf8');
+    const fonteCouncil = readFileSync(new URL('../src/hooks/useCouncil.js', import.meta.url), 'utf8');
+
+    assert.match(fonte, /stopGeneration/);
+    assert.match(fonte, /isGenerating/);
+    assert.match(fonteCouncil, /Geração interrompida\./);
+    assert.match(fonte, /Parar/);
+    assert.match(fonte, /■/);
+  });
+
+  it('runDebateStream propaga signal externo e não faz fallback quando aborta', async () => {
+    const { runDebateStream } = await import('../src/api/council.js');
+    const ctrl = new AbortController();
+    ctrl.abort();
+    let fallbackChamado = false;
+    let signalAbortado = false;
+
+    const resultado = await runDebateStream('Pergunta teste', 'paralelo', {
+      signal: ctrl.signal,
+      lobos: [{ id: 1, nome: 'Analista Crítico', modelo: 'm1', provider: 'openrouter' }],
+      chamarLobeStream: async (lobe, pergunta, contextoDebate, options = {}) => {
+        signalAbortado = options.signal?.aborted === true;
+        const erro = new Error('Abortado pelo utilizador');
+        erro.name = 'AbortError';
+        throw erro;
+      },
+      chamarLobe: async () => {
+        fallbackChamado = true;
+        return { id: 1, nome: 'Analista Crítico', resposta: 'fallback não permitido' };
+      },
+    });
+
+    assert.equal(signalAbortado, true);
+    assert.equal(fallbackChamado, false);
+    assert.equal(resultado.ronda1[0].status, 'rejected');
+  });
+});
+
+// ── Teste 29: mensagens de erro PT-PT ───────────────────────
+describe('Mensagens de erro PT-PT', () => {
+  it('classifyError devolve mensagem e acção correctas por categoria', async () => {
+    const { ERROR_MESSAGES, classifyError } = await import('../src/utils/errorMessages.js');
+
+    assert.deepEqual(classifyError('quota 429'), ERROR_MESSAGES.QUOTA_EXCEEDED);
+    assert.deepEqual(classifyError('network fetch failed'), ERROR_MESSAGES.NETWORK_ERROR);
+    assert.deepEqual(classifyError('timeout 408'), ERROR_MESSAGES.TIMEOUT);
+    assert.deepEqual(classifyError('401 unauthorized'), ERROR_MESSAGES.AUTH_ERROR);
+    assert.deepEqual(classifyError('503 unavailable'), ERROR_MESSAGES.MODEL_UNAVAILABLE);
+    assert.deepEqual(classifyError('empty no response'), ERROR_MESSAGES.MODEL_EMPTY_RESPONSE);
+    assert.deepEqual(classifyError('coisa estranha'), ERROR_MESSAGES.UNKNOWN);
+  });
+
+  it('ErrorMessage escolhe callback correcto e omite botão sem callback', async () => {
+    const { obterHandlerAccao } = await import('../src/components/ErrorMessage.jsx');
+    const onRetry = () => 'retry';
+    const onChangeModel = () => 'modelo';
+    const onSettings = () => 'definicoes';
+
+    assert.equal(obterHandlerAccao('Tentar novamente', { onRetry }), onRetry);
+    assert.equal(obterHandlerAccao('Verificar ligação e tentar novamente', { onRetry }), onRetry);
+    assert.equal(obterHandlerAccao('Escolher outro modelo', { onChangeModel }), onChangeModel);
+    assert.equal(obterHandlerAccao('Verificar definições', { onSettings }), onSettings);
+    assert.equal(obterHandlerAccao('Tentar novamente', {}), null);
+  });
+
+  it('locais visíveis de erro usam ErrorMessage ou classifyError', () => {
+    const fonteFileUpload = readFileSync(new URL('../src/components/FileUpload.jsx', import.meta.url), 'utf8');
+    const fonteFileUploadButton = readFileSync(new URL('../src/components/FileUploadButton.jsx', import.meta.url), 'utf8');
+    const fonteLobeCard = readFileSync(new URL('../src/components/LobeCard.jsx', import.meta.url), 'utf8');
+    const fonteCouncil = readFileSync(new URL('../src/hooks/useCouncil.js', import.meta.url), 'utf8');
+    const fonteKingCard = readFileSync(new URL('../src/components/KingCard.jsx', import.meta.url), 'utf8');
+
+    assert.match(fonteFileUpload, /<ErrorMessage error=\{erro\}/);
+    assert.match(fonteFileUploadButton, /<ErrorMessage error=\{erro\}/);
+    assert.match(fonteLobeCard, /<ErrorMessage error=/);
+    assert.match(fonteCouncil, /classifyError/);
+    assert.match(fonteKingCard, /classifyError/);
+  });
+});

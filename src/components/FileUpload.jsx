@@ -1,4 +1,5 @@
 import { useFileUpload } from '../hooks/useFileUpload.js';
+import ErrorMessage from './ErrorMessage.jsx';
 
 // FileUpload.jsx — componente visual leve; a extracção fica toda no hook.
 export default function FileUpload({ onUpload }) {
@@ -145,21 +146,7 @@ export default function FileUpload({ onUpload }) {
         )}
       </div>
 
-      {erro && (
-        <div
-          style={{
-            marginTop: 8,
-            color: '#fca5a5',
-            background: '#2a0a0a',
-            border: '1px solid #5a1a1a',
-            borderRadius: 8,
-            padding: '8px 10px',
-            fontSize: 12,
-          }}
-        >
-          {erro}
-        </div>
-      )}
+      {erro && <div style={{ marginTop: 8 }}><ErrorMessage error={erro} /></div>}
     </div>
   );
 }

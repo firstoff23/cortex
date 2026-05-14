@@ -139,6 +139,8 @@
 - ✅ Loop refinamento ronda 3 (score < 50%) — FEITO
 - ✅ Modo Code Agent com system prompts override — FEITO
 - ✅ Detecção de Frustração — FEITO
+- ✅ Botão Parar Geração — FEITO
+- ✅ Mensagens de erro PT-PT — FEITO
 - Persistência real com Supabase (substituir localStorage)
 - Conectores on-demand: Obsidian, Notion (ElevenLabs substituído por OpenRouter TTS)
 - Cloudflare: DNS + WAF + rate limiting + Turnstile
