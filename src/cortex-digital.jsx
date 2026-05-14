@@ -596,7 +596,7 @@ export default function Cortex(){
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
-  const { send: runCouncil, invoke: runInvoke, lobeResults, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, getLastSessionContext } = useCouncil(msgs, setMsgs);
+  const { send: runCouncil, invoke: runInvoke, lobeResults, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, getLastSessionContext, partialTexts } = useCouncil(msgs, setMsgs);
   const [input,setInput]     = useState("");
   const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
@@ -1660,10 +1660,9 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                         <CouncilGrid
                           lobos={LOBOS}
                           resultados={lobeResults}
-                          parciais={textosParciais}
+                          parciais={partialTexts.current}
                           fase={phase}
-                          aStreaming={aStreaming}
-                          isMobile={isMobile}
+                          aStreaming={isGenerating && phase === 'council'}
                         />
                       ) : (
                         <div style={{display:"flex",flexDirection:"column",gap:6}}>

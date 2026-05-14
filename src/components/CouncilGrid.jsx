@@ -1,238 +1,188 @@
-import React, { useState } from 'react';
-import LobeLoader from './LobeLoader';
+import React, { useMemo, useState } from 'react';
 
-/**
- * CouncilGrid — UI Mobile-First para o Debate do Conselho
- * 
- * @param {Array} lobos - Lista de definições oficiais dos lobos (LOBOS)
- * @param {Array} resultados - Resultados finais (m.lobeResults)
- * @param {Object} parciais - Textos em streaming (textosParciais)
- * @param {string} fase - Fase actual (phase)
- * @param {boolean} aStreaming - Se está a decorrer streaming global
- */
-export default function CouncilGrid({ 
-  lobos = [], 
-  resultados = [], 
-  parciais = {}, 
-  fase, 
-  aStreaming,
-  isMobile 
+export default function CouncilGrid({
+  lobos = [],
+  resultados = [],
+  parciais = {},
+  fase = 'council',
+  aStreaming = false,
 }) {
   const [selecionado, setSelecionado] = useState(null);
 
-  const fases = ["Respostas", "Crítica", "Síntese", "Veredicto"];
-  const fasesInternas = {
-    "council": 0,
-    "judges": 1,
-    "rei": 2,
-    "cortex": 2,
-    "reflex": 3
-  };
-  const indiceFase = fasesInternas[fase] ?? -1;
+  const fases = useMemo(
+    () => [
+      { id: 'council', label: 'Respostas' },
+      { id: 'judges', label: 'Crítica' },
+      { id: 'rei', label: 'Síntese' },
+      { id: 'reflex', label: 'Veredicto' },
+    ],
+    []
+  );
 
-  // Mapeia o estado de cada lobo
-  const getLoboStatus = (id) => {
-    const resFinal = resultados.find(r => String(r.id).includes(String(id)));
-    if (resFinal) return resFinal.isErr ? 'error' : 'done';
-    if (parciais[id]) return 'writing';
+  const idxFase = useMemo(() => {
+    const idx = fases.findIndex((f) => f.id === fase || (f.id === 'rei' && fase === 'cortex'));
+    return idx === -1 ? 0 : idx;
+  }, [fase, fases]);
+
+  const getResultado = (lobo) =>
+    resultados.find((r) => String(r.id).includes(String(lobo.id))) || null;
+
+  const getEstado = (res, txt) => {
+    if (res) return res.isErr ? 'error' : 'done';
+    if (txt) return 'writing';
     if (aStreaming && fase === 'council') return 'thinking';
     return 'idle';
   };
 
-  const getLoboText = (id) => {
-    const resFinal = resultados.find(r => String(r.id).includes(String(id)));
-    return resFinal?.result || parciais[id] || "";
+  const getPreview = (res, txt, lobo) => {
+    const base = txt || res?.ronda3 || res?.ronda2 || res?.ronda1 || res?.result || '';
+    if (base) return base;
+    return `Aguardando ${lobo.nome?.split(' ')?.[0] || 'lobo'}...`;
+  };
+
+  const abrir = (lobo, res, txt, estado) => {
+    const resposta = txt || res?.result || res?.ronda3 || res?.ronda2 || res?.ronda1 || '';
+    setSelecionado({
+      ...lobo,
+      resposta,
+      estado,
+      latency: res?.latency ?? null,
+      confidence: res?.confidence ?? null,
+      isErr: !!res?.isErr,
+    });
   };
 
   return (
-    <div className="council-container msg-in">
-      {/* Stepper de Pipeline */}
-      <div className="pipeline-stepper">
-        {fases.map((f, i) => (
-          <div key={f} className={`step ${i <= indiceFase ? 'active' : ''} ${i === indiceFase ? 'current' : ''}`}>
+    <section className="council-grid-shell" aria-label="Conselho de Lobos">
+      <div className="pipeline-stepper" aria-label="Fases do debate">
+        {fases.map((faseItem, i) => (
+          <div
+            key={faseItem.id}
+            className={`step ${i <= idxFase ? 'active' : ''} ${faseItem.id === fase ? 'current' : ''}`}
+          >
             <span className="step-dot" />
-            <span className="step-label">{f}</span>
+            <span className="step-label">{faseItem.label}</span>
           </div>
         ))}
       </div>
 
-      {/* Grid de Lobos */}
-      <div className={`lobes-grid ${isMobile ? 'mobile' : ''}`}>
+      <div className="lobes-grid">
         {lobos.map((lobo, idx) => {
-          const status = getLoboStatus(lobo.id);
-          const texto = getLoboText(lobo.id);
-          const icon = ["◉", "◈", "◐", "◑", "◒"][idx] || "◌";
-          
+          const res = getResultado(lobo);
+          const txt = parciais?.[lobo.id] || '';
+          const estado = getEstado(res, txt);
+          const preview = getPreview(res, txt, lobo);
+          const tempo = res?.latency ? `${(res.latency / 1000).toFixed(1)}s` : '—';
+          const progresso = typeof res?.confidence === 'number' ? Math.max(8, Math.min(100, res.confidence)) : (estado === 'thinking' ? 18 : 0);
+          const icon = lobo.icon || ['◉', '◈', '◐', '◑', '◒'][idx] || '◌';
+          const nome = lobo.nome || res?.label || 'Lobo';
+          const cor = lobo.cor || '#7c3aed';
+
           return (
-            <div 
-              key={lobo.id} 
-              className={`lobo-card ${status}`}
-              onClick={() => texto && setSelecionado({ ...lobo, resposta: texto, icon })}
-              style={{ '--accent-lobe': lobo.cor || lobo.color }}
+            <button
+              key={lobo.id}
+              type="button"
+              className={`lobo-card ${estado}`}
+              onClick={() => abrir({ ...lobo, nome, icon, cor }, res, txt, estado)}
+              style={{ '--accent': cor }}
+              aria-label={`Abrir detalhes de ${nome}`}
             >
-              <div className="lobo-header">
-                <span className="lobo-icon" style={{ color: lobo.cor || lobo.color }}>{icon}</span>
-                <div className={`status-indicator ${status}`} />
+              <div className="lobo-top">
+                <span className="lobo-icon">{icon}</span>
+                <span className={`lobo-state ${estado}`} />
               </div>
-              <div className="lobo-info">
-                <span className="lobo-nome">{lobo.nome.split(' ')[0]}</span>
+
+              <div className="lobo-meta">
+                <strong className="lobo-name">{nome.split(' ')[0]}</strong>
+                <span className="lobo-time">{tempo}</span>
               </div>
-              {status === 'thinking' && <div className="mini-loader"><LobeLoader tamanho={10} texto="" cor={lobo.cor} /></div>}
-              {texto && (
-                <p className="lobo-preview">
-                  {texto.slice(0, 60)}...
-                </p>
-              )}
-            </div>
+
+              <p className="lobo-preview">{preview.length > 90 ? `${preview.slice(0, 90)}...` : preview}</p>
+
+              <div className="lobo-meter" aria-hidden="true">
+                <span style={{ width: `${progresso}%` }} />
+              </div>
+            </button>
           );
         })}
       </div>
 
-      {/* Bottom Sheet para detalhe */}
-      {selecionado && (
-        <div className="bottom-sheet-overlay" onClick={() => setSelecionado(null)}>
-          <div className="bottom-sheet" onClick={e => e.stopPropagation()}>
+      {selecionado ? (
+        <div className="sheet-overlay" onClick={() => setSelecionado(null)} role="presentation">
+          <div className="sheet-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="sheet-handle" />
             <div className="sheet-header">
-              <span className="lobo-icon-large" style={{ color: selecionado.cor || selecionado.color }}>{selecionado.icon}</span>
-              <h3>{selecionado.nome}</h3>
-              <button className="close-sheet" onClick={() => setSelecionado(null)}>Fechar</button>
+              <span className="sheet-icon" style={{ color: selecionado.cor }}>{selecionado.icon}</span>
+              <div className="sheet-title">
+                <h3>{selecionado.nome}</h3>
+                <p>{selecionado.estado}</p>
+              </div>
+              <button className="sheet-close" type="button" onClick={() => setSelecionado(null)}>
+                Fechar
+              </button>
             </div>
-            <div className="full-argument">
-              {selecionado.resposta}
+
+            <div className="sheet-stats">
+              <div><span>Tempo</span><strong>{selecionado.latency != null ? `${(selecionado.latency / 1000).toFixed(1)}s` : '—'}</strong></div>
+              <div><span>Confiança</span><strong>{selecionado.confidence != null ? `${Math.round(selecionado.confidence)}%` : '—'}</strong></div>
+              <div><span>Erro</span><strong>{selecionado.isErr ? 'Sim' : 'Não'}</strong></div>
+            </div>
+
+            <div className="sheet-body">
+              <p className="sheet-label">Resposta</p>
+              <p className="sheet-text">{selecionado.resposta || 'Sem conteúdo disponível.'}</p>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      <style>{`
-        .council-container { 
-          padding: 14px; 
-          background: rgba(255, 255, 255, 0.03); 
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 18px; 
-          backdrop-filter: blur(12px);
-          margin: 8px 0;
-        }
-        
-        .pipeline-stepper { 
-          display: flex; 
-          justify-content: space-between; 
-          margin-bottom: 16px; 
-          border-bottom: 1px solid rgba(255, 255, 255, 0.06); 
-          padding-bottom: 10px; 
-        }
-        
-        .step { 
-          display: flex; 
-          flex-direction: column; 
-          align-items: center; 
-          opacity: 0.25; 
-          transition: all 0.4s ease;
-          flex: 1;
-        }
-        
-        .step.active { opacity: 0.6; }
-        .step.current { opacity: 1; transform: scale(1.1); }
-        .step.current .step-dot { background: var(--accent, #a78bfa); box-shadow: 0 0 8px var(--accent); }
-        
-        .step-dot { width: 5px; height: 5px; border-radius: 50%; background: #fff; margin-bottom: 5px; }
-        .step-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; }
-
-        .lobes-grid { 
-          display: grid; 
-          grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); 
-          gap: 10px; 
-        }
-        .lobes-grid.mobile {
-          grid-template-columns: repeat(3, 1fr);
-        }
-        
-        .lobo-card { 
-          background: rgba(255, 255, 255, 0.02); 
-          border: 1px solid rgba(255, 255, 255, 0.05); 
-          border-radius: 14px; 
-          padding: 12px 8px; 
-          display: flex; 
-          flex-direction: column; 
-          align-items: center; 
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-          cursor: pointer;
-          position: relative;
-          min-height: 80px;
-        }
-        
-        .lobo-card:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.15); }
-        .lobo-card:active { transform: scale(0.96); }
-        
-        .lobo-header { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .lobo-icon { font-size: 14px; }
-        
-        .status-indicator { width: 6px; height: 6px; border-radius: 50%; background: #444; }
-        .status-indicator.thinking { background: #3b82f6; box-shadow: 0 0 8px #3b82f6; animation: councilPulse 1.5s infinite; }
-        .status-indicator.writing { background: #10b981; box-shadow: 0 0 8px #10b981; animation: councilPulse 1s infinite; }
-        .status-indicator.done { background: #10b981; }
-        .status-indicator.error { background: #ef4444; }
-
-        .lobo-nome { font-size: 10px; font-weight: 700; color: var(--tx, #fff); }
-        .lobo-preview { 
-          font-size: 8px; 
-          color: rgba(255, 255, 255, 0.4); 
-          margin-top: 6px; 
-          text-align: center; 
-          line-height: 1.3;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-
-        .mini-loader { margin-top: 8px; }
-
-        @keyframes councilPulse { 0% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } 100% { opacity: 0.3; transform: scale(0.8); } }
-
-        .bottom-sheet-overlay { 
-          position: fixed; 
-          inset: 0; 
-          background: rgba(0, 0, 0, 0.7); 
-          backdrop-filter: blur(4px);
-          z-index: 2000; 
-          display: flex; 
-          align-items: flex-end;
-          animation: fadeSheet 0.3s ease;
-        }
-        
-        @keyframes fadeSheet { from { opacity: 0; } to { opacity: 1; } }
-
-        .bottom-sheet { 
-          width: 100%; 
-          background: #0f0f1a; 
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
-          border-top-left-radius: 24px; 
-          border-top-right-radius: 24px; 
-          padding: 24px; 
-          max-height: 85vh; 
-          overflow-y: auto; 
-          box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
-          animation: slideSheet 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        
-        @keyframes slideSheet { from { transform: translateY(100%); } to { transform: translateY(0); } }
-
-        .sheet-handle { width: 36px; height: 4px; background: rgba(255, 255, 255, 0.15); border-radius: 2px; margin: -8px auto 20px; }
-        
-        .sheet-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-        .lobo-icon-large { font-size: 24px; }
-        .sheet-header h3 { margin: 0; font-size: 18px; flex: 1; }
-        .close-sheet { background: rgba(255, 255, 255, 0.05); border: none; color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12px; cursor: pointer; }
-
-        .full-argument { 
-          font-size: 14px; 
-          line-height: 1.6; 
-          color: rgba(255, 255, 255, 0.85); 
-          white-space: pre-wrap; 
-        }
+      <style>{`\
+        .council-grid-shell{padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:rgba(10,10,15,.72);backdrop-filter:blur(14px)}\
+        .pipeline-stepper{display:flex;justify-content:space-between;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)}\
+        .step{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;opacity:.28}\
+        .step.active{opacity:.68}\
+        .step.current{opacity:1}\
+        .step-dot{width:7px;height:7px;border-radius:999px;background:#64748b}\
+        .step.current .step-dot{background:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.16)}\
+        .step-label{font-size:10px;line-height:1;text-transform:uppercase;letter-spacing:.04em;color:#cbd5e1;text-align:center}\
+        .lobes-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}\
+        .lobo-card{appearance:none;border:none;display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:inherit;text-align:left;min-height:118px;transition:transform .14s ease, background .14s ease, border-color .14s ease}\
+        .lobo-card:active{transform:scale(.98)}\
+        .lobo-card.thinking{border-color:rgba(59,130,246,.35)}\
+        .lobo-card.writing{border-color:rgba(16,185,129,.28)}\
+        .lobo-card.done{border-color:rgba(16,185,129,.22)}\
+        .lobo-card.error{border-color:rgba(239,68,68,.35)}\
+        .lobo-top{display:flex;align-items:center;justify-content:space-between}\
+        .lobo-icon{font-size:18px;line-height:1;color:var(--accent)}\
+        .lobo-state{width:8px;height:8px;border-radius:999px;background:#64748b;box-shadow:0 0 0 3px rgba(100,116,139,.14)}\
+        .lobo-state.thinking{background:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.18);animation:pulse 1.1s ease-in-out infinite}\
+        .lobo-state.writing{background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.16)}\
+        .lobo-state.done{background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.12)}\
+        .lobo-state.error{background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.18)}\
+        .lobo-meta{display:flex;justify-content:space-between;gap:8px;align-items:baseline}\
+        .lobo-name{font-size:12px;font-weight:700;color:#f8fafc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}\
+        .lobo-time{font-size:10px;color:#94a3b8;white-space:nowrap}\
+        .lobo-preview{margin:0;font-size:10px;line-height:1.35;color:#cbd5e1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;min-height:40px}\
+        .lobo-meter{height:4px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.08);margin-top:auto}\
+        .lobo-meter>span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#7c3aed,#06b6d4)}\
+        .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:9999;display:flex;align-items:flex-end}\
+        .sheet-panel{width:100%;max-height:78vh;overflow:auto;background:#0b0b14;border-top-left-radius:22px;border-top-right-radius:22px;border:1px solid rgba(255,255,255,.08);padding:16px 16px 24px;box-shadow:0 -20px 60px rgba(0,0,0,.35)}\
+        .sheet-handle{width:42px;height:4px;border-radius:999px;background:rgba(255,255,255,.18);margin:0 auto 14px}\
+        .sheet-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}\
+        .sheet-icon{font-size:28px;line-height:1}\
+        .sheet-title h3{margin:0;font-size:18px;color:#f8fafc}\
+        .sheet-title p{margin:2px 0 0;font-size:12px;color:#94a3b8;text-transform:capitalize}\
+        .sheet-close{margin-left:auto;background:rgba(255,255,255,.05);border:none;color:#fff;padding:6px 12px;border-radius:10px;font-size:11px}\
+        .sheet-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}\
+        .sheet-stats div{padding:10px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}\
+        .sheet-stats span{display:block;font-size:10px;color:#94a3b8;margin-bottom:4px}\
+        .sheet-stats strong{font-size:13px;color:#f8fafc}\
+        .sheet-body{padding-top:2px}\
+        .sheet-label{margin:0 0 6px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#94a3b8}\
+        .sheet-text{margin:0;color:#e2e8f0;line-height:1.55;font-size:14px;white-space:pre-wrap}\
+        @keyframes pulse{0%,100%{opacity:.55}50%{opacity:1}}\
+        @media (max-width:420px){.lobes-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sheet-stats{grid-template-columns:1fr}.sheet-panel{max-height:82vh}}\
       `}</style>
-    </div>
+    </section>
   );
 }

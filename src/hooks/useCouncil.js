@@ -643,6 +643,7 @@ export default function useCouncil(msgs, setMsgs) {
     generationState,
     generationTime,
     guardarMemoriaSessao,
-    getLastSessionContext
+    getLastSessionContext,
+    partialTexts: partialTextRef
   };
 }
