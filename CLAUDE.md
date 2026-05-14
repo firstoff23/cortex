@@ -1,55 +1,87 @@
 # Córtex Digital — Contexto do Projeto
 
 ## Identificação
-
 - **Aluno:** Alexandre — CTeSP Automação e Gestão Industrial, IPCB Castelo Branco
 - **Versão atual:** v12
 - **Localização local:** `C:\Users\Alexandre\Desktop\Computador Inteligência Adaptativa`
 - **Ficheiro principal:** `src/cortex-digital.jsx`
 
 ## Stack
-
 - React 18 + Vite 5.4.21
 - Deploy: Vercel (sem servidor local)
 - Proxy de APIs: Vercel serverless functions (`/api/*`)
 - Sem Tailwind, sem shadcn, sem Express, sem SQLite
 
-## Arquitetura
-
-- 11 lobos em paralelo com **Claude como juiz final** (council pattern)
-- Router inteligente antes de chamar APIs — nunca os 11 ao mesmo tempo
+## Arquitectura
+- **5 lobos oficiais** em paralelo (`Promise.allSettled`) com **Rei como juiz final**
+  (`meta-llama/llama-3.3-70b-instruct:free` via OpenRouter, definido em `src/api/king.js`)
+- Router inteligente (`routerDecide()`) — usa apenas lobos oficiais de `LOBOS`
+- Todos passam por `/api/chat` (proxy serverless OpenRouter)
 - Memória em `localStorage` (migração para Supabase planeada)
 - Constante de versão: `const MV = "cortex-v12"` no topo do ficheiro
 
-## Nomenclatura
+## Modelos Activos (2026-05-14)
+| Lobe                  | Modelo                                              |
+|-----------------------|-----------------------------------------------------|
+| Analista Crítico      | qwen/qwen3-next-80b-a3b-instruct:free               |
+| Inovador Criativo     | google/gemma-4-31b-it:free                          |
+| Pragmático Técnico    | nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free  |
+| Generalista Contextual| openai/gpt-oss-120b:free                            |
+| Advogado do Diabo     | nousresearch/hermes-3-llama-3.1-405b:free           |
+| **Rei (Juiz)**        | meta-llama/llama-3.3-70b-instruct:free              |
 
+## OpenRouter Plugins Activos
+- `file-parser` PDF — engine cloudflare-ai (substitui pdfjs-dist)
+- `response-healing` — Rei non-streaming; corrige JSON malformado
+- `openrouter:web_search` — Analista Crítico (id=1) + Generalista (id=4); max 3, PT
+- `openrouter:datetime` — todos os lobos, Europe/Lisbon
+- `openrouter/fusion` — fallback Rei em falha (pago, só activa quando Llama falha)
+
+### Plugins Obsoletos (não usar)
+- `{ id: 'web' }` → substituído por openrouter:web_search
+- sufixo `:online` → substituído por tools array
+- `pdfjs-dist` local → substituído por file-parser plugin
+
+## Nomenclatura
 - `lobos` = agentes individuais
-- `council` = síntese final pelo Claude
+- `council` = síntese final pelo Rei
 - `pills` = botões da navbar
-- `LOBES` = array de configuração dos lobos
-- `P` = objeto de prompts
-- `T` = tema atual (cores)
-- `AC` = accent colors por modelo
-- `invoke()` = função de chamada individual a cada lobe
-- `send()` = função principal que dispara o council completo
+- `LOBOS` = array oficial dos 5 lobos em `src/api/council.js`
+- `LOBES` = alias legado, prop interna em useCouncil
+- `P` = objeto de prompts | `T` = tema (cores) | `AC` = accent colors por modelo
+- `invoke()` = chamada individual por lobe
+- `send()` = dispara o council completo
+- `chamarLobeStream()` = SSE parcial por lobe em council.js
+- `runDebateStream()` = debate multi-lobe SSE com fallback
 - `routerDecide()` = router inteligente de seleção de lobos
-- `normalizeCouncilPayload()` = normaliza payload estruturado da resposta
+- `normalizeCouncilPayload()` = normaliza payload da resposta
 - `safeParseReflect()` = parse seguro da reflexão
 
-## Forma de trabalho
+## Hooks
+- `useCouncil.js` = orquestração council, debate, juízes e Rei
+- `useStreaming.js` = estado parcial por lobe durante SSE
+- `useAutoResize.js` = auto-resize do input principal
+- `useFileUpload.js` = F4-02 upload universal + previews
+- `useExport.js` = F4-03 export Word/Excel/Notion
 
+## Forma de Trabalho (Padrão Codex CLI)
 - Patches incrementais, **um de cada vez**
-- Substitui blocos exatos — nunca reescreve o ficheiro inteiro
-- Não quebra funcionalidades existentes sem aviso explícito
-- Usa `.catch(() => {})` onde integrações externas não podem quebrar a UX
+- Substitui blocos exactos — nunca reescreve ficheiro inteiro
+- Não quebra funcionalidades sem aviso explícito
+- Usa `.catch(() => {})` onde externas não podem quebrar UX
+- Preambles 8-12 palavras antes de tool calls, sem "Certamente!"
+- Timeout 8s por lobe — AbortController Map por lobe
+- Promise.allSettled sempre (NUNCA Promise.all)
 
-## Skills disponíveis
-
+## Contexto de Sistema Disponível
+- `SOUL.md` — valores, personalidade e regras de ouro do sistema
+- `AGENTS.md` — arquitectura completa, modelos, roadmap detalhado
 - `.claude/skills/cortex-digital` — skill principal do projeto
+- `.codex/` — contexto para Codex CLI
 
-## Roadmap próximo
-
-- Migração `invoke()` para OpenRouter (1 key para todos os modelos)
+## Roadmap Próximo
 - Persistência real com Supabase (substituir localStorage)
-- Conectores on-demand: Tavily, ElevenLabs, Obsidian, Notion
+- Conectores on-demand: Obsidian, Notion
 - Cloudflare: DNS + WAF + rate limiting + Turnstile
+- F5-01: RAG completo Qdrant
+- F5-02: Memória entre sessões
