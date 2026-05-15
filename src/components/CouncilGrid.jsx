@@ -20,9 +20,9 @@ export default function CouncilGrid({
   );
 
   const idxFase = useMemo(() => {
-    const idx = fases.findIndex((f) => f.id === fase || (f.id === 'rei' && fase === 'cortex'));
-    return idx === -1 ? 0 : idx;
-  }, [fase, fases]);
+    const mapping = { council: 0, critique: 1, judges: 2, rei: 3, cortex: 3, reflex: 4 };
+    return mapping[fase] ?? 0;
+  }, [fase]);
 
   const getResultado = (lobo) =>
     resultados.find((r) => String(r.id).includes(String(lobo.id))) || null;
@@ -88,7 +88,9 @@ export default function CouncilGrid({
               aria-label={`Abrir detalhes de ${nome}`}
             >
               <div className="lobo-top">
-                <span className="lobo-icon">{icon}</span>
+                <span className="lobo-icon">
+                  {fase === 'critique' && estado === 'writing' ? '⚔️' : icon}
+                </span>
                 <span className={`lobo-state ${estado}`} />
               </div>
 

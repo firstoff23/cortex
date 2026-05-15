@@ -108,6 +108,8 @@ export async function runDebateStream(pergunta, modo = "paralelo", options = {})
   return runDebateStreamApi(pergunta, modo, options);
 }
 
+const CRITIQUE_RING = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 1 };
+
 export default function useCouncil(msgs, setMsgs) {
   const [phase, setPhase] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -441,14 +443,13 @@ export default function useCouncil(msgs, setMsgs) {
     const ctrlJuizes = new AbortController();
     controllersRef.current.set("judges", ctrlJuizes);
     
-    // Payload enriquecido para os juízes com o debate auditável
-    const debateAuditavel = nextLobeResults.map(r => ({
-      lobo: r.label,
-      resposta_inicial: r.ronda1,
-      critica_que_fez: r.critique.text,
-      alvo_da_sua_critica: LOBOS.find(l => l.id === r.critique.target)?.nome,
-      critica_que_recebeu: nextLobeResults.find(other => other.critique.target === r.streamId)?.critique.text
-    }));
+    // Payload enriquecido para os juízes com o debate auditável e estruturado
+    const payloadAuditavel = {
+      initialResponses: nextLobeResults.map(r => ({ id: r.streamId, lobo: r.label, text: r.ronda1 })),
+      critiques: nextLobeResults.map(r => ({ from: r.streamId, to: r.critique.target, text: r.critique.text })),
+      pairingMap: CRITIQUE_RING,
+      debateFormat: "Anel Circular Fixo (Circular Ring Criticism)"
+    };
 
     try {
       veredictoJuizes = await runJudges(
@@ -457,7 +458,7 @@ export default function useCouncil(msgs, setMsgs) {
         juizesActivos,
         ctrlJuizes.signal,
         (juiz) => setJudgeResults((prev) => upsertJudge(prev, juiz)),
-        { debateAuditavel } // Passa o debate estruturado como contexto extra
+        payloadAuditavel // Passa o debate estruturado como contexto extra
       );
       veredictoJuizes = dedupeJudges(veredictoJuizes);
       setJudgeResults(veredictoJuizes);
