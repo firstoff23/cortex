@@ -79,6 +79,10 @@
 - `routerDecide()` = router inteligente de seleção de lobos
 - `normalizeCouncilPayload()` = normaliza payload estruturado da resposta
 - `safeParseReflect()` = parse seguro da reflexão
+- `precisaAprovacao()` = detecta comandos irreversíveis antes de executar
+- `gerarMensagemAprovacao()` = gera payload para AlertaBanner de aprovação
+- `planning_summary` = campo do Rei com resumo do plano antes do veredicto
+- `reasoning` = campo obrigatório por lobe explicando a lógica da análise
 
 ## Hooks
 
@@ -101,6 +105,7 @@
 - `SidePanel.jsx` = painel lateral direito deslizante para histórico, Blueprints e Modo Forense
 - `Abas.jsx` = tabs nativas sem Radix usadas no debate
 - `Slider.jsx` = range nativo para temperatura por lobe
+- `CouncilGrid.jsx` = grid visual do debate com estado por lobe em tempo real
 
 ## Forma de trabalho
 
@@ -144,6 +149,11 @@
 - ✅ Detecção de Frustração — FEITO
 - ✅ Botão Parar Geração — FEITO
 - ✅ Mensagens de erro PT-PT — FEITO
+- ✅ Cline Plan Mode — FEITO (`king.js`: bloco PLANNING no contexto do Rei; campo `planning_summary` de output; Rei confirma lobos disponíveis antes de sintetizar)
+- ✅ Cursor Reasoning — FEITO (`council.js`: campo `"reasoning"` obrigatório no JSON de cada lobe — explica a lógica da análise)
+- ✅ Factory Approval Gates — FEITO (`council.js`: `precisaAprovacao()` + `gerarMensagemAprovacao()`; `useCouncil.js`: intercepção em `send()` sem `aprovado:true`; `cortex-digital.jsx`: `AlertaBanner` com botões Confirmar/Cancelar/Ver impacto)
+- ✅ CouncilGrid — FEITO (componente visual do debate em grid por lobe)
+- ✅ Evals Fase 4 — FEITO (`evals/fase4.json`, 20 queries de teste cobrindo os 5 lobos)
 - Persistência real com Supabase (substituir localStorage)
 - Conectores on-demand: Obsidian, Notion (ElevenLabs substituído por OpenRouter TTS)
 - Cloudflare: DNS + WAF + rate limiting + Turnstile
