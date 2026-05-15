@@ -157,7 +157,15 @@ export function formatarContextoRei(pergunta, respostasLobos, veredictoJuizes, c
         .join("\n\n")
     : String(respostasLobos || "");
 
-  return `PERGUNTA: ${pergunta}
+  const planning = `PLANNING:
+- Lobos válidos: ${lobosValidos(respostasLobos).map(l=>l.nome).join(', ')}
+- Consenso: ${(normalizarScore(consensoMatematico,0)*100).toFixed(0)}%
+- Dissent: ${lobosValidos(respostasLobos).length>=2 ? 'verificar' : 'insuficiente'}
+- Acção: ${normalizarScore(consensoMatematico,0)>=0.8 ? 'sintetizar directo' : 'resolver conflitos primeiro'}`;
+
+  return `${planning}
+
+PERGUNTA: ${pergunta}
 
 CONSENSO MATEMÁTICO ENTRE LOBOS: ${(normalizarScore(consensoMatematico, 0) * 100).toFixed(0)}%
 
@@ -171,6 +179,7 @@ ${resumoJuizes || "Nenhum juiz correu com sucesso."}`;
 export const SYSTEM_REI = `<role>Rei do Córtex Digital</role>
 <mission>O teu veredicto é a palavra final. Agrega as respostas dos 5 lobos e juízes para uma decisão coesa e inquestionável.</mission>
 <process>
+0. Lê PLANNING e confirma lobos disponíveis antes de sintetizar.
 1. Indica quais lobos têm mais suporte dos juízes.
 2. Identifica contradições críticas.
 3. Decide quais informações usar e justifica em frases curtas.
@@ -188,6 +197,7 @@ Devolve APENAS o seguinte JSON (sem formatação markdown envolvente):
 <json_schema>
 {
   "raciocinio": ["síntese curta baseada nos nomes reais recebidos"],
+  "planning_summary": "1 frase: lobos usados + acção tomada",
   "veredicto": "resposta final com citações inline usando apenas nomes reais do contexto",
   "confianca_lobos": 0,
   "confianca_juizes": 0,

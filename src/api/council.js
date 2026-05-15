@@ -61,6 +61,8 @@ export const LOBOS = [
   },
 ];
 
+const CRITIQUE_MAP = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 1 };
+
 export const SYSTEM_PROMPTS = {
   1: `<role>Analista Crítico do Córtex Digital</role>
 <voice>seca, cirúrgica, implacável — mas construtiva</voice>
@@ -74,6 +76,7 @@ export const SYSTEM_PROMPTS = {
 - Regra hard: usa exclusivamente afirmações baseadas em evidências sólidas. Corta qualquer especulação ou o uso de 'pode ser que'.
 - Responde em PT-PT.
 - Usa no máximo 130 palavras.
+- Inclui SEMPRE "reasoning" no JSON de resposta: "analysis": "o teu conteúdo", "reasoning": "1-2 frases — porque chegaste a esta conclusão".
 </rules>`,
 
   2: `<role>Inovador Criativo do Córtex Digital</role>
@@ -88,6 +91,7 @@ export const SYSTEM_PROMPTS = {
 - Regra hard: oferece sempre abordagens novas. Ignora completamente respostas óbvias ou senso comum.
 - Responde em PT-PT.
 - Usa no máximo 130 palavras.
+- Inclui SEMPRE "reasoning" no JSON de resposta: "analysis": "o teu conteúdo", "reasoning": "1-2 frases — porque chegaste a esta conclusão".
 </rules>`,
 
   3: `<role>Pragmático Técnico do Córtex Digital</role>
@@ -106,6 +110,7 @@ export const SYSTEM_PROMPTS = {
 - Regra hard: fornece passos concretos obrigatoriamente. Sem passos concretos não é uma resposta.
 - Responde em PT-PT.
 - Usa no máximo 130 palavras.
+- Inclui SEMPRE "reasoning" no JSON de resposta: "analysis": "o teu conteúdo", "reasoning": "1-2 frases — porque chegaste a esta conclusão".
 </rules>`,
 
   4: `<role>Generalista Contextual do Córtex Digital</role>
@@ -120,6 +125,7 @@ export const SYSTEM_PROMPTS = {
 - Regra hard: enquadra sempre a resposta no detalhe holístico. Responde sempre a pensar no impacto geral.
 - Responde em PT-PT.
 - Usa no máximo 130 palavras.
+- Inclui SEMPRE "reasoning" no JSON de resposta: "analysis": "o teu conteúdo", "reasoning": "1-2 frases — porque chegaste a esta conclusão".
 </rules>`,
 
   5: `<role>Advogado do Diabo do Córtex Digital</role>
@@ -134,6 +140,7 @@ export const SYSTEM_PROMPTS = {
 - Regra hard: termina OBRIGATORIAMENTE todas as tuas respostas com: 'A questão que ninguém fez: [pergunta pertinente]'.
 - Responde em PT-PT.
 - Usa no máximo 130 palavras.
+- Inclui SEMPRE "reasoning" no JSON de resposta: "analysis": "o teu conteúdo", "reasoning": "1-2 frases — porque chegaste a esta conclusão".
 </rules>`,
 };
 
@@ -145,6 +152,7 @@ export const SYSTEM_PROMPTS_CODE = {
 - Cita linha e ficheiro quando possível.
 - Responde em PT-PT.
 - Usa no máximo 200 palavras.
+- Inclui SEMPRE "reasoning" no JSON de resposta: "analysis": "o teu conteúdo", "reasoning": "1-2 frases — porque chegaste a esta conclusão".
 </rules>`,
 
   2: `<role>Arquitecto Criativo do Córtex</role>
@@ -153,6 +161,7 @@ export const SYSTEM_PROMPTS_CODE = {
 <rules>
 - Responde em PT-PT.
 - Usa no máximo 200 palavras.
+- Inclui SEMPRE "reasoning" no JSON de resposta: "analysis": "o teu conteúdo", "reasoning": "1-2 frases — porque chegaste a esta conclusão".
 </rules>`,
 
   3: `<role>Implementador do Córtex</role>
@@ -165,6 +174,7 @@ export const SYSTEM_PROMPTS_CODE = {
   Comando: [se aplicável]
 - Responde em PT-PT.
 - Usa no máximo 200 palavras.
+- Inclui SEMPRE "reasoning" no JSON de resposta: "analysis": "o teu conteúdo", "reasoning": "1-2 frases — porque chegaste a esta conclusão".
 </rules>`,
 
   4: `<role>Contextualizador do Córtex</role>
@@ -172,6 +182,7 @@ export const SYSTEM_PROMPTS_CODE = {
 <rules>
 - Responde em PT-PT.
 - Usa no máximo 200 palavras.
+- Inclui SEMPRE "reasoning" no JSON de resposta: "analysis": "o teu conteúdo", "reasoning": "1-2 frases — porque chegaste a esta conclusão".
 </rules>`,
 
   5: `<role>Revisor Crítico do Córtex</role>
@@ -180,8 +191,26 @@ export const SYSTEM_PROMPTS_CODE = {
 <rules>
 - Responde em PT-PT.
 - Usa no máximo 200 palavras.
+- Inclui SEMPRE "reasoning" no JSON de resposta: "analysis": "o teu conteúdo", "reasoning": "1-2 frases — porque chegaste a esta conclusão".
 </rules>`,
 };
+
+// Padrão Factory: approval gate para acções irreversíveis
+export function precisaAprovacao(query) {
+  const GATILHOS = [
+    'apaga', 'deleta', 'remove', 'limpa histórico',
+    'migra', 'reseta', 'substitui tudo', 'sobrescreve'
+  ];
+  return GATILHOS.some(g => query.toLowerCase().includes(g));
+}
+
+export function gerarMensagemAprovacao(query) {
+  return {
+    tipo: 'approval_gate',
+    mensagem: `⚠️ Acção irreversível: "${query}"\nConfirmas?`,
+    opcoes: ['✅ Confirmar', '❌ Cancelar', '🔍 Ver impacto']
+  };
+}
 
 export function getBaseURL(provider) {
   if (provider === 'openrouter') return 'https://openrouter.ai/api/v1';
@@ -540,6 +569,7 @@ export async function runDebateStream(pergunta, modo = 'paralelo', options = {})
   const { imageDataUrl, ...optionsSemImagem } = options;
   const optionsRonda1 = imageDataUrl ? { ...optionsSemImagem, imageDataUrl } : optionsSemImagem;
 
+  options.onPhase?.("council");
   const ronda1 = await Promise.allSettled(
     lobos.map((lobe) =>
       chamarStreamComFallback(lobe, pergunta, null, chamarStream, chamarFallback, options.onToken, optionsRonda1)
@@ -553,18 +583,30 @@ export async function runDebateStream(pergunta, modo = 'paralelo', options = {})
     .map((r) => `[${r.value.nome}]: ${r.value.resposta}`)
     .join('\n\n');
 
+  options.onPhase?.("critique");
   const ronda2 = await Promise.allSettled(
-    lobos.map((lobe) =>
-      chamarStreamComFallback(
+    lobos.map((lobe) => {
+      let contextoLobe = contextoDebate;
+      if (modo === 'debate') {
+        const targetId = CRITIQUE_MAP[lobe.id];
+        const target = ronda1.find(r => r.status === 'fulfilled' && r.value.id === targetId);
+        if (target) {
+          contextoLobe = `Analisa criticamente esta resposta do ${target.value.nome}: "${target.value.resposta}". 
+            Aponta falhas, omissões ou riscos. Depois, mantém a tua posição original ou ajusta-a se necessário.`;
+        } else {
+          contextoLobe = `O teu alvo de crítica (${targetId}) falhou. Analisa a pergunta original directamente: ${pergunta}`;
+        }
+      }
+      return chamarStreamComFallback(
         lobe,
         pergunta,
-        contextoDebate,
+        contextoLobe,
         chamarStream,
         chamarFallback,
         options.onToken,
         optionsSemImagem
-      )
-    )
+      );
+    })
   );
 
   const scoreProvisorio = calcularScoreConsenso(ronda1, ronda2);

@@ -6,6 +6,8 @@ import {
   LOBOS,
   runDebate as runDebateApi,
   runDebateStream as runDebateStreamApi,
+  precisaAprovacao,
+  gerarMensagemAprovacao,
 } from "../api/council.js";
 import { runGraders } from "../utils/graders.js";
 import { getJuizesParaPergunta } from "../utils/orchestrator.js";
@@ -85,6 +87,11 @@ function lobeDebateParaUI(lobe, index, ronda1, ronda2, ronda3, lobeConfidenceSco
     ronda1: primeira.resposta || "",
     ronda2: segunda.resposta || "",
     ronda3: terceira.resposta || "",
+    critique: {
+      text: segunda.resposta || "",
+      target: { 1: 2, 2: 3, 3: 4, 4: 5, 5: 1 }[lobe.id],
+      from: { 1: 5, 2: 1, 3: 2, 4: 3, 5: 4 }[lobe.id]
+    },
     srcModel: lobe.modelo,
     srcReal: !isErr,
     isErr,
@@ -294,6 +301,10 @@ export default function useCouncil(msgs, setMsgs) {
     const q = (query || input).trim();
     if (!q || phase) return;
 
+    if (precisaAprovacao(q) && !ctx.options?.aprovado) {
+      return gerarMensagemAprovacao(q);
+    }
+
     abortControllerRef.current = new AbortController();
     stopRequestedRef.current = false;
     partialTextRef.current = {};
@@ -405,6 +416,7 @@ export default function useCouncil(msgs, setMsgs) {
         messages: messagesParaEnviar, // <--- ADICIONADO
         signal: abortControllerRef.current.signal,
         onToken: onTokenParcial,
+        onPhase: (p) => setPhase(p),
       });
     } finally {
       streaming?.terminar?.();
@@ -428,13 +440,24 @@ export default function useCouncil(msgs, setMsgs) {
     let veredictoJuizes = [];
     const ctrlJuizes = new AbortController();
     controllersRef.current.set("judges", ctrlJuizes);
+    
+    // Payload enriquecido para os juízes com o debate auditável
+    const debateAuditavel = nextLobeResults.map(r => ({
+      lobo: r.label,
+      resposta_inicial: r.ronda1,
+      critica_que_fez: r.critique.text,
+      alvo_da_sua_critica: LOBOS.find(l => l.id === r.critique.target)?.nome,
+      critica_que_recebeu: nextLobeResults.find(other => other.critique.target === r.streamId)?.critique.text
+    }));
+
     try {
       veredictoJuizes = await runJudges(
         q,
         nextLobeResults,
         juizesActivos,
         ctrlJuizes.signal,
-        (juiz) => setJudgeResults((prev) => upsertJudge(prev, juiz))
+        (juiz) => setJudgeResults((prev) => upsertJudge(prev, juiz)),
+        { debateAuditavel } // Passa o debate estruturado como contexto extra
       );
       veredictoJuizes = dedupeJudges(veredictoJuizes);
       setJudgeResults(veredictoJuizes);

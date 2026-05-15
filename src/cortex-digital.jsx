@@ -593,6 +593,7 @@ async function compressContext(buf, claudeKey, perpKey) {
 }
 // ── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 export default function Cortex(){
+  const [currentApprovalGate, setCurrentApprovalGate] = useState(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
@@ -873,7 +874,7 @@ function removerFicheiroAnexado() {
   setFicheiroAnexado(null);
 }
 
-async function send(query) {
+async function send(query, options = {}) {
   const q = (query || input).trim();
   if (q) setMemoryBannerDismissed(true);
   const imagemDataUrlEnvio = ficheiroAnexado?.imageDataUrl || null;
@@ -938,10 +939,17 @@ async function send(query) {
     systemPrompts: modoCode && modoDebate ? SYSTEM_PROMPTS_CODE : undefined,
     runDebateStream: runDebateStreamApi,
     streaming: { textosParciais, aStreaming, onToken, iniciar, terminar },
+    options,
   });
+  if (resultado?.tipo === 'approval_gate') {
+    setCurrentApprovalGate({ ...resultado, query: qComFicheiro });
+    ajustar(true);
+    return;
+  }
+
   ajustar(true);
   return resultado;
-  }
+}
 
   function aplicarSugestaoRei(sugestao) {
     const texto = typeof sugestao === "string" ? sugestao : sugestao?.texto || "";
@@ -1701,6 +1709,23 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                   tipo="info"
                   mensagem={aStreaming ? "Streaming a correr — respostas parciais dos lobos." : "Modo debate activo — os lobos fazem segunda ronda antes do Rei."}
                 />
+              </div>
+            )}
+            {currentApprovalGate && (
+              <div style={{maxWidth:820,margin:"0 auto 12px"}}>
+                <AlertaBanner
+                  tipo="aviso"
+                  mensagem={currentApprovalGate.mensagem}
+                >
+                  <div style={{display:"flex",gap:8,marginTop:10}}>
+                    <button onClick={()=>{
+                      send(currentApprovalGate.query, { aprovado: true });
+                      setCurrentApprovalGate(null);
+                    }} style={btn(T, "#ef4444")}>Confirmar</button>
+                    <button onClick={()=>setCurrentApprovalGate(null)} style={btn(T, T.ts)}>Cancelar</button>
+                    <button onClick={()=>toast("Esta acção pode remover dados permanentemente.", "info")} style={btn(T, AC.gemini)}>Ver impacto</button>
+                  </div>
+                </AlertaBanner>
               </div>
             )}
             {showFileUpload && (

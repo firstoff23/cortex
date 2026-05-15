@@ -8,7 +8,7 @@ const VARIANTES = {
   sucesso: { cor: "#22c55e", icone: "✓" },
 };
 
-export default function AlertaBanner({ tipo = "info", mensagem, onFechar }) {
+export default function AlertaBanner({ tipo = "info", mensagem, onFechar, children }) {
   if (!mensagem) return null;
   const v = VARIANTES[tipo] || VARIANTES.info;
 
@@ -17,53 +17,56 @@ export default function AlertaBanner({ tipo = "info", mensagem, onFechar }) {
       role={tipo === "erro" ? "alert" : "status"}
       style={{
         display: "flex",
-        alignItems: "center",
+        flexDirection: "column",
         gap: 9,
         border: `1px solid ${v.cor}55`,
         background: `${v.cor}14`,
         color: "var(--text-h, #f5f5ff)",
         borderRadius: 10,
-        padding: "8px 10px",
+        padding: "10px 12px",
         fontSize: 12,
         lineHeight: 1.45,
       }}
     >
-      <span
-        aria-hidden="true"
-        style={{
-          width: 20,
-          height: 20,
-          borderRadius: 999,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: `${v.cor}22`,
-          color: v.cor,
-          fontWeight: 900,
-          flexShrink: 0,
-        }}
-      >
-        {v.icone}
-      </span>
-      <span style={{ flex: 1 }}>{mensagem}</span>
-      {onFechar && (
-        <button
-          type="button"
-          aria-label="Fechar alerta"
-          onClick={onFechar}
+      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+        <span
+          aria-hidden="true"
           style={{
-            background: "transparent",
-            border: "none",
+            width: 20,
+            height: 20,
+            borderRadius: 999,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: `${v.cor}22`,
             color: v.cor,
-            cursor: "pointer",
-            fontSize: 14,
-            lineHeight: 1,
-            padding: 2,
+            fontWeight: 900,
+            flexShrink: 0,
           }}
         >
-          ×
-        </button>
-      )}
+          {v.icone}
+        </span>
+        <span style={{ flex: 1 }}>{mensagem}</span>
+        {onFechar && (
+          <button
+            type="button"
+            aria-label="Fechar alerta"
+            onClick={onFechar}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: v.cor,
+              cursor: "pointer",
+              fontSize: 14,
+              lineHeight: 1,
+              padding: 2,
+            }}
+          >
+            ×
+          </button>
+        )}
+      </div>
+      {children && <div style={{ marginTop: 2 }}>{children}</div>}
     </div>
   );
 }
