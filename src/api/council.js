@@ -61,7 +61,7 @@ export const LOBOS = [
   },
 ];
 
-const CRITIQUE_MAP = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 1 };
+
 
 export const SYSTEM_PROMPTS = {
   1: `<role>Analista Crítico do Córtex Digital</role>
@@ -586,7 +586,8 @@ export async function runDebateStream(pergunta, modo = 'paralelo', options = {})
     lobos.map((lobe) => {
       let contextoLobe = contextoDebate;
       if (modo === 'debate') {
-        const targetId = CRITIQUE_MAP[lobe.id];
+        const ids = lobos.map(l => l.id);
+        const targetId = ids[(lobos.findIndex(l => l.id === lobe.id) + 1) % ids.length];
         const target = ronda1.find(r => r.status === 'fulfilled' && r.value.id === targetId);
         if (target) {
           contextoLobe = `Analisa criticamente esta resposta do ${target.value.nome}: "${target.value.resposta}". 
