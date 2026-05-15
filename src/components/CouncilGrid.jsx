@@ -8,6 +8,15 @@ export default function CouncilGrid({
   aStreaming = false,
 }) {
   const [selecionado, setSelecionado] = useState(null);
+  
+  React.useEffect(() => {
+    if (selecionado) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [selecionado]);
 
   const fases = useMemo(
     () => [
@@ -167,14 +176,14 @@ export default function CouncilGrid({
         .lobo-preview{margin:0;font-size:10px;line-height:1.35;color:#cbd5e1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;min-height:40px}\
         .lobo-meter{height:4px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.08);margin-top:auto}\
         .lobo-meter>span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#7c3aed,#06b6d4)}\
-        .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:9999;display:flex;align-items:flex-end}\
+        .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:20000;display:flex;align-items:flex-end}\
         .sheet-panel{width:100%;max-height:78vh;overflow:auto;background:#0b0b14;border-top-left-radius:22px;border-top-right-radius:22px;border:1px solid rgba(255,255,255,.08);padding:16px 16px 24px;box-shadow:0 -20px 60px rgba(0,0,0,.35)}\
         .sheet-handle{width:42px;height:4px;border-radius:999px;background:rgba(255,255,255,.18);margin:0 auto 14px}\
         .sheet-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}\
         .sheet-icon{font-size:28px;line-height:1}\
         .sheet-title h3{margin:0;font-size:18px;color:#f8fafc}\
         .sheet-title p{margin:2px 0 0;font-size:12px;color:#94a3b8;text-transform:capitalize}\
-        .sheet-close{margin-left:auto;background:rgba(255,255,255,.05);border:none;color:#fff;padding:6px 12px;border-radius:10px;font-size:11px}\
+        .sheet-close{margin-left:auto;background:rgba(255,255,255,.05);border:none;color:#fff;padding:10px 16px;border-radius:12px;font-size:12px;min-height:44px;display:flex;align-items:center;justify-content:center}\
         .sheet-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}\
         .sheet-stats div{padding:10px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}\
         .sheet-stats span{display:block;font-size:10px;color:#94a3b8;margin-bottom:4px}\

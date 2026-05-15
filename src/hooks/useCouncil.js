@@ -108,7 +108,7 @@ export async function runDebateStream(pergunta, modo = "paralelo", options = {})
   return runDebateStreamApi(pergunta, modo, options);
 }
 
-const CRITIQUE_RING = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 1 };
+
 
 export default function useCouncil(msgs, setMsgs) {
   const [phase, setPhase] = useState(null);
@@ -443,12 +443,19 @@ export default function useCouncil(msgs, setMsgs) {
     const ctrlJuizes = new AbortController();
     controllersRef.current.set("judges", ctrlJuizes);
     
+    // Gerar Anel de Crítica Dinâmico (Ring Map)
+    const ringMap = {};
+    const ids = councilLobes.map(l => l.id);
+    ids.forEach((id, idx) => {
+      ringMap[id] = ids[(idx + 1) % ids.length];
+    });
+
     // Payload enriquecido para os juízes com o debate auditável e estruturado
     const payloadAuditavel = {
       initialResponses: nextLobeResults.map(r => ({ id: r.streamId, lobo: r.label, text: r.ronda1 })),
       critiques: nextLobeResults.map(r => ({ from: r.streamId, to: r.critique.target, text: r.critique.text })),
-      pairingMap: CRITIQUE_RING,
-      debateFormat: "Anel Circular Fixo (Circular Ring Criticism)"
+      pairingMap: ringMap,
+      debateFormat: `Anel Circular Fixo (${ids.length} Lobos)`
     };
 
     try {
