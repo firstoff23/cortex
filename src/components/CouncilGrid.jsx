@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from 'react';
 
+// pairingMap: prop reservada para v2 — setas visuais de crítica entre lobos
+
+
 export default function CouncilGrid({
   lobos = [],
   resultados = [],
@@ -21,9 +24,10 @@ export default function CouncilGrid({
   const fases = useMemo(
     () => [
       { id: 'council', label: 'Respostas' },
-      { id: 'judges', label: 'Crítica' },
+      { id: 'critique', label: 'Crítica' },
+      { id: 'judges', label: 'Análise' },
       { id: 'rei', label: 'Síntese' },
-      { id: 'reflex', label: 'Veredicto' },
+      { id: 'reflex', label: 'Reflexão' },
     ],
     []
   );

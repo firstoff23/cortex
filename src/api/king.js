@@ -247,6 +247,9 @@ function normalizarResultadoRei(parseado, consensoMatematico, scoreJuizesMedio, 
         ? parseado?.razao_incerteza || "Confiança final abaixo de 40%."
         : parseado?.razao_incerteza || null,
     suggestions: garantirSugestoes(parseado?.suggestions),
+    planning_summary: typeof parseado?.planning_summary === 'string'
+      ? parseado.planning_summary.trim()
+      : null,
   };
 }
 
