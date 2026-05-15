@@ -253,7 +253,8 @@ async function chamarJuizComCache(juiz, pergunta, respostasLobos, signalExterno)
     const dados = await lerJsonResposta(resposta);
     if (!resposta.ok || dados.error) throw new Error(dados.error || `HTTP ${resposta.status}`);
 
-    const parseado = extrairJson(dados.content || "");
+    const content = dados.choices?.[0]?.message?.content || dados.content || "";
+    const parseado = extrairJson(content);
     if (!parseado) throw new Error("JSON não encontrado na resposta");
 
     const entrada = {

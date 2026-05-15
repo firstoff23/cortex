@@ -56,7 +56,7 @@ export default async function handler(req, res) {
 
   const payload = {
     max_tokens: max_tokens || 420,
-    messages: system ? [{ role: "system", content: system }, ...messages] : messages,
+    messages: system ? [{ role: "system", content: system, _injected: true }, ...messages] : messages,
     plugins: plugins || undefined,
     response_format: response_format || undefined,
   };

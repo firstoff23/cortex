@@ -329,10 +329,8 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
       ? { model: lobe.modelo, models: lobe.fallbacks ? [lobe.modelo, ...lobe.fallbacks] : undefined, system, messages, max_tokens: options.max_tokens || 420, ...geracao, ...lobeTools }
       : {
           model: lobe.modelo,
-          messages: [
-            { role: 'system', content: system },
-            ...messages,
-          ],
+          system: system,
+          messages: messages,
           max_tokens: options.max_tokens || 420,
           ...geracao,
         };
