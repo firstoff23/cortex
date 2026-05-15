@@ -70,6 +70,7 @@ export default async function handler(req, res) {
 
   try {
     for (const modeloAtual of modelos) {
+      const isStream = req.body.stream === true;
       const upstream = await fetch(OPENROUTER_URL, {
         method: "POST",
         headers: {
@@ -78,19 +79,42 @@ export default async function handler(req, res) {
           "HTTP-Referer": PROD_ORIGIN,
           "X-Title": "Córtex Digital",
         },
-        body: JSON.stringify({ ...payload, model: modeloAtual }),
+        body: JSON.stringify({ 
+          ...payload, 
+          model: modeloAtual,
+          stream: isStream 
+        }),
       });
 
-      const dados = await lerJsonSeguro(upstream);
-      ultimoStatus = upstream.status;
-      ultimoErro = dados;
-
-      if (upstream.ok && !dados.error && dados.choices?.[0]) {
-        return res.status(200).json(dados);
+      if (upstream.ok) {
+        if (isStream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          
+          const reader = upstream.body.getReader();
+          const decoder = new TextDecoder();
+          
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            res.write(value);
+          }
+          return res.end();
+        } else {
+          const dados = await lerJsonSeguro(upstream);
+          if (dados.choices?.[0]) {
+            return res.status(200).json(dados);
+          }
+          ultimoErro = dados;
+        }
+      } else {
+        ultimoStatus = upstream.status;
+        ultimoErro = await lerJsonSeguro(upstream);
       }
     }
 
-    return res.status(502).json({
+    return res.status(ultimoStatus).json({
       error: "OpenRouter devolveu erro",
       status: ultimoStatus,
       detail: erroTexto(ultimoErro?.error || ultimoErro),

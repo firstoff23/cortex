@@ -264,7 +264,6 @@ async function chamarModeloRei(modelo, contexto, abortSignal, options = {}) {
   // Trunca e constrói o histórico se existirem mensagens prévias
   const messages = options.messages || [];
   const payloadMessages = [
-    { role: "system", content: SYSTEM_REI },
     ...messages,
     { role: "user", content: contexto }
   ];
@@ -279,6 +278,7 @@ async function chamarModeloRei(modelo, contexto, abortSignal, options = {}) {
     },
     body: JSON.stringify({
       model: modelo,
+      system: SYSTEM_REI,
       messages: payloadMessages,
       plugins: [{ id: "response-healing" }],
       response_format: { type: "json_object" },

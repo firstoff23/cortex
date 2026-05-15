@@ -380,22 +380,20 @@ export async function chamarLobeStream(lobe, pergunta, contextoDebate = null, op
   if (!apiKey) throw new Error(`API key ausente para ${lobe.provider}`);
   const system = options.systemPrompts?.[lobe.id] || SYSTEM_PROMPTS[lobe.id];
 
-  const resposta = await fetch(`${getBaseURL(lobe.provider)}/chat/completions`, {
+  const resposta = await fetch('/api/chat', {
     method: 'POST',
     signal: options.signal,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://cortex-digital.vercel.app',
       'X-Title': 'Córtex Digital',
     },
     body: JSON.stringify({
       model: lobe.modelo,
       models: lobe.fallbacks ? [lobe.modelo, ...lobe.fallbacks] : undefined,
       stream: true,
+      system,
       ...opcoesGeracaoLobe(lobe, options),
       messages: [
-        { role: "system", content: system },
         ...(options.messages || []),
         {
           role: "user",

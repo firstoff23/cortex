@@ -27,7 +27,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://vercel.live https://us-assets.i.posthog.com; style-src 'self' 'unsafe-inline' https://api.fontshare.com; font-src 'self' https://api.fontshare.com https://cdn.fontshare.com; connect-src 'self' https://openrouter.ai https://o4506565237604352.ingest.us.sentry.io https://us.i.posthog.com https://us-assets.i.posthog.com; img-src 'self' data: blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://vercel.live https://us-assets.i.posthog.com; style-src 'self' 'unsafe-inline' https://api.fontshare.com; font-src 'self' https://api.fontshare.com https://cdn.fontshare.com https://frontend-cdn.perplexity.ai; connect-src 'self' https://openrouter.ai https://o4506565237604352.ingest.us.sentry.io https://us.i.posthog.com https://us-assets.i.posthog.com https://*.clerk.accounts.dev; img-src 'self' data: blob:; frame-src 'self' https://vercel.live; worker-src 'self' blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
         }
       ]
     },
@@ -40,10 +40,10 @@
         },
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://cortex-five-hazel.vercel.app"
+          "value": "*"
         },
         { "key": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, X-OpenRouter-Cache, X-OpenRouter-Cache-TTL" }
       ]
     }
   ],
