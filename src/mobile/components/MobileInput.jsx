@@ -35,7 +35,7 @@ export default function MobileInput({
         zIndex: 1250,
         background: "var(--bg)",
         borderTop: "1px solid var(--border)",
-        padding: "10px 12px calc(10px + env(safe-area-inset-bottom))",
+        padding: "10px 12px calc(16px + env(safe-area-inset-bottom))",
         boxShadow: "0 -12px 32px rgba(0,0,0,0.32)",
       }}
     >

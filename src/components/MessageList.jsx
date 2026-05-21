@@ -244,10 +244,11 @@ const MessageList = React.memo(function MessageList({
                   {sugestoesRei.length > 0 && (
                     <div
                       style={{
-                        display: "inline-flex",
+                        display: "flex",
                         gap: "8px",
                         flexWrap: "wrap",
                         marginTop: "8px",
+                        maxWidth: "100%",
                       }}
                     >
                       {sugestoesRei.map((sugestao, idx) => (
@@ -260,6 +261,9 @@ const MessageList = React.memo(function MessageList({
                             borderRadius: "20px",
                             padding: "4px 12px",
                             fontSize: "13px",
+                            width: isMobile ? "auto" : undefined,
+                            maxWidth: "100%",
+                            whiteSpace: "normal",
                             cursor: "pointer",
                             background: "transparent",
                             color: "var(--accent)",

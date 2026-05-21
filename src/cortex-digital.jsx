@@ -483,7 +483,7 @@ function iFmt(text){
 
 function CopyBtn({text,T,t}){
   const [copied,setCopied]=useState(false);
-  return <button onClick={()=>{navigator.clipboard?.writeText(text).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1800);});}} title={t?.answer?.copy || "Copiar"} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:5,padding:"2px 7px",color:copied?"#10b981":T.tf,fontSize:9,cursor:"pointer",transition:"color 0.2s"}}>{copied?(t?.answer?.copied || "âœ“ copiado"):(t?.answer?.copy || "âŽ˜ copiar")}</button>;
+  return <button onClick={()=>{navigator.clipboard?.writeText(text).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1800);});}} title={t?.answer?.copy || "Copiar"} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:5,padding:"2px 7px",color:copied?"#10b981":T.tf,fontSize:9,cursor:"pointer",transition:"color 0.2s"}}>{copied?(t?.answer?.copied || "✓ copiado"):(t?.answer?.copy || "⌘ copiar")}</button>;
 }
 
 function Toggle({on,onChange,color}){
@@ -535,7 +535,7 @@ function Modal({T,title,onClose,children}){
               width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",
               borderRadius:"50%",transition:"background 220ms cubic-bezier(0.4,0,0.2,1)"
             }}
-          >âœ•</button>
+          >✕</button>
         </div>
         {children}
       </div>
@@ -1347,7 +1347,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                   <div style={{fontSize:11,fontWeight:700,color:theme===key?th.tx:T.ts}}>{th.name}</div>
                   <div style={{display:"flex",gap:3,marginTop:3}}>{[th.bg,th.s1,AC.claude,th.tx].map((c,i)=><div key={`theme-swatch-${i}-${c}`} style={{width:10,height:10,borderRadius:"50%",background:c,border:`1px solid ${th.b1}`}}/>)}</div>
                 </div>
-                {theme===key&&<span style={{marginLeft:"auto",color:AC.claude,fontWeight:700}}>âœ“</span>}
+                {theme===key&&<span style={{marginLeft:"auto",color:AC.claude,fontWeight:700}}>✓</span>}
               </button>
             ))}
           </div>
@@ -1496,7 +1496,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               <div style={{fontSize:11,fontWeight:700,color:T.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{conv.title}</div>
               <div style={{fontSize:9,color:T.ts,marginTop:3}}>{conv.msgs?.filter(m=>m.role==="user").length || 0} mensagens · {new Date(conv.updatedAt).toLocaleDateString("pt-PT")}</div>
             </div>
-            <button onClick={e=>deleteConv(conv.id,e)} aria-label="Apagar conversa" style={{background:"transparent",border:"none",color:T.tf,cursor:"pointer",fontSize:12,flexShrink:0,opacity:0.65,padding:2,lineHeight:1}}>âœ•</button>
+            <button onClick={e=>deleteConv(conv.id,e)} aria-label="Apagar conversa" style={{background:"transparent",border:"none",color:T.tf,cursor:"pointer",fontSize:12,flexShrink:0,opacity:0.65,padding:2,lineHeight:1}}>✕</button>
           </div>
         ))
       }
@@ -1777,8 +1777,8 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       style={{
         position:"fixed",
         right:16,
-        bottom:isMobile ? `calc(96px + env(safe-area-inset-bottom))` : `calc(16px + env(safe-area-inset-bottom))`,
-        zIndex:1201,
+        bottom:isMobile ? `calc(128px + env(safe-area-inset-bottom))` : `calc(16px + env(safe-area-inset-bottom))`,
+        zIndex:isMobile ? 1240 : 1201,
         width:56,
         height:56,
         borderRadius:"50%",
@@ -1890,7 +1890,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
           </div>
 
           {!isMobile && (
-          <div style={{padding:"8px 10px",paddingBottom:"10px",background:T.s1,borderTop:`1px solid ${T.b2}`,flexShrink:0}}>
+          <div style={{padding:"8px 10px",paddingBottom:"16px",background:T.s1,borderTop:`1px solid ${T.b2}`,flexShrink:0}}>
             <label style={{ fontSize:'0.85rem', color:'var(--text-muted)', display:'flex', alignItems:'center', gap:'6px', maxWidth:820, margin:'0 auto 6px' }}>
               <input
                 type="checkbox"
@@ -2012,7 +2012,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                   style={{background:input.trim()&&!phase?"var(--accent)":"#333",border:"none",borderRadius:14,width:44,height:44,cursor:input.trim()&&!phase?"pointer":"not-allowed",fontSize:16,color:"#fff",transition:"background 0.2s, box-shadow 0.2s, opacity 0.2s",opacity:phase?0.4:1,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:input.trim()&&!phase?"0 0 16px rgba(168,85,247,0.45)":"none",flexShrink:0}}
                   onMouseEnter={e=>{if(input.trim()&&!phase)e.currentTarget.style.background="#7e22ce";}}
                   onMouseLeave={e=>{if(input.trim()&&!phase)e.currentTarget.style.background="var(--accent)";}}
-                >â–¶</button>
+                >▶</button>
               )}
               {/* botão nova conversa */}
               <button onClick={newChat} title={"Nova Conversa"} style={{background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,width:44,height:44,cursor:"pointer",fontSize:16,color:T.ts,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=AC.claude+"66";e.currentTarget.style.color=AC.claude;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.b1;e.currentTarget.style.color=T.ts;}}>+</button>

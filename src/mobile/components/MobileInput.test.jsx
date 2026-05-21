@@ -12,6 +12,7 @@ describe("MobileInput", () => {
     expect(html).toContain("position:fixed");
     expect(html).toContain("bottom:0");
     expect(html).toContain("env(safe-area-inset-bottom)");
+    expect(html).toContain("calc(16px + env(safe-area-inset-bottom))");
     expect(html).toContain("font-size:16px");
     expect(html).toContain("var(--bg)");
     expect(html).toContain("var(--border)");
