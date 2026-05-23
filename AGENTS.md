@@ -10,8 +10,10 @@
 ## Stack
 
 - React 18 + Vite 5.4.21
-- Deploy: Vercel (sem servidor local)
+- Deploy: Vercel (plano Hobby, sem servidor local)
 - Proxy de APIs: Vercel serverless functions (`/api/*`)
+- Auth: Clerk (dev keys — aguarda domínio próprio para produção; GitHub OAuth configurado mas desativado até domínio final)
+- Monitorização: Sentry + PostHog (PostHog bloqueado por AdBlockers — comportamento esperado, não afeta a app)
 - Sem Tailwind, sem shadcn, sem Express, sem SQLite
 
 ## OpenRouter Plugins
@@ -30,6 +32,8 @@
 - { id: 'web' } → substituído por openrouter:web_search
 - sufixo :online → substituído por tools array
 - pdfjs-dist → substituído por file-parser plugin
+- xlsx → substituído por exceljs (vulnerabilidade de segurança)
+- ElevenLabs TTS → substituído por OpenRouter TTS
 
 ## Arquitetura
 
@@ -59,8 +63,65 @@
 - Rei fallback: `openrouter/fusion` (pago, Claude Opus + GPT) — activa apenas quando Llama 3.3 falha ou devolve vazio
 - F4-01 Upload imagens multimodal: ✅ FEITO — imagens seguem por `image_url` via OpenRouter content array; `imageDataUrl` é transitório, não persistido em histórico/localStorage; preview nativo aparece no chat
 - Upload de PDF remoto: Substituído `pdfjs-dist` (local) pelo OpenRouter `file-parser` plugin (`cloudflare-ai` engine) enviado em Base64 — reduz ~500kb do bundle size
-- Memória em `localStorage` (migração para Supabase planeada)
+- Memória em `localStorage` + Supabase (F5-01/F5-02 implementados — ver secção RAG)
 - Constante de versão: `const MV = "cortex-v12"` no topo do ficheiro
+
+## Timeouts e Limites (actualizado 2026-05-22)
+
+- `vercel.json`: `api/chat.js` → `maxDuration: 60` (máximo Hobby plan; era 30s — causava erros 504)
+- `fetchWithTimeout` em `cortex-digital.jsx` → `60000ms` (era 30000ms)
+- Mensagens injectadas pelo sistema (RAG + grounding) usam `_injected: true` para passar o middleware de segurança
+- Para desenvolvimento local: usar sempre `vercel dev` (não `npm run dev` isolado) — o Vite sozinho causa `ECONNREFUSED` no proxy `/api`
+
+## RAG e Memória Persistente (F5-01/F5-02 — activo)
+
+- Supabase usado para RAG com vector search (pgvector)
+- `api/memory/_db.js` — cliente Supabase partilhado
+- `api/memory/upsert.js` — guarda memórias com embedding
+- `api/memory/query.js` — busca semântica por similaridade
+- `api/memory/delete.js` — remove memórias
+- `api/memory/stats.js` — estatísticas de uso de memória
+- `src/hooks/useCouncil.js`: `queryMemories(userId, q, 0.45, 3)` injecta contexto RAG no histórico com `role: "system"` + `_injected: true`
+- `sessionMemory.js` — persistência de resumo de sessão no localStorage `cortex_session_memory`
+
+## Tavily Web Grounding (F5-05 — activo)
+
+- `api/tavily.js` — endpoint serverless proxy para a API Tavily
+- `src/hooks/useCouncil.js` exporta `deveUsarGroundingWeb()` e `obterGroundingWeb()`
+- `GROUNDING_KEYWORDS` detecta automaticamente queries que precisam de dados actuais (notícias, preços, eventos, etc.)
+- Resultado injectado no histórico com `role: "system"` + `_injected: true` antes dos lobos
+- Fontes web aparecem na UI (webSources)
+- TAVILY_API_KEY guardada em Vercel env vars (não no `.env.local`)
+
+## Rate Limiting (F5-04 — activo)
+
+- Rate limiting em produção no `api/chat.js`
+- Confidence badges na UI
+
+## Memory Observability (F5-03 — activo)
+
+- Painel de observabilidade de memória implementado
+
+## Evals (F4-07)
+
+- `evals/fase4.json` — 20 queries de teste cobrindo os 5 lobos
+- Harness com dataset, graders e runner implementado
+- `api/chat.test.js` e `api/tavily.test.js` — testes unitários dos endpoints
+
+## Endpoints Serverless Activos
+
+| Endpoint | Função |
+|---|---|
+| `api/chat.js` | Proxy OpenRouter — todos os lobos + Rei |
+| `api/tts.js` | Text-to-Speech via OpenRouter |
+| `api/stt.js` | Speech-to-Text via OpenRouter Whisper |
+| `api/notion-export.js` | Export para Notion (token em memória de sessão) |
+| `api/tavily.js` | Web grounding via Tavily |
+| `api/memory/upsert.js` | Guardar memória RAG no Supabase |
+| `api/memory/query.js` | Busca semântica RAG |
+| `api/memory/delete.js` | Apagar memórias |
+| `api/memory/stats.js` | Estatísticas de memória |
+| `api/nim-proxy.js` | ⚠️ INACTIVO — NIM removido, mantido por compatibilidade |
 
 ## Nomenclatura
 
@@ -83,10 +144,13 @@
 - `gerarMensagemAprovacao()` = gera payload para AlertaBanner de aprovação
 - `planning_summary` = campo do Rei com resumo do plano antes do veredicto
 - `reasoning` = campo obrigatório por lobe explicando a lógica da análise
+- `obterGroundingWeb()` = função que decide e executa web grounding via Tavily
+- `deveUsarGroundingWeb()` = detecta se a query precisa de dados actuais
+- `queryMemories()` = busca semântica RAG no Supabase
 
 ## Hooks
 
-- `useCouncil.js` = orquestração do council, debate, juízes e Rei
+- `useCouncil.js` = orquestração do council, debate, juízes e Rei; exporta funções de grounding
 - `useStreaming.js` = estado parcial por lobe durante streaming SSE
 - `useAutoResize.js` = auto-resize do input principal do chat
 - `useFileUpload.js` = F4-02 upload universal com extracção de texto, previews e `imageDataUrl` transitório para F4-01
@@ -113,6 +177,8 @@
 - Substitui blocos exatos — nunca reescreve o ficheiro inteiro
 - Não quebra funcionalidades existentes sem aviso explícito
 - Usa `.catch(() => {})` onde integrações externas não podem quebrar a UX
+- Mensagens de sistema injectadas pelo agente (RAG, grounding) **devem sempre ter** `_injected: true` para passar o middleware de segurança
+- Desenvolvimento local: usar `vercel dev` (não `npm run dev` isolado)
 
 ## Skills disponíveis
 
@@ -131,7 +197,7 @@
 - ✅ Input com contador chars/tokens — FEITO
 - ✅ Temperatura por lobe — FEITO (`Slider.jsx`)
 - ✅ Side panels — FEITO (Histórico, Blueprints, Modo Forense)
-- ✅ Modelos :free rápidos — FEITO (timeout 28s, 4 lobos substituídos 2026-05-13)
+- ✅ Modelos :free rápidos — FEITO (4 lobos substituídos 2026-05-13)
 - ✅ Fix parser Rei — FEITO (`choices[0].message.content` em `king.js`)
 - ✅ Web search — FEITO (`openrouter:web_search` em lobos 1+4, parser tool_calls, custo ~$0.02/req)
 - ✅ DateTime tool — FEITO (`openrouter:datetime` em todos os lobos, Europe/Lisbon)
@@ -154,6 +220,17 @@
 - ✅ Factory Approval Gates — FEITO (`council.js`: `precisaAprovacao()` + `gerarMensagemAprovacao()`; `useCouncil.js`: intercepção em `send()` sem `aprovado:true`; `cortex-digital.jsx`: `AlertaBanner` com botões Confirmar/Cancelar/Ver impacto)
 - ✅ CouncilGrid — FEITO (componente visual do debate em grid por lobe)
 - ✅ Evals Fase 4 — FEITO (`evals/fase4.json`, 20 queries de teste cobrindo os 5 lobos)
-- Persistência real com Supabase (substituir localStorage)
-- Conectores on-demand: Obsidian, Notion (ElevenLabs substituído por OpenRouter TTS)
+- ✅ F5-01 RAG Supabase — FEITO (`api/memory/*`, `queryMemories()` em `useCouncil.js`)
+- ✅ F5-02 Persistência de resumos de sessão — FEITO (`sessionMemory.js`, auto RAG context injection)
+- ✅ F5-03 Memory Observability Panel — FEITO
+- ✅ F5-04 Rate Limiting produção + Confidence Badges — FEITO (`api/chat.js`)
+- ✅ F5-05 Tavily Web Grounding — FEITO (`api/tavily.js`, `deveUsarGroundingWeb()`, `obterGroundingWeb()`, fontes na UI)
+- ✅ Fix timeout 504 — FEITO (maxDuration 60s no Vercel, fetchWithTimeout 60s, `_injected: true` nas injecções de sistema)
+- ✅ Segurança xlsx → exceljs — FEITO
+- ✅ UTF-8 encoding fix — FEITO (charset headers Vite + Vercel, mojibake em cortex-digital.jsx)
+- ✅ Mobile fix — FEITO (chips wrap, input padding, botões encoding)
+- ✅ runDebate/runDebateStream — @deprecated (manter mas não usar em código novo)
+- Clerk GitHub OAuth — aguarda domínio próprio de produção
+- Persistência total com Supabase (substituir localStorage restante)
 - Cloudflare: DNS + WAF + rate limiting + Turnstile
+- Conectores on-demand: Obsidian, Notion
