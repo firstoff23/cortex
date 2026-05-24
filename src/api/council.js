@@ -266,8 +266,23 @@ function construirConteudoUtilizador(pergunta, contextoDebate, imageDataUrl) {
   ];
 }
 
+/**
+ * Remove blocos de raciocínio interno de modelos como Nemotron, Qwen3-coder e DeepSeek.
+ * Estes modelos expõem o chain-of-thought em <think>...</think> ou <thinking>...</thinking>
+ * no campo content da resposta. Sem esta limpeza o Rei recebe o thinking em inglês
+ * e inclui-o literalmente no veredicto em vez de fazer síntese.
+ */
+function limparThinking(texto) {
+  if (!texto) return '';
+  // Remove blocos <think>...</think> e <thinking>...</thinking> (qualquer capitalização)
+  let limpo = texto.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '');
+  // Remove prefixos de thinking expostos sem tag de fecho (modelo truncado)
+  limpo = limpo.replace(/^<think(?:ing)?>[\s\S]*/i, '');
+  return limpo.trim();
+}
+
 function normalizarRespostaLobe(lobe, resposta, contextoDebate) {
-  let texto = String(resposta || '').trim();
+  let texto = limparThinking(String(resposta || ''));
   if (contextoDebate && lobe.id === 5 && !/A questão que ninguém fez/i.test(texto)) {
     texto = `${texto}\nA questão que ninguém fez: que hipótese faria a maioria mudar de ideias?`.trim();
   }
@@ -497,11 +512,12 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
   }
 
   // Quando web search está activo, a resposta pode conter chamadas de ferramenta em vez de conteúdo directo.
-  const texto =
+  const textoRaw =
     dados.choices?.[0]?.message?.content ||
     dados.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ||
     dados.content ||
     '';
+  const texto = limparThinking(textoRaw);
   return normalizarValorLobe(
     lobe,
     {
@@ -581,11 +597,11 @@ export async function chamarLobeStream(lobe, pergunta, contextoDebate = null, op
         }
       } catch {
         // Linhas SSE malformadas não devem quebrar a UX.
-      }
+      }
     }
   }
 
-  return normalizarValorLobe(lobe, { resposta: textoCompleto }, contextoDebate);
+  return normalizarValorLobe(lobe, { resposta: limparThinking(textoCompleto) }, contextoDebate);
 }
 
 export function chamarRei(...args) {

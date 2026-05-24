@@ -40,6 +40,32 @@ function extrairJson(texto) {
   }
 }
 
+/**
+ * Remove blocos de raciocínio interno (<think>/<thinking>) de modelos como Nemotron,
+ * Qwen3 e DeepSeek. Também extrai o campo 'analysis' do JSON dos lobos
+ * (os lobos respondem em JSON {analysis, reasoning}), garantindo que o Rei
+ * recebe apenas a resposta síntese e não o thinking intermediário.
+ */
+function limparThinking(texto) {
+  if (!texto) return '';
+  let limpo = texto.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '');
+  limpo = limpo.replace(/^<think(?:ing)?>[\s\S]*/i, '');
+  return limpo.trim();
+}
+
+function extrairAnalysis(texto) {
+  const limpo = limparThinking(texto || '');
+  // Tenta parsear JSON de lobo ({analysis, reasoning}) para extrair só o campo 'analysis'.
+  const match = limpo.match(/\{[\s\S]*\}/);
+  if (match) {
+    try {
+      const obj = JSON.parse(match[0]);
+      if (typeof obj.analysis === 'string' && obj.analysis.trim()) return obj.analysis.trim();
+    } catch { /* ignora JSON inválido */ }
+  }
+  return limpo;
+}
+
 async function lerJsonResposta(resposta) {
   // Evita mensagens técnicas do browser quando /api/chat devolve vazio ou HTML.
   if (typeof resposta.text === "function") {
@@ -61,11 +87,13 @@ async function lerJsonResposta(resposta) {
 
 function textoDoLobe(lobe) {
   if (!lobe) return "";
-  if (typeof lobe === "string") return lobe;
+  if (typeof lobe === "string") return extrairAnalysis(lobe);
   if (lobe.ronda1 || lobe.ronda2) {
-    return [`Ronda 1: ${lobe.ronda1 || "sem resposta"}`, `Ronda 2: ${lobe.ronda2 || lobe.result || "sem resposta"}`].join("\n");
+    const r1 = extrairAnalysis(lobe.ronda1 || 'sem resposta');
+    const r2 = extrairAnalysis(lobe.ronda2 || lobe.result || 'sem resposta');
+    return [`Ronda 1: ${r1}`, `Ronda 2: ${r2}`].join("\n");
   }
-  return lobe.resultado || lobe.result || lobe.content || "";
+  return extrairAnalysis(lobe.resultado || lobe.result || lobe.content || lobe.conteudo || "");
 }
 
 function nomeDoLobe(lobe, idx) {
