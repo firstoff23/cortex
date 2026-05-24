@@ -5,7 +5,23 @@ import LandingPage from "./LandingPage.jsx";
 
 function expandir(elemento) {
   if (!React.isValidElement(elemento)) return elemento;
-  if (typeof elemento.type === "function") return expandir(elemento.type(elemento.props));
+  if (typeof elemento.type === "function") {
+    const secret = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+    const originalDispatcher = secret.ReactCurrentDispatcher.current;
+    try {
+      secret.ReactCurrentDispatcher.current = {
+        useState: (init) => [typeof init === "function" ? init() : init, () => {}],
+        useRef: (init) => ({ current: init }),
+        useEffect: () => {},
+        useLayoutEffect: () => {},
+        useCallback: (fn) => fn,
+        useMemo: (fn) => fn(),
+      };
+      return expandir(elemento.type(elemento.props));
+    } finally {
+      secret.ReactCurrentDispatcher.current = originalDispatcher;
+    }
+  }
   return React.cloneElement(
     elemento,
     elemento.props,

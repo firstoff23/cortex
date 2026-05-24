@@ -414,7 +414,7 @@ async function callProxyChat(model, sys, msg, tokens=420) {
   });
   const d = await r.json();
   if(d.error) throw new Error(d.error);
-  return d.content||"";
+  return d.choices?.[0]?.message?.content || d.content || "";
 }
 
 async function callClaude(sys, msg, tokens=700) {
@@ -577,7 +577,8 @@ function KeyRow({ api, T, value, onChange }) {
         }),
       });
       const d = await r.json();
-      const ok = r.ok && !d.error && typeof d.content === "string";
+      const content = d.choices?.[0]?.message?.content || d.content;
+      const ok = r.ok && !d.error && typeof content === "string";
       setStatus(ok ? "ok" : "err");
     } catch { setStatus("err"); }
     setTimeout(() => setStatus(null), 3000);

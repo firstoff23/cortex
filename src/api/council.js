@@ -448,6 +448,10 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
   const history = options.messages || [];
   const messages = [...history, { role: "user", content: userContent }];
   const geracao = opcoesGeracaoLobe(lobe, options);
+  const isReasoning = [lobe.modelo, ...(lobe.fallbacks || [])].some(m => 
+    m.includes('deepseek') || m.includes('nemotron') || m.includes('reasoning') || m.includes('hermes')
+  );
+  const tokenLimit = options.max_tokens || (isReasoning ? 1200 : 420);
   const lobeTools = lobe.provider === 'openrouter'
     ? {
         tools: [
@@ -474,12 +478,12 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
 
   const body =
     lobe.provider === 'openrouter'
-      ? { model: lobe.modelo, models: lobe.fallbacks ? [lobe.modelo, ...lobe.fallbacks] : undefined, system, messages, max_tokens: options.max_tokens || 420, ...geracao, ...lobeTools }
+      ? { model: lobe.modelo, models: lobe.fallbacks ? [lobe.modelo, ...lobe.fallbacks] : undefined, system, messages, max_tokens: tokenLimit, ...geracao, ...lobeTools }
       : {
           model: lobe.modelo,
           system: system,
           messages: messages,
-          max_tokens: options.max_tokens || 420,
+          max_tokens: tokenLimit,
           ...geracao,
         };
 
@@ -557,7 +561,7 @@ export async function chamarLobeStream(lobe, pergunta, contextoDebate = null, op
       ],
       max_tokens:
         options.max_tokens ||
-        (lobe.modelo.includes('deepseek') ? 1200 : lobe.modelo.includes('llama-4') ? 800 : 420),
+        (([lobe.modelo, ...(lobe.fallbacks || [])].some(m => m.includes('deepseek') || m.includes('nemotron') || m.includes('reasoning') || m.includes('hermes')) ? 1200 : 420)),
     }),
   });
 
