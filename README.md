@@ -1,203 +1,125 @@
 # Córtex Digital v12
 
-> Sistema de chat multi-agente com council de 11 lobos IA, síntese final por Claude e streaming em tempo real.
+> Sistema de chat multi-agente com um conselho de 5 lobos especialistas de IA, síntese final por um Rei (Llama 3.3 70B via OpenRouter), streaming SSE em tempo real, memória persistente RAG (Supabase + pgvector) e pesquisa web ativa (Tavily).
 
 [![Deploy](https://img.shields.io/badge/deploy-vercel-black?logo=vercel)](https://cortex-five-hazel.vercel.app)
 [![React](https://img.shields.io/badge/react-18-blue?logo=react)](https://react.dev)
-[![Vite](https://img.shields.io/badge/vite-5.4.21-purple?logo=vite)](https://vitejs.dev)
+[![Vite](https://img.shields.io/badge/vite-6.3.0-purple?logo=vite)](https://vitejs.dev)
 [![License](https://img.shields.io/badge/license-private-red)](#)
 
 ---
 
 ## Demonstração
 
-**URL de produção:** https://cortex-five-hazel.vercel.app
+**URL de produção:** [https://cortex-five-hazel.vercel.app](https://cortex-five-hazel.vercel.app)
 
 ---
 
-## Stack
+## Stack Tecnológica
 
 | Camada | Tecnologia |
 |---|---|
-| Frontend | React 18 + Vite 5.4.21 |
-| Deploy | Vercel (CD automático no push para `main`) |
-| Proxies de API | Vercel Serverless Functions (`/api/*`) |
-| Memória | `localStorage` (migração Supabase planeada) |
-| Estilo | CSS puro (sem Tailwind, sem shadcn) |
-| i18n | PT / EN |
+| **Frontend** | React 18 + Vite 6.3.0 |
+| **Estilos** | CSS Puro (Vanilla CSS), altamente responsivo |
+| **Deploy** | Vercel (plano Hobby, deploys contínuos via `main`) |
+| **APIs & Proxies** | Vercel Serverless Functions (`/api/*`) com timeouts ajustados para 60s |
+| **Autenticação** | Clerk (GitHub OAuth & Dev Keys) |
+| **Base de Dados & RAG** | Supabase com extensão `pgvector` (busca semântica por similaridade) |
+| **Pesquisa Web** | Tavily Search API para grounding em tempo real |
+| **Monitorização** | Sentry + PostHog |
 
 ---
 
-## Arquitetura
+## Arquitetura do Conselho
 
-O Córtex usa um padrão **council multi-modelo**:
+O Córtex funciona através de um padrão de **debate distribuído com juiz central**:
 
 ```
-Utilizador
-    ↓ query
-routerDecide()        ← decide quais lobos ativar
-    ↓ paralelo
-invoke() × N lobos    ← streaming SSE por lobo
-    ↓ respostas
-chamarRei() / Codex   ← síntese final como juiz
-    ↓
-Reflexão + Memória   ← atualiza localStorage
+           Utilizador
+               ↓ query
+        routerDecide()         ← Seleciona automaticamente os lobos ativos
+               ↓ paralelo
+        invoke() × N Lobos     ← Streaming SSE por lobo (Ronda 1)
+               ↓ debate
+        Critique / Refine      ← Segunda ronda de feedback cruzado entre lobos
+               ↓ consensos
+        Síntese Ómega (Rei)    ← Rei Llama 3.3 avalia argumentos, calcula confiança e dita o veredicto
+               ↓
+     Persistência RAG (Sessão) ← Cria embeddings e guarda sumário/vetores no Supabase
 ```
 
-### Ficheiros principais
+### Ficheiros Principais
 
 | Ficheiro | Função |
 |---|---|
-| `src/cortex-digital.jsx` | Componente raiz, UI principal |
-| `src/api/council.js` | Array `LOBOS`, `invoke()`, `send()`, streaming |
-| `src/hooks/useCouncil.js` | Orquestração do conselho, debate, juízes |
-| `src/hooks/useStreaming.js` | Estado parcial por lobo durante SSE |
-| `src/hooks/useFileUpload.js` | Upload universal (PDF, DOCX, TXT, CSV, XLSX, imagens) |
-| `api/chat.js` | Proxy Vercel → OpenRouter |
-| `api/nim-proxy.js` | Proxy Vercel → NVIDIA NIM |
-
-### Componentes
-
-| Componente | Descrição |
-|---|---|
-| `KingCard.jsx` | Card do lobo Rei (resposta final) |
-| `LobeCard.jsx` | Card individual de cada lobo |
-| `JudgeCard.jsx` | Card do juiz/Codex |
-| `ClaudeCard.jsx` | Card específico Claude |
-| `MessageList.jsx` | Lista de mensagens do chat |
-| `DebateTimeline.jsx` | Timeline visual do debate multi-ronda |
-| `BlueprintsPanel.jsx` | Painel de padrões de arquitetura / RAG / IA |
-| `EvalsPanel.jsx` | Painel de avaliações dos lobos |
-| `FileUpload.jsx` | Zona drag-and-drop para ficheiros |
-| `FileUploadButton.jsx` | Botão de upload inline |
-| `AgentPlan.jsx` | Plano e configuração dos agentes |
+| [cortex-digital.jsx](file:///c:/Users/Alexandre/Desktop/Computador%20Intelig%C3%AAncia%20Adaptativa/src/cortex-digital.jsx) | Componente principal e ecrã de chat raiz |
+| [council.js](file:///c:/Users/Alexandre/Desktop/Computador%20Intelig%C3%AAncia%20Adaptativa/src/api/council.js) | Definição oficial dos `LOBOS`, roteamento de query e execução do debate cognitivo |
+| [useCouncil.js](file:///c:/Users/Alexandre/Desktop/Computador%20Intelig%C3%AAncia%20Adaptativa/src/hooks/useCouncil.js) | Orquestração do conselho, debate, grounding web e carregamento de contexto Supabase |
+| [useFileUpload.js](file:///c:/Users/Alexandre/Desktop/Computador%20Intelig%C3%AAncia%20Adaptativa/src/hooks/useFileUpload.js) | Hook de Upload Universal com base64 e parser cloud-native |
+| [useExport.js](file:///c:/Users/Alexandre/Desktop/Computador%20Intelig%C3%AAncia%20Adaptativa/src/hooks/useExport.js) | Exportações seguras dinâmicas para Word, Excel (`exceljs`) e Notion |
 
 ---
 
-## Modelos disponíveis (lobos)
+## Modelos do Conselho (v12)
 
-| ID | Modelo | Provedor |
+Os 5 lobos oficiais do conselho e o Rei utilizam os seguintes modelos (com fallbacks automáticos em caso de falha de serviço no OpenRouter):
+
+| Lobe | Modelo Principal | Função Primária |
 |---|---|---|
-| `claude` | Claude 3.5 Sonnet | Anthropic |
-| `gpt` | GPT-4o | OpenAI |
-| `gemini` | Gemini 2.0 Flash | Google |
-| `grok` | Grok-3 | xAI |
-| `groq` | Llama 3.3 70B | Groq |
-| `perp` | Sonar Pro | Perplexity |
-| `mistral` | Mistral Large | Mistral |
-| `cohere` | Command R+ | Cohere |
-| `deepseek` | DeepSeek V3 | DeepSeek |
-| `qwen` | Qwen 2.5 72B | Alibaba |
-| `ollama` | Llama local | Ollama |
-
-Todos os modelos externos passam por `/api/chat` (OpenRouter) ou `/api/nim-proxy` (NVIDIA NIM). **Nenhuma API key é exposta no cliente.**
+| **Analista Crítico** | `qwen/qwen3-next-80b-a3b-instruct:free` | Factos, lógica matemática e pesquisa web |
+| **Inovador Criativo** | `google/gemma-4-31b-it:free` | Brainstorming, conceitos e ideias fora da caixa |
+| **Pragmático Técnico** | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | Arquitetura, código de sistemas e raciocínio profundo |
+| **Generalista Contextual** | `openai/gpt-oss-120b:free` | Integração de perspetivas e pesquisa factual secundária |
+| **Advogado do Diabo** | `nousresearch/hermes-3-llama-3.1-405b:free` | Mitigação de riscos, testes de falhas e refutação |
+| **Juiz Final (Rei)** | `meta-llama/llama-3.3-70b-instruct:free` | Síntese integradora final (com fallback para `openrouter/fusion` pago) |
 
 ---
 
-## Desenvolvimento local
+## Funcionalidades Implementadas
+
+- **Streaming SSE em Tempo Real**: Tokens parciais visíveis por lobo durante a execução em paralelo.
+- **Debate Multi-ronda**: Debate adaptativo de até 3 rondas (ativado condicionalmente na UI).
+- **RAG & Supabase Vector Search**: Gravação automática de sumários e pesquisa semântica por vizinhos mais próximos com threshold `0.45` e limite de 3 itens.
+- **Tavily Web Grounding**: Pesquisa dinâmica de notícias/dados atuais injetados no contexto do sistema antes da chamada dos lobos.
+- **Upload Universal & Multimodal**: Suporte para PDF, DOCX, TXT, CSV, Excel (`exceljs`), imagens e áudio de voz. Os PDFs usam processamento em nuvem com o plugin `file-parser` da OpenRouter.
+- **Painel de Observabilidade de Memória**: Permite ver o estado de armazenamento de embeddings Supabase, latência de buscas RAG e eliminação completa.
+- **Exportação Multiformato**: Exportações seguras para Notion (serverless functions), Word e Excel.
+- **Factory Approval Gates**: Interceção de comandos destrutivos ou complexos que requerem confirmação explícita do utilizador antes de processar.
+- **Contador de Tokens/Caracteres**: Indicador visual dinâmico do tamanho da pergunta no input.
+- **Multilinguismo PT-PT**: Localização completa e instruções com foco em português de Portugal.
+
+---
+
+## Desenvolvimento Local
+
+Para evitar erros no proxy `/api` de serverless functions locais, deves utilizar a CLI do Vercel para correr o projeto em desenvolvimento:
 
 ```bash
-# Instalar dependências
+# Instalar a CLI do Vercel globalmente (se não tiveres)
+npm install -g vercel
+
+# Instalar dependências do projeto
 npm install
 
-# Iniciar servidor de desenvolvimento
-npm run dev
-
-# Build de produção
-npm run build
-
-# Preview do build
-npm run preview
+# Correr o projeto localmente emulado
+vercel dev
 ```
 
-> O servidor local corre em `http://localhost:5173` por defeito.
+O servidor local ficará disponível em `http://localhost:3000`.
 
-### Variáveis de ambiente
+### Variáveis de Ambiente
 
-Copia `.env.exemplo` para `.env.local` e preenche as chaves necessárias. **Nunca fazer commit de `.env.local`.**
-
-Em produção, as chaves são geridas como **Environment Variables do servidor no Vercel** (nunca expostas no bundle do cliente).
+Cria um ficheiro `.env.local` na raiz com base no `.env.example` para configurar as variáveis de desenvolvimento. Em produção (Vercel), as chaves são geridas de forma segura através das variáveis de ambiente de sistema da plataforma.
 
 ---
 
-## Deploy
+## Scripts Disponíveis
 
-O deploy é automático via Vercel:
-
-```bash
-# Qualquer push para main dispara deploy em produção
-git push origin main
-
-# Deploy manual (se necessário)
-npm run build
-vercel --prod
-```
-
----
-
-## Estrutura de pastas
-
-```
-córtex/
-├── api/                    # Serverless functions (proxies)
-├── middleware/             # Middleware Vercel
-├── public/                 # Ficheiros estáticos
-├── src/
-│   ├── API/                # Clientes de API do lado cliente
-│   ├── assets/             # Imagens e recursos estáticos
-│   ├── components/         # Componentes React
-│   ├── docs/               # Documentação interna do código
-│   ├── hooks/              # Custom hooks React
-│   ├── i18n/               # Traduções PT/EN
-│   ├── lib/                # Utilitários e helpers
-│   ├── utils/              # Funções auxiliares
-│   ├── App.jsx
-│   ├── cortex-digital.jsx  # Componente principal
-│   ├── index.css
-│   └── main.jsx
-├── .env.exemplo
-├── AGENTS.md               # Contexto para agentes IA
-├── CLAUDE.md               # Instruções para Claude Code
-├── SECURITY.md             # Política de segurança
-├── package.json
-├── vercel.json
-└── vite.config.js
-```
-
----
-
-## Funcionalidades
-
-- **Council multi-modelo** — até 11 lobos respondem em paralelo
-- **Streaming SSE** — respostas em tempo real por lobo (`chamarLobeStream`, `runDebateStream`)
-- **Debate multi-ronda** — lobos debatem entre si com `DebateTimeline`
-- **Juiz final** — Claude/Codex sintetiza e veredita
-- **Upload universal** — PDF, DOCX, TXT, CSV, XLSX, imagens com extração de texto
-- **Blueprints/Mapas** — padrões de arquitetura, RAG, IA pré-definidos
-- **Memória vetorial** — compressão semântica em `localStorage`
-- **Temas visuais** — Córtex, Grok, Neural, Obsidian, Midnight, Gemini, Perplexity, Crimson
-- **i18n** — português e inglês
-- **Router inteligente** — seleciona automaticamente os lobos mais adequados à query
-
----
-
-## Segurança
-
-Consulta [SECURITY.md](./SECURITY.md) para a política completa de segurança e como reportar vulnerabilidades.
-
----
-
-## Roadmap
-
-- [x] Streaming SSE no council e chat
-- [x] Upload Universal (F4-02)
-- [x] Blueprints / Mapas
-- [x] Debate multi-ronda com timeline
-- [x] AgentPlan — configuração visual dos agentes
-- [ ] Persistência real com Supabase + pgvector
-- [ ] Conectores on-demand: Tavily, ElevenLabs, Notion, Obsidian
-- [ ] Cloudflare DNS + WAF + Turnstile
-- [ ] Modo offline com Ollama local
+- `npm run dev` / `vercel dev`: Inicia o ambiente de desenvolvimento.
+- `npm run build`: Compila a aplicação para produção (Vite).
+- `npm run preview`: Previsualiza localmente o bundle de produção compilado.
+- `npm run test`: Executa os testes unitários e de integração com Vitest.
+- `npm run eval`: Executa o harness de evals (`evals/runEvals.js`).
 
 ---
 

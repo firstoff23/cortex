@@ -56,11 +56,11 @@
     "api/chat.js":               { "maxDuration": 60 },
     "api/tts.js":                { "maxDuration": 60 },
     "api/stt.js":                { "maxDuration": 60 },
-    "api/tavily.js":             { "maxDuration": 30 },
-    "api/notion-export.js":      { "maxDuration": 30 },
-    "api/memory/upsert.js":      { "maxDuration": 30 },
-    "api/memory/query.js":       { "maxDuration": 30 },
-    "api/memory/delete.js":      { "maxDuration": 15 },
-    "api/memory/stats.js":       { "maxDuration": 15 }
+    "api/tavily.js":             { "maxDuration": 60 },
+    "api/notion-export.js":      { "maxDuration": 60 },
+    "api/memory/upsert.js":      { "maxDuration": 60 },
+    "api/memory/query.js":       { "maxDuration": 60 },
+    "api/memory/delete.js":      { "maxDuration": 60 },
+    "api/memory/stats.js":       { "maxDuration": 60 }
   }
 }

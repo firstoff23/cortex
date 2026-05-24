@@ -512,6 +512,7 @@ export default function useCouncil(msgs, setMsgs) {
         role: "system",
         content: `[Memória Semântica Histórica Recuperada via RAG]\nUse as seguintes informações históricas se forem úteis/relevantes para responder à pergunta atual do utilizador:\n${ragContext}`,
         systemNote: true,
+        _injected: true,
       });
     }
 
@@ -524,6 +525,7 @@ export default function useCouncil(msgs, setMsgs) {
         role: "system",
         content: groundingWeb.contexto,
         systemNote: true,
+        _injected: true,
       });
     }
 

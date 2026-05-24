@@ -6,8 +6,9 @@ import BlueprintsPanel from './components/BlueprintsPanel';
 import EvalsPanel from './components/EvalsPanel'
 import FileUpload from './components/FileUpload.jsx';
 import AlertaBanner from './components/AlertaBanner.jsx';
-import EstadoVazio from './components/EstadoVazio.jsx';
+import LandingPage from './components/LandingPage.jsx';
 import SidePanel from './components/SidePanel.jsx';
+import StyleSelector, { ESTILOS_CONSELHO } from './components/StyleSelector.jsx';
 import Slider from './components/Slider.jsx';
 import MemoryBanner from './components/MemoryBanner.jsx';
 import Toast, { useToast } from './components/Toast.jsx';
@@ -22,8 +23,6 @@ import { useStreaming } from "./hooks/useStreaming.js";
 import { ouvirMicrofone } from "./hooks/useVoice.js";
 import { LOBOS, runDebateStream as runDebateStreamApi, SYSTEM_PROMPTS_CODE } from "./api/council.js";
 import { getUserId } from "./lib/auth.js";
-import { generateChips } from "./utils/generateChips.js";
-import { gerarChipsLocais } from "./utils/generateChips.js";
 import {
   clearMemory,
   injectSessionContext,
@@ -35,6 +34,8 @@ import { getMemoryStats, deleteMemory } from "./lib/memory.js";
 import { obterBadgeConfianca, obterFontesWebMensagem } from "./utils/confidence.js";
 
 const MV="cortex-v12";
+const STYLE_KEY=`${MV}-style`;
+const CUSTOM_INSTRUCTIONS_KEY=`${MV}-custom-instructions`;
 const MAX_BUF=8;
 const COMPRESS_THRESHOLD = 20; 
 const COMPRESS_KEEP_TAIL = 6;
@@ -429,7 +430,7 @@ async function callClaude(sys, msg, tokens=700) {
 }
 
 // â”€â”€ PEDIDOS COM TIMEOUT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function fetchWithTimeout(url, opts={}, ms=30000){
+async function fetchWithTimeout(url, opts={}, ms=60000){
   const ctrl=new AbortController();
   const tid=setTimeout(()=>ctrl.abort(),ms);
   try{
@@ -698,8 +699,13 @@ export default function Cortex(){
   const [lobeConfigAberto,setLobeConfigAberto] = useState(null);
   const [modoDebate, setModoDebate] = useState(false);
   const [modoCode, setModoCode] = useState(false);
+  const [estiloConselho, setEstiloConselho] = useState(() => {
+    try { return localStorage.getItem(STYLE_KEY) || "normal"; } catch { return "normal"; }
+  });
+  const [instrucoesPersonalizadas, setInstrucoesPersonalizadas] = useState(() => {
+    try { return localStorage.getItem(CUSTOM_INSTRUCTIONS_KEY) || ""; } catch { return ""; }
+  });
   const [userId, setUserId] = useState("anon");
-  const [sugestoesIniciais, setSugestoesIniciais] = useState(() => gerarChipsLocais("casual"));
 
   // modais
   const [showGuide,setShowGuide]   = useState(false);
@@ -717,6 +723,7 @@ export default function Cortex(){
   const [showSidebar, setShowSidebar] = useState(false);
   const [showBlueprintsPanel, setShowBlueprintsPanel] = useState(false);
   const [showForensePanel, setShowForensePanel] = useState(false);
+  const [landingPanel, setLandingPanel] = useState(null);
   const [supabaseStats, setSupabaseStats] = useState(null);
   const [recentMemories, setRecentMemories] = useState([]);
   const [loadingForense, setLoadingForense] = useState(false);
@@ -786,23 +793,6 @@ export default function Cortex(){
       cancelado = true;
     };
   },[]);
-  useEffect(()=>{
-    let cancelado = false;
-    generateChips({
-      texto: input,
-      frustrationLevel,
-      userId,
-    })
-      .then((chips) => {
-        if (!cancelado) setSugestoesIniciais(chips);
-      })
-      .catch(() => {
-        if (!cancelado) setSugestoesIniciais(gerarChipsLocais("casual"));
-      });
-    return () => {
-      cancelado = true;
-    };
-  },[input, frustrationLevel, userId]);
   useEffect(()=>() => {
     uploadPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     uploadPreviewUrlsRef.current.clear();
@@ -892,6 +882,16 @@ const saveConvs = c => safePut(MV+"-convs", c.slice(0,50));
   const saveTheme  = t  => safePut(MV+"-theme",  t);
   const saveModels = mo => safePut(MV+"-models", mo);
   const saveTemperaturas = temps => safePut(MV+"-temperaturas", temps);
+function guardarEstiloConselho(id) {
+  setEstiloConselho(id);
+  try { localStorage.setItem(STYLE_KEY, id); } catch {}
+}
+
+function guardarInstrucoesPersonalizadas(valor) {
+  setInstrucoesPersonalizadas(valor);
+  try { localStorage.setItem(CUSTOM_INSTRUCTIONS_KEY, valor); } catch {}
+}
+
 function newChat() {
   if (msgs.length>0) {
     autoSaveConv(msgs, currentConvId);
@@ -904,6 +904,12 @@ function newChat() {
   setShowSidebar(false);
   setFrustrationDismissed(false);
   setFrustrationLevel("none");
+}
+
+function iniciarConselhoLanding() {
+  setPage("chat");
+  setPagina("chat");
+  requestAnimationFrame(() => inputRef.current?.focus());
 }
 
 function switchConv(conv) {
@@ -1216,8 +1222,134 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
   };
 }
 
-  if(!loaded)return <Splash/>;
-  const cur=phase?phases[phase]:null;
+  const estiloAtivo = ESTILOS_CONSELHO.find((estilo) => estilo.id === estiloConselho) || ESTILOS_CONSELHO[0];
+  const lobosAtivos = MODELS.filter((m) => modelsOn[m.id] !== false).length;
+  const faseAtual = phase ? phases[phase] : null;
+  const modoAtual = [estiloAtivo.nome, modoDebate ? "Debate" : "Paralelo", modoCode ? "Código" : null]
+    .filter(Boolean)
+    .join(" · ");
+  const estadoSessao = !loaded
+    ? "O conselho está a preparar-se..."
+    : isGenerating
+    ? "Conselho em curso"
+    : aStreaming
+    ? "Lobos a responder"
+    : faseAtual?.label || "Pronto para começar";
+  const landingPanelTitles = {
+    conhecimento: "Conhecimento do Projeto",
+    instrucoes: "Instruções Personalizadas",
+    estilos: "Estilos Ativos",
+    competencias: "Competências",
+    historico: "Histórico",
+  };
+
+  function renderLandingPanelContent() {
+    if (landingPanel === "conhecimento") {
+      return (
+        <div style={{display:"flex",flexDirection:"column",gap:12,fontSize:12,lineHeight:1.55,color:"var(--text, #9ca3af)"}}>
+          <p>Contexto disponível para orientar o conselho antes da primeira pergunta.</p>
+          <div style={{display:"grid",gap:8}}>
+            {[
+              ["Factos semânticos", brain.semantic.length],
+              ["Sessões registadas", brain.sessions],
+              ["Padrões activos", brain.patterns.length],
+              ["Memória episódica", brain.episodic.length],
+            ].map(([label,value])=>(
+              <div key={`landing-knowledge-${label}`} style={{display:"flex",justifyContent:"space-between",gap:10,border:"1px solid var(--border)",borderRadius:10,padding:"8px 10px"}}>
+                <span>{label}</span>
+                <strong style={{color:"var(--text-h)"}}>{value}</strong>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={()=>{setShowSeed(true);setLandingPanel(null);}} style={btn(T,AC.claude)}>Adicionar contexto</button>
+        </div>
+      );
+    }
+
+    if (landingPanel === "instrucoes") {
+      return (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <p style={{fontSize:12,lineHeight:1.55,color:"var(--text, #9ca3af)",margin:0}}>Define preferências locais para orientar a tua sessão. Nesta fase ficam guardadas como contexto visual/local.</p>
+          <textarea
+            value={instrucoesPersonalizadas}
+            onChange={(e)=>guardarInstrucoesPersonalizadas(e.target.value)}
+            placeholder="Ex.: responde de forma técnica, assume PT-PT, mostra riscos antes de soluções..."
+            rows={8}
+            style={{width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid var(--border)",borderRadius:12,padding:12,color:"var(--text-h)",fontFamily:"inherit",fontSize:12,lineHeight:1.5,resize:"vertical",outline:"none"}}
+          />
+          <button type="button" onClick={()=>guardarInstrucoesPersonalizadas("")} style={btn(T,T.ts)}>Limpar instruções</button>
+        </div>
+      );
+    }
+
+    if (landingPanel === "estilos") {
+      return (
+        <StyleSelector
+          estiloAtivo={estiloConselho}
+          onChange={guardarEstiloConselho}
+        />
+      );
+    }
+
+    if (landingPanel === "competencias") {
+      return (
+        <div style={{display:"flex",flexDirection:"column",gap:10,fontSize:12,color:"var(--text, #9ca3af)"}}>
+          <div style={{display:"grid",gap:8}}>
+            <div style={{border:"1px solid var(--border)",borderRadius:10,padding:"8px 10px"}}><strong style={{color:"var(--text-h)"}}>{lobosAtivos}</strong> lobos activos em paralelo</div>
+            <div style={{border:"1px solid var(--border)",borderRadius:10,padding:"8px 10px"}}>Juiz actual: <strong style={{color:"var(--text-h)"}}>Rei do Córtex</strong></div>
+            <div style={{border:"1px solid var(--border)",borderRadius:10,padding:"8px 10px"}}>Modo: <strong style={{color:"var(--text-h)"}}>{modoAtual}</strong></div>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {MODELS.filter((m)=>modelsOn[m.id]!==false).map((m)=>(
+              <div key={`landing-skill-${m.id}`} style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{width:8,height:8,borderRadius:"50%",background:m.color,flexShrink:0}} />
+                <span>{m.name}</span>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={()=>{setShowModels(true);setLandingPanel(null);}} style={btn(T,AC.gemini)}>Configurar lobos</button>
+        </div>
+      );
+    }
+
+    if (landingPanel === "historico") {
+      return (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <button type="button" onClick={()=>{newChat();setLandingPanel(null);}} style={btn(T,AC.claude)}>Nova conversa</button>
+          {conversations.length===0 ? (
+            <p style={{fontSize:12,color:"var(--text, #9ca3af)",lineHeight:1.55}}>Ainda não há sessões anteriores guardadas.</p>
+          ) : conversations.map((conv)=>(
+            <button
+              key={`landing-history-${conv.id}`}
+              type="button"
+              onClick={()=>{switchConv(conv);setLandingPanel(null);}}
+              style={{background:"rgba(255,255,255,0.04)",border:"1px solid var(--border)",borderRadius:10,padding:"9px 10px",color:"var(--text-h)",fontFamily:"inherit",textAlign:"left",cursor:"pointer"}}
+            >
+              <span style={{display:"block",fontSize:12,fontWeight:800,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{conv.title}</span>
+              <span style={{display:"block",fontSize:10,color:"var(--text)",marginTop:3}}>{conv.msgs?.filter(m=>m.role==="user").length || 0} mensagens · {new Date(conv.updatedAt).toLocaleDateString("pt-PT")}</span>
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    return null;
+  }
+
+  if(!loaded)return (
+    <div style={{height:"var(--app-height, 100dvh)",background:T.bg,color:T.tx,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+      <LandingPage
+        carregando
+        lobosAtivos={lobosAtivos}
+        juizAtual="Rei do Córtex"
+        modoAtual={modoAtual}
+        estadoSessao={estadoSessao}
+        onIniciar={()=>{}}
+        onAbrirContexto={()=>{}}
+      />
+    </div>
+  );
+  const cur=faseAtual;
   const mostrarMemoryBanner = shouldShowMemoryBanner({
     page,
     dismissed: memoryBannerDismissed,
@@ -1482,6 +1614,14 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       {page==="chat" && (
         <>
         <>
+  <SidePanel
+    aberto={Boolean(landingPanel)}
+    onFechar={()=>setLandingPanel(null)}
+    titulo={landingPanelTitles[landingPanel] || "Contexto"}
+    largura="min(460px, 94vw)"
+  >
+    {renderLandingPanelContent()}
+  </SidePanel>
   <SidePanel aberto={showSidebar} onFechar={()=>setShowSidebar(false)} titulo={"Histórico"}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:10}}>
       <span style={{fontSize:11,color:T.ts}}>{conversations.length} {"Conversas"}</span>
@@ -1811,20 +1951,16 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               <button onClick={()=>{botRef.current?.scrollIntoView({behavior:"smooth"});setAtBottom(true);}} style={{position:"sticky",bottom:10,left:"50%",transform:"translateX(-50%)",zIndex:10,display:"flex",alignItems:"center",gap:5,background:T.s1,border:`1px solid ${AC.claude}55`,borderRadius:18,padding:"5px 13px",color:AC.claude,fontSize:10,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${T.b2}88`,marginBottom:4}}>{"Descer"}</button>
             )}
             {msgs.length===0 ? (
-              <div style={{minHeight:"80%",display:"flex",flexDirection:"column",justifyContent:"center"}}>
-                <EstadoVazio
-                  titulo={"Bem-vindo ao Córtex"}
-                  subtitulo={`${"O que vamos explorar hoje?"} ${"Lobos oficiais"} · ${"Veredicto"} Rei/Codex`}
-                  sugestoes={sugestoesIniciais}
-                  onSugestao={aplicarSugestaoRei}
+              <div style={{minHeight:"100%",display:"flex",flexDirection:"column"}}>
+                <LandingPage
+                  carregando={!loaded}
+                  lobosAtivos={lobosAtivos}
+                  juizAtual="Rei do Córtex"
+                  modoAtual={modoAtual}
+                  estadoSessao={estadoSessao}
+                  onIniciar={iniciarConselhoLanding}
+                  onAbrirContexto={setLandingPanel}
                 />
-                <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:12,fontSize:10,color:T.ts}}>
-                  {brain.semantic.length>0
-                    ?<span>🧠 {brain.semantic.length} {"Factos".toLowerCase()} · {brain.sessions} {"Sessões".toLowerCase()}</span>
-                    :<button onClick={()=>setShowSeed(true)} style={{...btn(T,AC.genspark),fontSize:10,padding:"4px 10px"}}>{"Configurar o Cérebro"}</button>
-                  }
-                  {conversations.length>0&&<span style={{color:T.tf}}>· {conversations.length} {"Conversas"}</span>}
-                </div>
               </div>
             ) : (
               <div style={{display:"flex",flexDirection:"column",gap:12,maxWidth:800,margin:"0 auto"}}>
