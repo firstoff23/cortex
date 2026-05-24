@@ -8,6 +8,12 @@ export default function MobileInput({
   inputRef,
   disabled = false,
   placeholder = "Pergunta ao conselho...",
+  onAttachClick,
+  ficheiroAnexado,
+  onRemoveAttachment,
+  AC,
+  T,
+  children,
 }) {
   const haptic = useHapticFeedback();
   const podeEnviar = Boolean(value?.trim()) && !disabled;
@@ -33,12 +39,66 @@ export default function MobileInput({
         right: 0,
         bottom: 0,
         zIndex: 1250,
-        background: "var(--bg)",
+        background: T?.bg || "var(--bg)",
         borderTop: "1px solid var(--border)",
         padding: "10px 12px calc(16px + env(safe-area-inset-bottom))",
         boxShadow: "0 -12px 32px rgba(0,0,0,0.32)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
       }}
     >
+      {/* Alertas, gates de aprovação e banners passados por children */}
+      {children && <div style={{ width: "100%", maxWidth: 820, margin: "0 auto" }}>{children}</div>}
+
+      {/* Badge de Ficheiro Anexado */}
+      {ficheiroAnexado && AC && T && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            border: `1px solid ${AC.claude}33`,
+            background: `${AC.claude}10`,
+            borderRadius: 10,
+            padding: "6px 9px",
+            color: AC.claude,
+            fontSize: 11,
+            maxWidth: "min(320px, 100%)",
+            alignSelf: "flex-start",
+            width: "fit-content",
+            margin: "0 auto 0 0",
+          }}
+        >
+          <span
+            style={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={ficheiroAnexado.nome}
+          >
+            📎 {ficheiroAnexado.nome}
+          </span>
+          <button
+            type="button"
+            onClick={onRemoveAttachment}
+            title="Remover ficheiro"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: T.ts,
+              cursor: "pointer",
+              fontSize: 12,
+              padding: 0,
+              lineHeight: 1,
+            }}
+          >
+            ✖
+          </button>
+        </div>
+      )}
+
       <div
         style={{
           display: "flex",
@@ -49,6 +109,35 @@ export default function MobileInput({
           margin: "0 auto",
         }}
       >
+        {/* Botão Anexar Ficheiro */}
+        {onAttachClick && AC && T && (
+          <button
+            type="button"
+            onClick={() => {
+              haptic.leve();
+              onAttachClick();
+            }}
+            aria-label="Anexar ficheiro"
+            title="Anexar ficheiro"
+            style={{
+              width: 48,
+              height: 44,
+              borderRadius: 14,
+              border: `1px solid ${ficheiroAnexado ? AC.claude + "55" : T.b1 || "var(--border)"}`,
+              background: ficheiroAnexado ? `${AC.claude}18` : "transparent",
+              color: ficheiroAnexado ? AC.claude : T.ts || "var(--text-h)",
+              fontSize: 18,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            📎
+          </button>
+        )}
+
         <textarea
           ref={inputRef}
           value={value}

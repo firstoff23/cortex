@@ -754,6 +754,64 @@ export default function Cortex(){
   const uploadPreviewUrlsRef = useRef(new Set());
   const T = THEMES[theme];
 
+  const renderBannersAndControls = () => {
+    return (
+      <>
+        {(modoDebate || aStreaming) && (
+          <div style={{maxWidth:820,margin:"0 auto 8px"}}>
+            <AlertaBanner
+              tipo="info"
+              mensagem={aStreaming ? "Streaming a correr — respostas parciais dos lobos." : "Modo debate activo — os lobos fazem segunda ronda antes do Rei."}
+            />
+          </div>
+        )}
+        {currentApprovalGate && (
+          <div style={{maxWidth:820,margin:"0 auto 12px"}}>
+            <AlertaBanner
+              tipo="aviso"
+              mensagem={currentApprovalGate.mensagem}
+            >
+              <div style={{display:"flex",gap:8,marginTop:10}}>
+                <button onClick={()=>{
+                  send(currentApprovalGate.query, { aprovado: true });
+                  setCurrentApprovalGate(null);
+                }} style={btn(T, "#ef4444")}>Confirmar</button>
+                <button onClick={()=>setCurrentApprovalGate(null)} style={btn(T, T.ts)}>Cancelar</button>
+                <button onClick={()=>toast("Esta acção pode remover dados permanentemente.", "info")} style={btn(T, AC.gemini)}>Ver impacto</button>
+              </div>
+            </AlertaBanner>
+          </div>
+        )}
+        {showFileUpload && (
+          <div style={{maxWidth:820,margin:"0 auto 8px",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,padding:12,boxShadow:`0 8px 30px ${T.b2}88`}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10}}>
+              <strong style={{fontSize:12,color:T.tx}}>Anexar ficheiro</strong>
+              <button type="button" onClick={()=>setShowFileUpload(false)} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:8,color:T.ts,cursor:"pointer",fontSize:12,padding:"4px 9px",fontFamily:"inherit"}}>Fechar</button>
+            </div>
+            <FileUpload onUpload={handleFileUpload} />
+          </div>
+        )}
+        {frustrationLevel !== "none" && !frustrationDismissed && (
+          <div style={{maxWidth:820,margin:"0 auto 10px"}}>
+            <FrustrationBanner
+              level={frustrationLevel}
+              onRegenerate={() => {
+                setFrustrationDismissed(true);
+                setFrustrationLevel("none");
+                regenerate(); 
+              }}
+              onDismiss={() => {
+                setFrustrationDismissed(true);
+                setFrustrationLevel("none");
+              }}
+              T={T}
+            />
+          </div>
+        )}
+      </>
+    );
+  };
+
   const hP=keys.perp?.trim().length>10, hC=keys.claude?.trim().length>10;
   const inputChars = input.length;
   const inputTokens = Math.round(inputChars / 4);
@@ -1880,6 +1938,13 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               label:"Código",
               active:modoCode,
               onClick:()=>{setModoCode((m) => !m);setFabOpen(false);}
+            },
+            {
+              key:"debate",
+              icon:"🐺",
+              label:"Debate",
+              active:modoDebate,
+              onClick:()=>{setModoDebate((m) => !m);setFabOpen(false);}
             }
           ].map((item,idx)=>(
             <button
@@ -2038,55 +2103,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
                 <span style={{ color:'var(--warning)' }}>⏳ ~2x mais lento</span>
               }
             </label>
-            {(modoDebate || aStreaming) && (
-              <div style={{maxWidth:820,margin:"0 auto 8px"}}>
-                <AlertaBanner
-                  tipo="info"
-                  mensagem={aStreaming ? "Streaming a correr — respostas parciais dos lobos." : "Modo debate activo — os lobos fazem segunda ronda antes do Rei."}
-                />
-              </div>
-            )}
-            {currentApprovalGate && (
-              <div style={{maxWidth:820,margin:"0 auto 12px"}}>
-                <AlertaBanner
-                  tipo="aviso"
-                  mensagem={currentApprovalGate.mensagem}
-                >
-                  <div style={{display:"flex",gap:8,marginTop:10}}>
-                    <button onClick={()=>{
-                      send(currentApprovalGate.query, { aprovado: true });
-                      setCurrentApprovalGate(null);
-                    }} style={btn(T, "#ef4444")}>Confirmar</button>
-                    <button onClick={()=>setCurrentApprovalGate(null)} style={btn(T, T.ts)}>Cancelar</button>
-                    <button onClick={()=>toast("Esta acção pode remover dados permanentemente.", "info")} style={btn(T, AC.gemini)}>Ver impacto</button>
-                  </div>
-                </AlertaBanner>
-              </div>
-            )}
-            {showFileUpload && (
-              <div style={{maxWidth:820,margin:"0 auto 8px",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:14,padding:12,boxShadow:`0 8px 30px ${T.b2}88`}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10}}>
-                  <strong style={{fontSize:12,color:T.tx}}>Anexar ficheiro</strong>
-                  <button type="button" onClick={()=>setShowFileUpload(false)} style={{background:"transparent",border:`1px solid ${T.b1}`,borderRadius:8,color:T.ts,cursor:"pointer",fontSize:12,padding:"4px 9px",fontFamily:"inherit"}}>Fechar</button>
-                </div>
-                <FileUpload onUpload={handleFileUpload} />
-              </div>
-            )}
-            {frustrationLevel === "high" && !phase && !frustrationDismissed && (
-              <div style={{maxWidth:820,margin:"0 auto"}}>
-                <FrustrationBanner 
-                  onRetry={() => {
-                    setFrustrationDismissed(true);
-                    regenerate(); 
-                  }}
-                  onDismiss={() => {
-                    setFrustrationDismissed(true);
-                    setFrustrationLevel("none");
-                  }}
-                  T={T}
-                />
-              </div>
-            )}
+            {renderBannersAndControls()}
             <div style={{display:"flex",gap:8,maxWidth:820,margin:"0 auto",alignItems:"flex-end"}}>
               {/* caixa de texto */}
               <div style={{flex:1,display:"flex",background:T.s2,border:`1px solid ${T.b1}`,borderRadius:16,padding:"8px 10px",alignItems:"flex-end",boxShadow:`0 2px 14px ${T.b2}66`,transition:"border-color 0.2s",gap:8}}>
@@ -2164,7 +2181,14 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               onSend={()=>{send();ajustar(true);}}
               onStop={isGenerating ? stopGeneration : undefined}
               disabled={!!phase}
-            />
+              onAttachClick={() => setShowFileUpload(p => !p)}
+              ficheiroAnexado={ficheiroAnexado}
+              onRemoveAttachment={removerFicheiroAnexado}
+              AC={AC}
+              T={T}
+            >
+              {renderBannersAndControls()}
+            </MobileInput>
           )}
         </>
       )}
