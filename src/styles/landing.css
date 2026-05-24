@@ -1,0 +1,489 @@
+/* landing.css — Córtex Digital v12 — Landing Page mobile-first */
+
+/* ─── Variáveis Locais ─── */
+.lp {
+  --lp-bg:      #07080d;
+  --lp-surface: rgba(18, 19, 29, 0.82);
+  --lp-border:  rgba(255, 255, 255, 0.09);
+  --lp-border-strong: rgba(16, 185, 129, 0.40);
+  --lp-text:    #f0f2f8;
+  --lp-muted:   #8a93a8;
+  --lp-faint:   #52596a;
+  --lp-accent:  #10b981;
+  --lp-accent-soft: rgba(16, 185, 129, 0.13);
+  --lp-shadow:  0 32px 96px rgba(0, 0, 0, 0.42);
+
+  position: relative;
+  min-height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-x: hidden;
+  padding: 28px 16px 96px;
+
+  background:
+    linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px),
+    linear-gradient(180deg, #08090f 0%, var(--lp-bg) 100%);
+  background-size: 40px 40px, 40px 40px, auto;
+
+  color: var(--lp-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ─── Fade-in escalonado por secção ─── */
+.lp__fade {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 420ms cubic-bezier(0.22, 1, 0.36, 1) var(--lp-delay, 0ms),
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1) var(--lp-delay, 0ms);
+}
+
+.lp--visivel .lp__fade {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Brilho de fundo animado */
+.lp__glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 44% at 50% -8%, rgba(16,185,129,0.11) 0%, transparent 72%);
+}
+
+/* ─── Conteúdo principal ─── */
+.lp__content {
+  position: relative;
+  z-index: 1;
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+/* ─── HERO ─── */
+.lp__hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  width: 100%;
+}
+
+/* Logo / Avatar */
+.lp__logo {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(16,185,129,0.22), rgba(255,255,255,0.04));
+  border: 1px solid var(--lp-border-strong);
+  box-shadow: 0 0 48px rgba(16,185,129,0.18);
+  color: var(--lp-accent);
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+}
+
+.lp__logo-pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 22px;
+  border: 1.5px solid rgba(16,185,129,0.25);
+  animation: lp-pulse 2.4s ease-in-out infinite;
+}
+
+/* Título */
+.lp__title {
+  margin: 0;
+  font-size: clamp(30px, 10vw, 58px);
+  line-height: 1.05;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--lp-text);
+}
+
+.lp__title-accent {
+  color: var(--lp-accent);
+  display: block;
+}
+
+/* Subtítulo */
+.lp__subtitle {
+  margin: 0;
+  max-width: 500px;
+  color: var(--lp-muted);
+  font-size: clamp(14px, 3.5vw, 17px);
+  line-height: 1.55;
+}
+
+/* ─── CTA ─── */
+.lp__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  margin-top: 4px;
+}
+
+.lp__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 28px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(16,185,129,0.55);
+  background: linear-gradient(135deg, #d1fae5 0%, var(--lp-accent) 100%);
+  color: #042e1b;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 16px 48px rgba(16,185,129,0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lp__cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 56px rgba(16,185,129,0.36);
+}
+
+.lp__cta:active {
+  transform: translateY(0);
+}
+
+.lp__cta-icon {
+  font-size: 18px;
+}
+
+.lp__estado {
+  min-height: 16px;
+  color: var(--lp-faint);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+/* ─── Labels de secção ─── */
+.lp__section-label {
+  margin: 0 0 10px;
+  color: var(--lp-faint);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  text-align: center;
+}
+
+/* ─── Grelha dos Lobos ─── */
+.lp__lobos {
+  width: 100%;
+}
+
+.lp__lobos-grid {
+  display: grid;
+  /* Mobile: 2 colunas — evita cards de 60px ilegíveis em 390px */
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.lp__lobo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 6px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--lp-border);
+  background: var(--lp-surface);
+  backdrop-filter: blur(16px);
+  text-align: center;
+  animation: lp-card-in 360ms cubic-bezier(0.22, 1, 0.36, 1) var(--lp-card-delay, 0ms) both;
+  transition: border-color 0.18s, transform 0.18s;
+}
+
+.lp__lobo-card:hover {
+  border-color: var(--lobo-cor, var(--lp-border-strong));
+  transform: translateY(-2px);
+}
+
+.lp__lobo-icone {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.lp__lobo-nome {
+  color: var(--lp-text);
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.lp__lobo-desc {
+  color: var(--lp-faint);
+  font-size: 8.5px;
+  line-height: 1.3;
+  display: none; /* aparece em ecrãs maiores */
+}
+
+/* ─── Como Funciona — Stepper ─── */
+.lp__como {
+  width: 100%;
+}
+
+.lp__passos {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-border);
+  border-radius: 14px;
+  overflow: hidden;
+  backdrop-filter: blur(16px);
+}
+
+.lp__passo {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px 12px;
+}
+
+.lp__passo:not(:last-child) {
+  border-right: 1px solid var(--lp-border);
+}
+
+.lp__passo-num {
+  color: var(--lp-accent);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.lp__passo-titulo {
+  display: block;
+  color: var(--lp-text);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.lp__passo-desc {
+  display: block;
+  color: var(--lp-muted);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.lp__passo-seta {
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--lp-faint);
+  font-size: 14px;
+  z-index: 2;
+  display: none; /* visível em ecrãs maiores */
+}
+
+/* ─── Cards de Contexto ─── */
+.lp__contexto-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.lp__ctx-card {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid var(--lp-border);
+  border-radius: 10px;
+  background: var(--lp-surface);
+  color: var(--lp-text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  backdrop-filter: blur(16px);
+  transition: border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lp__ctx-card:hover {
+  border-color: var(--lp-border-strong);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.lp__ctx-icone {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--lp-accent-soft);
+  border: 1px solid rgba(16,185,129,0.18);
+  color: var(--lp-accent);
+  font-size: 16px;
+}
+
+.lp__ctx-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lp__ctx-titulo {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--lp-text);
+}
+
+.lp__ctx-desc {
+  font-size: 11px;
+  color: var(--lp-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp__ctx-arrow {
+  color: var(--lp-faint);
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* ─── Status do Rei ─── */
+.lp__rei-status {
+  margin: 0;
+  color: var(--lp-faint);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ─── Skeleton de Loading ─── */
+.lp__skeleton {
+  width: min(480px, 100%);
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.lp__skeleton span {
+  height: 38px;
+  border-radius: 8px;
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.05),
+    rgba(255,255,255,0.12),
+    rgba(255,255,255,0.05)
+  );
+  background-size: 340px 100%;
+  animation: lp-shimmer 1.5s linear infinite;
+}
+
+/* ─── Animações ─── */
+@keyframes lp-enter {
+  from { opacity: 0; transform: translateY(14px) scale(0.984); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes lp-card-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes lp-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%       { opacity: 0; transform: scale(1.14); }
+}
+
+@keyframes lp-shimmer {
+  from { background-position: -340px 0; }
+  to   { background-position: 340px 0; }
+}
+
+/* ─── Tablet (≥ 580px) ─── */
+@media (min-width: 580px) {
+  .lp {
+    padding: 36px 24px 64px;
+    align-items: center;
+  }
+
+  /* Tablet: 3 colunas para os lobos — leitura confortável */
+  .lp__lobos-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .lp__lobo-desc {
+    display: block;
+  }
+
+  .lp__contexto-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ─── Desktop (≥ 820px) ─── */
+@media (min-width: 820px) {
+  .lp__title {
+    font-size: clamp(44px, 6vw, 68px);
+  }
+
+  /* Desktop: 5 colunas — espaço suficiente */
+  .lp__lobos-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .lp__lobo-nome {
+    font-size: 11px;
+  }
+
+  .lp__contexto-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .lp__ctx-card {
+    flex-direction: column;
+    grid-template-columns: 1fr;
+    min-height: 120px;
+    align-content: start;
+    gap: 8px;
+  }
+
+  .lp__ctx-arrow {
+    display: none;
+  }
+
+  .lp__passo-seta {
+    display: block;
+  }
+}
+
+/* ─── Movimento Reduzido ─── */
+@media (prefers-reduced-motion: reduce) {
+  .lp__content,
+  .lp__lobo-card,
+  .lp__skeleton span,
+  .lp__logo-pulse {
+    animation: none;
+  }
+}
