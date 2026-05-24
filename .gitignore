@@ -59,3 +59,9 @@ roadmap.txt
 .vercel
 .env*.local
 .env.local
+
+# IDEs e temporários locais
+.vs/
+**/.vs/
+supabase/.temp/
+
