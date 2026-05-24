@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { callOpenRouter, OR_MODELS } from "../lib/openrouter.js";
-import { calcularConsensoMatematico, runJudges } from "../api/judges.js";
-import { runKing } from "../api/king.js";
 import {
   LOBOS,
   construirSystemPromptOmega,
@@ -12,7 +10,6 @@ import {
   gerarMensagemAprovacao,
 } from "../api/council.js";
 import { runGraders } from "../utils/graders.js";
-import { getJuizesParaPergunta } from "../utils/orchestrator.js";
 import { detectFrustration } from "../utils/detectFrustration.js";
 import { classifyError } from "../utils/errorMessages.js";
 import { GENERATION_STATES } from "../utils/generationStates.js";
@@ -23,7 +20,6 @@ import {
   buildMemoryEntry,
   saveMemoryEntry,
   getLastSessionContext,
-  getLastSessionContextFromSupabase,
 } from "../utils/sessionMemory.js";
 
 // Cache curta de respostas dos lobos para evitar chamadas repetidas.
@@ -83,68 +79,12 @@ function cacheSet(id, q, v) {
   responseCache.set(id + "::" + q, { v, t: Date.now() });
 }
 
-function upsertJudge(prev, next) {
-  const idx = prev.findIndex((item) => item.juiz === next.juiz);
-  if (idx === -1) return [...prev, next];
-  return prev.map((item, i) => (i === idx ? next : item));
-}
-
-function dedupeJudges(judges) {
-  const vistos = new Set();
-  return judges.filter((judge) => {
-    if (!judge?.juiz || vistos.has(judge.juiz)) return false;
-    vistos.add(judge.juiz);
-    return true;
-  });
-}
-
 function fallbackDosLobos(lobes) {
   const validos = lobes.filter((l) => !l.isErr && l.result?.length > 10);
   const origem = validos.length ? validos : lobes;
   return origem.length
     ? origem.map((l) => `**${l.label}:** ${l.result}`).join("\n\n")
     : "Nenhum serviço respondeu. Verifica a ligação.";
-}
-
-function valorSettled(resultado, fallback = {}) {
-  return resultado?.status === "fulfilled" ? resultado.value : fallback;
-}
-
-function erroSettled(resultado) {
-  return resultado?.status === "rejected" ? resultado.reason?.message || "Serviço indisponível" : null;
-}
-
-function lobeDebateParaUI(lobe, index, ronda1, ronda2, ronda3, lobeConfidenceScore) {
-  const primeira = valorSettled(ronda1?.[index], {});
-  const segunda = valorSettled(ronda2?.[index], primeira);
-  const terceira = valorSettled(ronda3?.[index], segunda);
-  const erro = erroSettled(ronda3?.[index]) || erroSettled(ronda2?.[index]) || erroSettled(ronda1?.[index]);
-  const result = erro ? `[Erro em ${lobe.nome}: ${erro}]` : terceira.resposta || segunda.resposta || primeira.resposta || "";
-  const isErr = !!erro || !result || result.startsWith("[Erro");
-
-  return {
-    id: `debate-${lobe.id}`,
-    streamId: lobe.id,
-    label: lobe.nome,
-    sub: lobe.provider,
-    color: lobe.cor,
-    icon: ["◉", "◈", "◐", "◑", "◒"][index] || "◌",
-    _key: `debate-${lobe.id}-${index}`,
-    result,
-    ronda1: primeira.resposta || "",
-    ronda2: segunda.resposta || "",
-    ronda3: terceira.resposta || "",
-    critique: {
-      text: segunda.resposta || "",
-      target: { 1: 2, 2: 3, 3: 4, 4: 5, 5: 1 }[lobe.id],
-      from: { 1: 5, 2: 1, 3: 2, 4: 3, 5: 4 }[lobe.id]
-    },
-    srcModel: lobe.modelo,
-    srcReal: !isErr,
-    isErr,
-    latency: terceira.latency || segunda.latency || primeira.latency || null,
-    confidence: lobeConfidenceScore(result, isErr),
-  };
 }
 
 function parseJsonSeguro(valor) {
@@ -416,7 +356,6 @@ export default function useCouncil(msgs, setMsgs) {
       buildMem,
       brain,
       selectUsedMem,
-      routerDecide,
       LOBES,
       modelsOn,
       temperaturas,
@@ -440,9 +379,6 @@ export default function useCouncil(msgs, setMsgs) {
       currentConvId,
       taRef,
       lobeConfidenceScore,
-      modoDebate = "paralelo",
-      runDebateStream = runDebateStreamApi,
-      streaming,
       displayQuery,
       anexoUpload,
       imageDataUrl,

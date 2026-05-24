@@ -687,7 +687,7 @@ export default function Cortex(){
   const { isMobile } = useMobile();
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
-  const { send: runCouncil, invoke: runInvoke, lobeResults, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, getLastSessionContext, partialTexts, ragLatency } = useCouncil(msgs, setMsgs);
+  const { send: runCouncil, invoke: runInvoke, lobeResults, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, partialTexts, ragLatency } = useCouncil(msgs, setMsgs);
   const [input,setInput]     = useState("");
   const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
