@@ -731,6 +731,7 @@ export default function Cortex(){
     try { return localStorage.getItem(CUSTOM_INSTRUCTIONS_KEY) || ""; } catch { return ""; }
   });
   const [userId, setUserId] = useState("anon");
+  const [currentConvId, setCurrentConvId] = useState(null);
 
   const [forks, setForks] = useState([]);
   const [turnoAtivo, setTurnoAtivo] = useState("veredicto");
@@ -792,7 +793,6 @@ export default function Cortex(){
   const [loadingForense, setLoadingForense] = useState(false);
   const [showCouncil, setShowCouncil] = useState(null);
   const [conversations, setConversations] = useState([]);
-  const [currentConvId, setCurrentConvId] = useState(null);
   const [atBottom,setAtBottom]     = useState(true);
   const [devUnlocked,setDevUnlocked] = useState(()=>DEV_MODE);
   const [pinInput,setPinInput]       = useState("");
