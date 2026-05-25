@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Abas from "./Abas.jsx";
+import ConversationForks from "./ConversationForks.jsx";
 
 function valorLobe(item) {
   if (!item) return null;
@@ -98,81 +99,61 @@ function RondaSection({ titulo, lobos, defaultOpen }) {
   );
 }
 
-export default function DebateTimeline({ ronda1, ronda2, ronda3, modoDebate }) {
+// Transforma rondas em turnos normalizados
+function normalizeTurns(r1, r2, r3, veredicto) {
+  const turns = [];
+  if (r1?.length) turns.push({ id: "ronda1", titulo: "Ronda 1", lobos: r1 });
+  if (r2?.length) turns.push({ id: "ronda2", titulo: "Ronda 2", lobos: r2 });
+  if (r3?.length) turns.push({ id: "ronda3", titulo: "Ronda 3", lobos: r3 });
+  if (veredicto) turns.push({ id: "veredicto", titulo: "Veredicto", isFinal: true });
+  return turns;
+}
+
+export default function DebateTimeline({ ronda1, ronda2, ronda3, veredicto, modoDebate, turnoAtivo, onForkTurn, forks = [], onFork, onSelectTurn, T, AC }) {
   if (!modoDebate) return null;
-  const abas = [
-    {
-      id: "ronda1",
-      titulo: "Ronda 1",
-      conteudo: (
-        <RondaSection
-          titulo="Posições iniciais"
-          lobos={ronda1}
-          defaultOpen={false}
-        />
-      ),
-    },
-    {
-      id: "ronda2",
-      titulo: "Ronda 2",
-      conteudo: (
-        <RondaSection
-          titulo="Reacções"
-          lobos={ronda2}
-          defaultOpen={false}
-        />
-      ),
-    },
-    ...(ronda3?.length
-      ? [
-          {
-            id: "ronda3",
-            titulo: "Ronda 3",
-            conteudo: (
-              <RondaSection
-                titulo="Refinamento"
-                lobos={ronda3}
-                defaultOpen={false}
-              />
-            ),
-          },
-        ]
-      : []),
-    {
-      id: "veredicto",
-      titulo: "Veredicto",
-      conteudo: (
-        <div
-          style={{
-            border: "1px solid var(--cor-borda, var(--border, #2a2a3a))",
-            borderRadius: "8px",
-            background: "var(--cor-fundo-2, var(--social-bg, #14141e))",
-            padding: "10px",
-            color: "var(--text-muted, var(--text, #a0a0b8))",
-            fontSize: "0.78rem",
-            lineHeight: 1.55,
-          }}
-        >
-          O Rei cruza as rondas dos lobos e mostra a síntese final abaixo.
-        </div>
-      ),
-    },
-  ];
+  const turns = normalizeTurns(ronda1, ronda2, ronda3, veredicto);
 
   return (
-    <div
-      className="debate-timeline"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-        paddingBottom: "4px",
-        borderBottom: "1px solid var(--cor-borda, var(--border, #2a2a3a))",
-      }}
-    >
-      <Abas
-        defaultActiva="veredicto"
-        abas={abas}
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px", width: "100%" }}>
+      <div
+        className="debate-timeline"
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          gap: "12px",
+          overflowX: "auto",
+          scrollSnapType: "x mandatory",
+          paddingBottom: "4px",
+          borderBottom: "1px solid var(--cor-borda, var(--border, #2a2a3a))",
+        }}
+      >
+        {turns.map(t => (
+          <div
+            key={t.id}
+            aria-current={turnoAtivo === t.id ? "step" : undefined}
+            style={{ scrollSnapAlign: "start", minWidth: "80vw" }}
+          >
+            {t.isFinal ? (
+              <div style={{ padding: "10px" }}>O Rei cruza as rondas dos lobos e mostra a síntese final abaixo.</div>
+            ) : (
+              <RondaSection titulo={t.titulo} lobos={t.lobos} defaultOpen={turnoAtivo === t.id} />
+            )}
+            <button
+               onClick={() => onForkTurn?.({ step: t.id, _injected: true })}
+               style={{ minHeight: "44px", width: "100%", marginTop: 8 }}
+            >
+               Bifurcar a partir daqui
+            </button>
+          </div>
+        ))}
+      </div>
+      <ConversationForks
+        currentTurnId={turnoAtivo}
+        forks={forks}
+        onFork={onFork}
+        onSelectTurn={onSelectTurn}
+        T={T}
+        AC={AC}
       />
     </div>
   );

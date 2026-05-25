@@ -1,7 +1,21 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { supabaseClient } from "../api/memory/_db.js";
 
 // EstadoVazio.jsx — ecrã inicial para sessões sem mensagens.
-export default function EstadoVazio({ titulo, subtitulo, sugestoes = [], onSugestao }) {
+export default function EstadoVazio({ titulo, subtitulo, sugestoes = [], onSugestao, userId, ragTopics = [] }) {
+  const [sugestoesDinamicas, setSugestoesDinamicas] = useState(sugestoes);
+
+  useEffect(() => {
+    // Se houver ragTopics ou userId, podemos buscar histórico ou adaptar sugestões
+    if (ragTopics.length > 0) {
+      const topicosBase = ragTopics.slice(0, 3).map(t => ({
+        texto: `Explica-me mais sobre ${t}...`,
+        modo: "casual"
+      }));
+      if (topicosBase.length > 0) setSugestoesDinamicas(topicosBase);
+    }
+  }, [ragTopics, userId]);
+
   const normalizarSugestao = (item) => {
     if (typeof item === "string") return { texto: item, modo: "casual" };
     return {
@@ -53,7 +67,7 @@ export default function EstadoVazio({ titulo, subtitulo, sugestoes = [], onSuges
         )}
       </div>
 
-      {sugestoes.length > 0 && (
+      {sugestoesDinamicas.length > 0 && (
         <div style={{ display: "grid", gap: 7, width: "100%", maxWidth: 520, marginTop: 4 }}>
           <style>
             {`@keyframes fade-in-chip {
@@ -61,7 +75,7 @@ export default function EstadoVazio({ titulo, subtitulo, sugestoes = [], onSuges
               to { opacity: 1; transform: translateY(0); }
             }`}
           </style>
-          {sugestoes.map((item, idx) => {
+          {sugestoesDinamicas.map((item, idx) => {
             const chip = normalizarSugestao(item);
             const textoVisivel = chip.texto.length > 40 ? `${chip.texto.slice(0, 40)}...` : chip.texto;
 

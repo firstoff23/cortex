@@ -14,6 +14,7 @@ export const LOBOS = [
     ],
     provider: 'openrouter',
     cor: '#ef4444',
+    ambito: 'Análise de rigor e consistência lógica',
   },
   {
     id: 2,
@@ -25,6 +26,7 @@ export const LOBOS = [
     ],
     provider: 'openrouter',
     cor: '#22c55e',
+    ambito: 'Perspetivas disruptivas e ideias fora da caixa',
   },
   {
     id: 3,
@@ -36,6 +38,7 @@ export const LOBOS = [
     ],
     provider: 'openrouter',
     cor: '#3b82f6',
+    ambito: 'Viabilidade técnica, código e arquitetura',
   },
   {
     id: 4,
@@ -47,6 +50,7 @@ export const LOBOS = [
     ],
     provider: 'openrouter',
     cor: '#eab308',
+    ambito: 'Visão global, integração e síntese',
   },
   {
     id: 5,
@@ -58,6 +62,7 @@ export const LOBOS = [
     ],
     provider: 'openrouter',
     cor: '#6b7280',
+    ambito: 'Identificação de riscos e pontos fracos',
   },
 ];
 

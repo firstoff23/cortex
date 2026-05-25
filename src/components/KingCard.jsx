@@ -302,6 +302,8 @@ const KingCard = React.memo(function KingCard({
               respostaBruta={textoPrincipal}
               confiancaFinal={king?.confianca_final}
               webSources={m.webSources || m.structured?.webSources || king?.webSources}
+              T={T}
+              wolves={m.lobeResults || []}
             />
           ) : (
             <ChatBubble papel="rei" nome="Rei do Córtex" cor={accent} destaque>

@@ -25,6 +25,8 @@ export default async function handler(req, res) {
       .order('created_at', { ascending: false })
       .limit(1);
 
+    if (latestError) throw latestError;
+
     const lastUpdated = latest && latest.length > 0 ? latest[0].created_at : null;
 
     return res.status(200).json({
