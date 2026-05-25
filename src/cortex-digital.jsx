@@ -17,6 +17,8 @@ import CouncilGrid from './components/CouncilGrid.jsx';
 import MobileInput from './mobile/components/MobileInput.jsx';
 import { PainelSintese } from './components/PainelSintese.jsx';
 import useCouncil from './hooks/useCouncil';
+import GenerationStatus from './components/GenerationStatus.jsx';
+import { GENERATION_STATES } from './utils/generationStates.js';
 import { useAutoResize } from "./hooks/useAutoResize.js";
 import useMobile from "./hooks/useMobile.js";
 import { useStreaming } from "./hooks/useStreaming.js";
@@ -687,7 +689,7 @@ export default function Cortex(){
   const { isMobile } = useMobile();
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
-  const { send: runCouncil, invoke: runInvoke, lobeResults, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, partialTexts, ragLatency } = useCouncil(msgs, setMsgs);
+  const { send: runCouncil, invoke: runInvoke, lobeResults, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, partialTexts, ragLatency, generationState, generationTime } = useCouncil(msgs, setMsgs);
   const [input,setInput]     = useState("");
   const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
@@ -807,6 +809,16 @@ export default function Cortex(){
               }}
               T={T}
             />
+          </div>
+        )}
+        {generationState !== GENERATION_STATES.IDLE && (
+          <div style={{ maxWidth: 820, margin: "0 auto 8px", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
+            <GenerationStatus state={generationState} T={T} />
+            {generationState === GENERATION_STATES.DONE && generationTime > 0 && (
+              <div style={{ fontSize: 9, color: T.ts, fontStyle: "italic", marginLeft: 8 }}>
+                Resposta gerada em {generationTime}s
+              </div>
+            )}
           </div>
         )}
       </>

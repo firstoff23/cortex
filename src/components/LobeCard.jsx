@@ -73,9 +73,25 @@ const LobeCard = React.memo(function LobeCard({
             <div style={{ fontSize: 11, fontWeight: 800, color: corLobe, letterSpacing: 0.3 }}>
               {nomeLobe}
             </div>
+            {l.ambito && (
+              <div
+                style={{
+                  fontSize: 8,
+                  color: T.ts,
+                  fontStyle: 'italic',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  opacity: 0.85
+                }}
+                title={l.ambito}
+              >
+                {l.ambito}
+              </div>
+            )}
             <div
               style={{
-                fontSize: 9,
+                fontSize: 8,
                 color: T.tf,
                 whiteSpace: "nowrap",
                 overflow: "hidden",

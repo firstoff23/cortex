@@ -153,6 +153,7 @@ function lobeDagParaUI(lobe, index, faseAlpha = [], faseBeta = [], lobeConfidenc
     latency: alpha?.telemetria?.tempo_ms || null,
     tokens: alpha?.telemetria?.total_tokens || null,
     confidence: lobeConfidenceScore(result, isErr),
+    ambito: lobe.ambito,
   };
 }
 

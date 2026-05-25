@@ -230,6 +230,8 @@
 - ✅ UTF-8 encoding fix — FEITO (charset headers Vite + Vercel, mojibake em cortex-digital.jsx)
 - ✅ Mobile fix — FEITO (chips wrap, input padding, botões encoding)
 - ✅ runDebate/runDebateStream — @deprecated (manter mas não usar em código novo)
+- ✅ Estados de progresso granulares — FEITO (`GenerationStatus.jsx`, `generationStates.js`, `useCouncil.js`)
+- ✅ Frases de âmbito no header dos lobos — FEITO (`council.js`, `LobeCard.jsx`, `useCouncil.js`)
 - Clerk GitHub OAuth — aguarda domínio próprio de produção
 - Persistência total com Supabase (substituir localStorage restante)
 - Cloudflare: DNS + WAF + rate limiting + Turnstile
