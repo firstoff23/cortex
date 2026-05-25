@@ -19,6 +19,9 @@ import { PainelSintese } from './components/PainelSintese.jsx';
 import useCouncil from './hooks/useCouncil';
 import GenerationStatus from './components/GenerationStatus.jsx';
 import { GENERATION_STATES } from './utils/generationStates.js';
+import PromptEnhancer from './components/PromptEnhancer.jsx';
+import QuickActionsBar from './components/QuickActionsBar.jsx';
+import ResultConfidence from './components/ResultConfidence.jsx';
 import { useAutoResize } from "./hooks/useAutoResize.js";
 import useMobile from "./hooks/useMobile.js";
 import { useStreaming } from "./hooks/useStreaming.js";
@@ -34,10 +37,18 @@ import {
 } from "./utils/sessionMemory.js";
 import { getMemoryStats, deleteMemory } from "./lib/memory.js";
 import { obterBadgeConfianca, obterFontesWebMensagem } from "./utils/confidence.js";
+import { createClient } from "@supabase/supabase-js";
+import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts.js";
+import useSessionPersistence from "./hooks/useSessionPersistence.js";
+import ConsensusMeter from "./components/ConsensusMeter.jsx";
 
 const MV="cortex-v12";
 const STYLE_KEY=`${MV}-style`;
 const CUSTOM_INSTRUCTIONS_KEY=`${MV}-custom-instructions`;
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+const supabaseClient = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 const MAX_BUF=8;
 const COMPRESS_THRESHOLD = 20; 
 const COMPRESS_KEEP_TAIL = 6;
@@ -190,11 +201,22 @@ function FontesWebVerificadas({ webSources }) {
   );
 }
 
-function PainelSinteseComConfianca({ respostaBruta, confiancaFinal, webSources }) {
+function PainelSinteseComConfianca({ respostaBruta, confiancaFinal, webSources, T, wolves = [] }) {
+  const confNum = Number(confiancaFinal || 75);
+  const confDecimal = confNum / 100;
+  
+  let explanation = "Acordo moderado com variações secundárias nas análises dos lobos.";
+  if (confNum >= 85) {
+    explanation = "Forte consenso entre os lobos com validação cruzada positiva dos juízes.";
+  } else if (confNum < 65) {
+    explanation = "Divergência significativa ou incerteza elevada nas conclusões do debate.";
+  }
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <ConfidenceBadge confiancaFinal={confiancaFinal} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <ResultConfidence confidence={confDecimal} explanation={explanation} T={T} />
       <PainelSintese respostaBruta={respostaBruta} />
+      <ConsensusMeter wolves={wolves} T={T} />
       <FontesWebVerificadas webSources={webSources} />
     </div>
   );
@@ -689,14 +711,14 @@ export default function Cortex(){
   const { isMobile } = useMobile();
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
-  const { send: runCouncil, invoke: runInvoke, lobeResults, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, partialTexts, ragLatency, generationState, generationTime } = useCouncil(msgs, setMsgs);
+  const { send: runCouncil, invoke: runInvoke, lobeResults, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, partialTexts, ragLatency, generationState, generationTime, activeLobes, isRouting } = useCouncil(msgs, setMsgs);
   const [input,setInput]     = useState("");
   const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
   const [pagina, setPagina] = useState('chat'); // 'chat' | 'mapas'
   const [theme,setTheme]     = useState("cortex");
   const [keys,setKeys]       = useState(defaultKeys);
-  const { toasts, toast, removerToast } = useToast();
+  const { toasts, toast, removerToast, notifyWolfError, notifyWolfSuccess } = useToast();
   const [modelsOn,setModelsOn] = useState(Object.fromEntries(MODELS.map(m=>[m.id,true])));
   const [temperaturas,setTemperaturas] = useState(Object.fromEntries(MODELS.map(m=>[m.id,0.7])));
   const [lobeConfigAberto,setLobeConfigAberto] = useState(null);
@@ -709,6 +731,43 @@ export default function Cortex(){
     try { return localStorage.getItem(CUSTOM_INSTRUCTIONS_KEY) || ""; } catch { return ""; }
   });
   const [userId, setUserId] = useState("anon");
+
+  const [forks, setForks] = useState([]);
+  const [turnoAtivo, setTurnoAtivo] = useState("veredicto");
+
+  const { saveSession, loadSession, isSyncing, error: syncError } = useSessionPersistence({
+    supabaseClient,
+    userId,
+    conversationId: currentConvId
+  });
+
+  const handleSelectTurn = (turnId) => {
+    setTurnoAtivo(turnId);
+    toast(`Turno activo mudado para: ${turnId}`, "info");
+  };
+
+  const handleForkTurn = (payload) => {
+    if (!payload || !payload.step) return;
+    const { step, _injected } = payload;
+    if (!_injected) {
+      console.warn("Fork bloqueado: payload sem _injected: true");
+      return;
+    }
+    const newFork = {
+      turnId: step,
+      title: `Bifurcação do debate no passo ${step}`,
+      timestamp: Date.now()
+    };
+    setForks(prev => {
+      if (prev.some(f => f.turnId === step)) {
+        toast(`Já existe um fork para o passo ${step}`, "aviso");
+        return prev;
+      }
+      const updated = [...prev, newFork];
+      toast(`Fork criado com sucesso a partir do passo ${step}`, "sucesso");
+      return updated;
+    });
+  };
 
   // modais
   const [showGuide,setShowGuide]   = useState(false);
@@ -726,6 +785,7 @@ export default function Cortex(){
   const [showSidebar, setShowSidebar] = useState(false);
   const [showBlueprintsPanel, setShowBlueprintsPanel] = useState(false);
   const [showForensePanel, setShowForensePanel] = useState(false);
+  const [showExportSidePanel, setShowExportSidePanel] = useState(false);
   const [landingPanel, setLandingPanel] = useState(null);
   const [supabaseStats, setSupabaseStats] = useState(null);
   const [recentMemories, setRecentMemories] = useState([]);
@@ -749,6 +809,19 @@ export default function Cortex(){
   const { ref: inputRef, ajustar } = useAutoResize({
     minHeight: 52,
     maxHeight: 200
+  });
+
+  useKeyboardShortcuts({
+    onSubmit: () => { send(); ajustar(true); },
+    onCancel: stopGeneration,
+    onForense: () => setShowForensePanel(true),
+    onClear: () => {
+      if (window.confirm("Tens a certeza que desejas limpar a conversa actual?")) {
+        newChat();
+      }
+    },
+    inputRef,
+    isGenerating
   });
 
   const botRef  = useRef(null);
@@ -821,6 +894,20 @@ export default function Cortex(){
             )}
           </div>
         )}
+        <div style={{ maxWidth: 820, margin: "0 auto" }}>
+          <PromptEnhancer
+            input={input}
+            onApply={(enhanced) => {
+              setInput(enhanced);
+              requestAnimationFrame(() => {
+                ajustar();
+                inputRef.current?.focus();
+              });
+            }}
+            T={T}
+            AC={AC}
+          />
+        </div>
       </>
     );
   };
@@ -841,7 +928,33 @@ export default function Cortex(){
       const convs = await safeGet(MV+"-convs", []);
       setConversations(Array.isArray(convs) ? convs : []);
       setBrain(normBrain(b));
-      setMsgs(Array.isArray(m)?m:[]);
+      
+      // Verificar se há share param na URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const shareData = urlParams.get("share");
+      if (shareData) {
+        try {
+          const decoded = JSON.parse(decodeURIComponent(atob(shareData)));
+          if (decoded && decoded.p && decoded.v) {
+            window.history.replaceState({}, document.title, window.location.origin);
+            const sharedMsgs = [
+              { role: "user", content: decoded.p },
+              { role: "assistant", content: decoded.v, king: { veredicto: decoded.v }, _injected: true }
+            ];
+            setMsgs(sharedMsgs);
+            await safePut(MV+"-msgs", sharedMsgs);
+            toast("Debate partilhado carregado com sucesso!", "sucesso");
+          } else {
+            setMsgs(Array.isArray(m)?m:[]);
+          }
+        } catch (e) {
+          console.error("Erro ao decodificar share link:", e);
+          setMsgs(Array.isArray(m)?m:[]);
+        }
+      } else {
+        setMsgs(Array.isArray(m)?m:[]);
+      }
+
       setKeys({...defaultKeys,...(k&&typeof k==="object"?k:{})});
       setTheme(typeof t==="string"&&THEMES[t]?t:"cortex");
       setModelsOn(mo&&typeof mo==="object"?mo:Object.fromEntries(MODELS.map(x=>[x.id,true])));
@@ -888,6 +1001,14 @@ export default function Cortex(){
     if (msgs.some((m)=>m.role==="user")) return;
     getLastSessionContextFromSupabase(userId).then(setContextoSessaoAnterior);
   },[loaded, currentConvId, msgs, userId]);
+
+  useEffect(() => {
+    if (loaded && currentConvId) {
+      loadSession(currentConvId).then((loadedMsgs) => {
+        if (loadedMsgs) setMsgs(loadedMsgs);
+      });
+    }
+  }, [loaded, currentConvId, loadSession]);
 
   useEffect(()=>{
     const guardarAntesDeSair = () => {
@@ -943,12 +1064,15 @@ export default function Cortex(){
   },[isMobile]);
 
   useEffect(()=>{
-    if(showGuide || showModels || showTP || showSidebar || showBlueprintsPanel || showForensePanel) setFabOpen(false);
-  },[showGuide,showModels,showTP,showSidebar,showBlueprintsPanel,showForensePanel]);
+    if(showGuide || showModels || showTP || showSidebar || showBlueprintsPanel || showForensePanel || showExportSidePanel) setFabOpen(false);
+  },[showGuide,showModels,showTP,showSidebar,showBlueprintsPanel,showForensePanel,showExportSidePanel]);
 
 const saveConvs = c => safePut(MV+"-convs", c.slice(0,50));
   const saveBrain  = b  => safePut(MV+"-brain",  b);
-  const saveMsgs   = m  => safePut(MV+"-msgs",   m.slice(-MAX_STORED));
+  const saveMsgs   = m  => {
+    safePut(MV+"-msgs",   m.slice(-MAX_STORED));
+    saveSession(m);
+  };
   const saveKeys   = k  => safePut("cortex-keys-global", k);
   const saveTheme  = t  => safePut(MV+"-theme",  t);
   const saveModels = mo => safePut(MV+"-models", mo);
@@ -1131,6 +1255,8 @@ async function send(query, options = {}) {
     MAX_PATTERNS,
     MAX_EPISODIC,
     toast,
+    notifyWolfSuccess,
+    notifyWolfError,
     autoSaveConv,
     currentConvId,
     taRef: inputRef,
@@ -1183,6 +1309,26 @@ async function send(query, options = {}) {
     navigator.clipboard?.writeText(md);
     const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([md],{type:"text/markdown"}));a.download=`cortex-${Date.now()}.md`;a.click();
     toast("Relatório exportado","success");
+  }
+
+  function handleQuickAction(actionId) {
+    if (actionId === "resumir") {
+      send("Faz um resumo breve e estruturado deste debate/conversa.");
+    } else if (actionId === "forense") {
+      setShowForensePanel(true);
+    } else if (actionId === "copiar") {
+      const lastAssistant = [...msgs].reverse().find(m => m.role === "assistant");
+      if (lastAssistant) {
+        const texto = lastAssistant.king?.veredicto || lastAssistant.structured?.final || lastAssistant.content || "";
+        navigator.clipboard?.writeText(texto).then(() => {
+          toast("Veredicto copiado para a área de transferência", "sucesso");
+        });
+      } else {
+        toast("Nenhuma resposta disponível para copiar", "info");
+      }
+    } else if (actionId === "exportar") {
+      setShowExportSidePanel(true);
+    }
   }
 
   function applySeed(){
@@ -1693,7 +1839,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
   >
     {renderLandingPanelContent()}
   </SidePanel>
-  <SidePanel aberto={showSidebar} onFechar={()=>setShowSidebar(false)} titulo={"Histórico"}>
+  <SidePanel aberto={showSidebar} onFechar={()=>setShowSidebar(false)} titulo={"Histórico"} exportData={{ msgs, T, AC, toast }}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:10}}>
       <span style={{fontSize:11,color:T.ts}}>{conversations.length} {"Conversas"}</span>
       <button onClick={newChat} style={{...btn(T,AC.claude),fontSize:9,padding:"4px 10px"}}>{"Nova Conversa"}</button>
@@ -1729,6 +1875,7 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
     onFechar={()=>setShowForensePanel(false)}
     titulo="Modo Forense"
     largura="min(520px, 94vw)"
+    exportData={{ msgs, T, AC, toast }}
   >
     <div style={{display:"flex",flexDirection:"column",gap:16,maxHeight:"100%",overflowY:"auto",paddingBottom:20}}>
       
@@ -1818,6 +1965,20 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
       </div>
 
     </div>
+  </SidePanel>
+  <SidePanel
+    aberto={showExportSidePanel}
+    onFechar={() => setShowExportSidePanel(false)}
+    titulo="Exportar Relatório"
+    largura="min(460px, 94vw)"
+  >
+    <ExportPanel
+      msgs={msgs}
+      T={T}
+      AC={AC}
+      toast={toast}
+      onClose={() => setShowExportSidePanel(false)}
+    />
   </SidePanel>
 </>
           {DEV_MODE && (
@@ -2065,6 +2226,11 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
   textosParciais={textosParciais}
   aStreaming={aStreaming}
   onSuggestionClick={aplicarSugestaoRei}
+  forks={forks}
+  onFork={(step) => handleForkTurn({ step, _injected: true })}
+  onSelectTurn={handleSelectTurn}
+  turnoAtivo={turnoAtivo}
+  onForkTurn={handleForkTurn}
 />
 
                 {cur&&(
@@ -2102,6 +2268,14 @@ function normalizeCouncilPayload(raw, fallbackText = "") {
               </div>
             )}
           </div>
+          
+          <QuickActionsBar
+            onAction={handleQuickAction}
+            msgs={msgs}
+            T={T}
+            AC={AC}
+            disabled={!!phase}
+          />
 
           {!isMobile && (
           <div style={{padding:"8px 10px",paddingBottom:"16px",background:T.s1,borderTop:`1px solid ${T.b2}`,flexShrink:0}}>

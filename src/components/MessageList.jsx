@@ -35,6 +35,11 @@ const MessageList = React.memo(function MessageList({
   textosParciais,
   aStreaming,
   onSuggestionClick = () => {},
+  forks = [],
+  onFork,
+  onSelectTurn,
+  turnoAtivo,
+  onForkTurn,
 }) {
   const ClaudeCardView = ClaudeCardComponent;
 
@@ -202,6 +207,13 @@ const MessageList = React.memo(function MessageList({
                         ronda2={m.debate?.ronda2}
                         ronda3={m.debate?.ronda3}
                         modoDebate={m.modoDebate}
+                        forks={forks}
+                        onFork={onFork}
+                        onSelectTurn={onSelectTurn}
+                        turnoAtivo={turnoAtivo}
+                        onForkTurn={onForkTurn}
+                        T={T}
+                        AC={AC}
                       />
                     ) : null
                   }

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, createContext, useContext } from "react";
 
 // Toast.jsx — notificações nativas sem Sonner/Radix.
 const TIPOS = {
@@ -8,9 +8,17 @@ const TIPOS = {
   info: { cor: "#3b82f6", icone: "ℹ" },
   sucesso: { cor: "#22c55e", icone: "✓" },
   success: { cor: "#22c55e", icone: "✓" },
+  wolf: { cor: "var(--accent, #8b5cf6)", icone: "🐺" },
 };
 
+const TOAST_LIMIT = 3;
+export const ToastContext = createContext(null);
+
 export function useToast() {
+  const context = useContext(ToastContext);
+  if (context) return context;
+
+  // Fallback se não for usado dentro do provider
   const [toasts, setToasts] = useState([]);
 
   const removerToast = useCallback((id) => {
@@ -19,12 +27,29 @@ export function useToast() {
 
   const toast = useCallback((mensagem, tipo = "erro") => {
     const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, mensagem, tipo }]);
+    setToasts((prev) => {
+      const novos = [...prev, { id, mensagem, tipo }];
+      if (novos.length > TOAST_LIMIT) return novos.slice(novos.length - TOAST_LIMIT);
+      return novos;
+    });
     setTimeout(() => removerToast(id), 4000);
     return id;
   }, [removerToast]);
 
-  return { toasts, toast, removerToast };
+  const notifyWolfError = useCallback((wolfName, message) => toast(`[${wolfName}] ${message}`, "erro"), [toast]);
+  const notifyWolfSuccess = useCallback((wolfName, message) => toast(`[${wolfName}] ${message}`, "wolf"), [toast]);
+
+  return { toasts, toast, removerToast, notifyWolfError, notifyWolfSuccess };
+}
+
+export function ToastProvider({ children }) {
+  const toastData = useToast();
+  return (
+    <ToastContext.Provider value={toastData}>
+      {children}
+      <Toast toasts={toastData.toasts} onFechar={toastData.removerToast} />
+    </ToastContext.Provider>
+  );
 }
 
 export default function Toast({ toasts = [], onFechar }) {

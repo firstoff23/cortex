@@ -21,6 +21,7 @@ import {
   saveMemoryEntry,
   getLastSessionContext,
 } from "../utils/sessionMemory.js";
+import useAdaptiveRouting from "./useAdaptiveRouting.js";
 
 // Cache curta de respostas dos lobos para evitar chamadas repetidas.
 const responseCache = new Map();
@@ -200,6 +201,7 @@ export async function runDebateStream(pergunta, modo = "paralelo", options = {})
 
 
 export default function useCouncil(msgs, setMsgs) {
+  const { activeLobes, isRouting, routePromptRequest } = useAdaptiveRouting();
   const [phase, setPhase] = useState(FASES_DAG.OCIOSO);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationState, setGenerationState] = useState(GENERATION_STATES.IDLE);
@@ -288,7 +290,7 @@ export default function useCouncil(msgs, setMsgs) {
   }, []);
 
   async function invoke(id, sys, msg, ctx = {}) {
-    const { toast, callOllama } = ctx;
+    const { toast, callOllama, notifyWolfSuccess, notifyWolfError } = ctx;
     const ctrl = new AbortController();
     controllersRef.current.set(id, ctrl);
 
@@ -329,6 +331,8 @@ export default function useCouncil(msgs, setMsgs) {
       const text = await callOpenRouter(id, sys, msg, 420, 30000, { signal: ctrl.signal });
       const r = ok(text, true, Date.now() - t0);
       cacheSet(id, msg, r);
+      const nomeLobe = LOBOS.find((lobe) => String(lobe.id) === String(id))?.nome || id;
+      notifyWolfSuccess?.(nomeLobe);
       return r;
     } catch (e) {
       if (e.name === "AbortError") {
@@ -338,6 +342,7 @@ export default function useCouncil(msgs, setMsgs) {
       const erro = classifyError(e);
       toast?.(`${id}: ${erro.mensagem} ${erro.accao}.`, "erro");
       const nomeLobe = LOBOS.find((lobe) => String(lobe.id) === String(id))?.nome || id;
+      notifyWolfError?.(nomeLobe, errMsg || "indisponível");
       return { result: `[Erro em ${nomeLobe}: ${errMsg || "serviço indisponível"}]`, model: id, real: false };
     } finally {
       if (controllersRef.current.get(id) === ctrl) controllersRef.current.delete(id);
@@ -385,6 +390,8 @@ export default function useCouncil(msgs, setMsgs) {
       imageDataUrl,
       systemPrompts,
       userId,
+      notifyWolfSuccess,
+      notifyWolfError,
     } = ctx;
 
     const q = (query || input).trim();
@@ -478,14 +485,17 @@ export default function useCouncil(msgs, setMsgs) {
     const mem = buildMem(brain);
     const usedMem = selectUsedMem(brain, q);
 
-    let councilLobes = LOBES.filter(
+    // Roteamento adaptativo de prompts
+    const routedLobes = await routePromptRequest(q);
+
+    let councilLobes = routedLobes.filter(
       (l) =>
         modelsOn[l.id] !== false &&
         (!focusMode || focusLobes.has(l.id))
     ).slice(0, 5);
 
     if (!councilLobes.length && focusMode) {
-      councilLobes = LOBES.filter(
+      councilLobes = routedLobes.filter(
         (l) => modelsOn[l.id] !== false
       ).slice(0, 5);
     }
@@ -550,6 +560,16 @@ export default function useCouncil(msgs, setMsgs) {
       lobeDagParaUI(l, i, debateResultado.fase_alpha, debateResultado.fase_beta, lobeConfidenceScore)
     );
     setLobeResults(nextLobeResults);
+    
+    // Disparar notificações de sucesso/erro dos lobos
+    nextLobeResults.forEach((l) => {
+      if (l.isErr) {
+        notifyWolfError?.(l.label, l.result || "Falha ao responder");
+      } else {
+        notifyWolfSuccess?.(l.label);
+      }
+    });
+
     nextLobeResults
       .filter((l) => l.isErr)
       .slice(0, 2)
@@ -779,6 +799,8 @@ export default function useCouncil(msgs, setMsgs) {
     guardarMemoriaSessao,
     getLastSessionContext,
     partialTexts: partialTextRef,
-    ragLatency
+    ragLatency,
+    activeLobes,
+    isRouting
   };
 }

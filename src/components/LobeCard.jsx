@@ -21,6 +21,8 @@ const LobeCard = React.memo(function LobeCard({
   Markdown,
   textosParciais,
   aStreaming,
+  stance,
+  onSelectTurn,
 }) {
   const streamKey = l.streamId ?? l.id;
   const textoParcial = textosParciais?.[streamKey] || textosParciais?.[l.id] || "";
@@ -32,6 +34,7 @@ const LobeCard = React.memo(function LobeCard({
   return (
     <div
       className="lobe-card"
+      onClick={() => onSelectTurn?.(l)}
       style={{
         position: "relative",
         alignSelf: "start",
@@ -41,6 +44,8 @@ const LobeCard = React.memo(function LobeCard({
         borderRadius: 14,
         padding: "12px 12px 10px",
         boxShadow: "0 4px 14px #00000016",
+        cursor: onSelectTurn ? "pointer" : "default",
+        opacity: stance === "discorda" ? 0.8 : 1,
       }}
     >
       <div
