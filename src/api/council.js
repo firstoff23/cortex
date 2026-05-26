@@ -2,6 +2,7 @@
 
 import { runKing } from './king.js';
 import { calcularConsensoMatematico } from './judges.js';
+import { traceLobe } from '../lib/monitoring.js';
 
 export const LOBOS = [
   {
@@ -517,7 +518,18 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
   if (cacheStatus) console.log(`[Cache] ${lobe.nome}: ${cacheStatus}`);
 
   if (!resposta.ok || dados.error) {
-    throw new Error(dados.error?.message || dados.error || `HTTP ${resposta.status}`);
+    const erro = dados.error?.message || dados.error || `HTTP ${resposta.status}`;
+    await traceLobe({
+      lobo: lobe.nome,
+      modelo: lobe.modelo,
+      pergunta,
+      resposta: '',
+      sucesso: false,
+      erro,
+      tempoMs: Date.now() - inicio,
+      fase: contextoDebate ? 'beta' : 'alpha',
+    }).catch(() => {});
+    throw new Error(erro);
   }
 
   // Quando web search está activo, a resposta pode conter chamadas de ferramenta em vez de conteúdo directo.
@@ -527,11 +539,22 @@ export async function chamarLobe(lobe, pergunta, contextoDebate = null, options 
     dados.content ||
     '';
   const texto = limparThinking(textoRaw);
+  const telemetria = extrairTelemetriaOpenRouter(dados, Date.now() - inicio, cacheStatus);
+  await traceLobe({
+    lobo: lobe.nome,
+    modelo: lobe.modelo,
+    pergunta,
+    resposta: texto,
+    sucesso: true,
+    tempoMs: telemetria.tempo_ms,
+    tokens: telemetria.total_tokens,
+    fase: contextoDebate ? 'beta' : 'alpha',
+  }).catch(() => {});
   return normalizarValorLobe(
     lobe,
     {
       resposta: texto,
-      telemetria: extrairTelemetriaOpenRouter(dados, Date.now() - inicio, cacheStatus),
+      telemetria,
     },
     contextoDebate,
   );

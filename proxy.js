@@ -3,7 +3,10 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { existsSync, readFileSync } from "fs";
 import sanitize from "./middleware/sanitize.js"; // ← .js obrigatório em ESM
+import arcjetMiddleware from "./middleware/arcjet.js";
 import notionExportHandler from "./api/notion-export.js";
+import { notifyCouncilError, notifyLobeTimeout } from "./src/lib/discord.js";
+import { traceLobe } from "./src/lib/monitoring.js";
 
 const PROD_ORIGIN = "https://cortex-five-hazel.vercel.app";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -45,7 +48,7 @@ const aiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-app.use(["/api/chat", "/api/nim-proxy", "/ollama", "/gemini/{*path}"], aiLimiter, sanitize);
+app.use(["/api/chat", "/api/nim-proxy", "/ollama", "/gemini/{*path}"], aiLimiter, arcjetMiddleware, sanitize);
 
 async function lerJsonSeguro(resposta) {
   const texto = await resposta.text().catch(() => "");
@@ -72,6 +75,31 @@ function lerNimKey() {
   return process.env.NVIDIA_NIM_KEY || process.env.VITE_NVIDIA_NIM_KEY;
 }
 
+function resumirConteudo(conteudo) {
+  if (typeof conteudo === "string") return conteudo.slice(0, 800);
+  if (Array.isArray(conteudo)) {
+    const texto = conteudo.find((item) => item?.type === "text")?.text;
+    return texto ? String(texto).slice(0, 800) : "[conteúdo multimodal]";
+  }
+  return "";
+}
+
+function perguntaDoProxy(messages) {
+  const ultima = Array.isArray(messages) ? messages.at(-1) : null;
+  return resumirConteudo(ultima?.content);
+}
+
+function textoRespostaOpenRouter(dados) {
+  return dados?.choices?.[0]?.message?.content || dados?.content || "";
+}
+
+function notificarTimeoutSeAplicavel(erro, contexto) {
+  const texto = erroTexto(erro);
+  if (contexto.status === 408 || contexto.status === 504 || /timeout/i.test(texto)) {
+    notifyLobeTimeout(contexto).catch(() => {});
+  }
+}
+
 // ── Proxy local compatível com /api/chat da Vercel ───────────
 app.post("/api/chat", async (req, res) => {
   const { model, messages, system, max_tokens } = req.body || {};
@@ -94,9 +122,11 @@ app.post("/api/chat", async (req, res) => {
     : [model];
   let ultimoErro = null;
   let ultimoStatus = 502;
+  const perguntaTrace = perguntaDoProxy(messages);
 
   try {
     for (const modeloAtual of modelos) {
+      const inicio = Date.now();
       const upstream = await fetch(OPENROUTER_URL, {
         method: "POST",
         headers: {
@@ -110,8 +140,22 @@ app.post("/api/chat", async (req, res) => {
       const dados = await lerJsonSeguro(upstream);
       ultimoStatus = upstream.status;
       ultimoErro = dados;
+      const sucesso = upstream.ok && !dados.error && dados.choices?.[0];
+      const erro = dados.error?.message || dados.error || (!upstream.ok ? `HTTP ${upstream.status}` : null);
 
-      if (upstream.ok && !dados.error && dados.choices?.[0]) {
+      traceLobe({
+        lobo: "proxy:/api/chat",
+        modelo: modeloAtual,
+        pergunta: perguntaTrace,
+        resposta: textoRespostaOpenRouter(dados),
+        sucesso: Boolean(sucesso),
+        erro,
+        tempoMs: Date.now() - inicio,
+        tokens: dados.usage?.total_tokens,
+        fase: "proxy",
+      }).catch(() => {});
+
+      if (sucesso) {
         const choice = dados.choices[0];
         return res.status(200).json({
           content: choice.message?.content || "",
@@ -120,7 +164,22 @@ app.post("/api/chat", async (req, res) => {
           usage: dados.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
         });
       }
+
+      notificarTimeoutSeAplicavel(erro || dados, {
+        lobo: "proxy:/api/chat",
+        modelo: modeloAtual,
+        tempoMs: Date.now() - inicio,
+        status: upstream.status,
+        fase: "proxy",
+      });
     }
+
+    notifyCouncilError(new Error("OpenRouter devolveu erro"), {
+      fase: "proxy",
+      status: ultimoStatus,
+      modelo: model,
+      detalhe: erroTexto(ultimoErro?.error || ultimoErro),
+    }).catch(() => {});
 
     return res.status(502).json({
       error: "OpenRouter devolveu erro",
@@ -128,6 +187,12 @@ app.post("/api/chat", async (req, res) => {
       detail: erroTexto(ultimoErro?.error || ultimoErro),
     });
   } catch (e) {
+    notificarTimeoutSeAplicavel(e, {
+      lobo: "proxy:/api/chat",
+      modelo: model,
+      fase: "proxy",
+    });
+    notifyCouncilError(e, { fase: "proxy", modelo: model }).catch(() => {});
     return res.status(500).json({ error: e.message });
   }
 });
