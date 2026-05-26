@@ -41,6 +41,7 @@ import { createClient } from "@supabase/supabase-js";
 import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts.js";
 import useSessionPersistence from "./hooks/useSessionPersistence.js";
 import ConsensusMeter from "./components/ConsensusMeter.jsx";
+import ExportPanel from "./components/ExportPanel.jsx";
 
 const MV="cortex-v12";
 const STYLE_KEY=`${MV}-style`;
