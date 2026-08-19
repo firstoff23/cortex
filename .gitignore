@@ -65,3 +65,6 @@ roadmap.txt
 **/.vs/
 supabase/.temp/
 
+
+# Relatórios transitórios de cobertura
+coverage/

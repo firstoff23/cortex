@@ -29,6 +29,9 @@
   <a href="https://github.com/firstoff23/cortex/actions/workflows/quality-checks.yml">
     <img src="https://github.com/firstoff23/cortex/actions/workflows/quality-checks.yml/badge.svg" alt="Estado do workflow de testes e compilação" />
   </a>
+  <a href="https://github.com/firstoff23/cortex/actions/workflows/coverage.yml">
+    <img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffirstoff23%2Fcortex%2Fmain%2Fbadges%2Fcoverage.json" alt="Cobertura de testes" />
+  </a>
 </p>
 
 ---
