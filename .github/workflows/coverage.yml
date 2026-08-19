@@ -58,8 +58,8 @@ jobs:
       - name: Guardar relatório de cobertura
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-summary
-          path: coverage/coverage-summary.json
+          name: coverage-report
+          path: coverage/
           if-no-files-found: error
 
   publish-badge:
@@ -81,7 +81,7 @@ jobs:
       - name: Obter resumo de cobertura
         uses: actions/download-artifact@v5
         with:
-          name: coverage-summary
+          name: coverage-report
           path: coverage
 
       - name: Atualizar badge
