@@ -26,6 +26,9 @@
   <a href="https://github.com/firstoff23/cortex/actions/workflows/readme-check.yml">
     <img src="https://github.com/firstoff23/cortex/actions/workflows/readme-check.yml/badge.svg" alt="Estado do workflow README checks" />
   </a>
+  <a href="https://github.com/firstoff23/cortex/actions/workflows/quality-checks.yml">
+    <img src="https://github.com/firstoff23/cortex/actions/workflows/quality-checks.yml/badge.svg" alt="Estado do workflow de testes e compilação" />
+  </a>
 </p>
 
 ---

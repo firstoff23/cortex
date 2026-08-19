@@ -1,0 +1,57 @@
+name: Quality checks
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "api/**"
+      - "lib/**"
+      - "middleware/**"
+      - "evals/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.*"
+      - ".github/workflows/quality-checks.yml"
+  push:
+    paths:
+      - "src/**"
+      - "api/**"
+      - "lib/**"
+      - "middleware/**"
+      - "evals/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.*"
+      - ".github/workflows/quality-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    name: Testar e compilar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Obter o repositório
+        uses: actions/checkout@v5
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm install --package-lock=false
+
+      - name: Executar testes
+        run: npm run test
+
+      - name: Compilar para produção
+        run: npm run build
