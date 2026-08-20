@@ -42,6 +42,7 @@ import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts.js";
 import useSessionPersistence from "./hooks/useSessionPersistence.js";
 import ConsensusMeter from "./components/ConsensusMeter.jsx";
 import ExportPanel from "./components/ExportPanel.jsx";
+import { buildSessionTransparency } from "./utils/sessionTransparency.js";
 
 const MV="cortex-v12";
 const STYLE_KEY=`${MV}-style`;
@@ -202,6 +203,39 @@ function FontesWebVerificadas({ webSources }) {
   );
 }
 
+function SessionTransparencyPanel({ wolves, webSources, T }) {
+  const summary = buildSessionTransparency(wolves, webSources);
+  const participantText = summary.participantCount
+    ? summary.participants.join(", ")
+    : "Participantes não disponibilizados";
+  const sourceText = summary.hasExternalSources
+    ? `${summary.sourceCount} fonte${summary.sourceCount === 1 ? "" : "s"} externa${summary.sourceCount === 1 ? "" : "s"} apresentada${summary.sourceCount === 1 ? "" : "s"} abaixo`
+    : "Sem fontes externas anexadas a esta resposta";
+
+  return (
+    <details
+      style={{
+        background: T.s2,
+        border: `1px solid ${T.b1}`,
+        borderRadius: 10,
+        padding: "8px 10px",
+        color: T.ts,
+        fontSize: 11,
+        lineHeight: 1.5,
+      }}
+    >
+      <summary style={{ cursor: "pointer", color: T.tx, fontWeight: 800 }}>
+        Transparência da sessão
+      </summary>
+      <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 8 }}>
+        <span><strong style={{ color: T.tx }}>Participantes ({summary.participantCount}):</strong> {participantText}</span>
+        <span><strong style={{ color: T.tx }}>Fontes:</strong> {sourceText}.</span>
+        <span>O indicador de confiança resume consenso e verificações disponíveis; não garante que a resposta esteja correta.</span>
+      </div>
+    </details>
+  );
+}
+
 function PainelSinteseComConfianca({ respostaBruta, confiancaFinal, webSources, T, wolves = [] }) {
   const confNum = Number(confiancaFinal || 75);
   const confDecimal = confNum / 100;
@@ -218,6 +252,7 @@ function PainelSinteseComConfianca({ respostaBruta, confiancaFinal, webSources, 
       <ResultConfidence confidence={confDecimal} explanation={explanation} T={T} />
       <PainelSintese respostaBruta={respostaBruta} />
       <ConsensusMeter wolves={wolves} T={T} />
+      <SessionTransparencyPanel wolves={wolves} webSources={webSources} T={T} />
       <FontesWebVerificadas webSources={webSources} />
     </div>
   );
@@ -712,7 +747,7 @@ export default function Cortex(){
   const { isMobile } = useMobile();
   const [brain,setBrain]     = useState(defaultBrain);
   const [msgs,setMsgs]       = useState([]);
-  const { send: runCouncil, invoke: runInvoke, lobeResults, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, partialTexts, ragLatency, generationState, generationTime, activeLobes, isRouting } = useCouncil(msgs, setMsgs);
+  const { send: runCouncil, invoke: runInvoke, lobeResults, cacheSize, phase, setPhase, stopGeneration, isGenerating, frustrationLevel, setFrustrationLevel, guardarMemoriaSessao, partialTexts, ragLatency, generationState, generationTime } = useCouncil(msgs, setMsgs);
   const [input,setInput]     = useState("");
   const [buf,setBuf]         = useState([]);  const [loaded,setLoaded]   = useState(false);
   const [page,setPage]       = useState("chat");
@@ -737,7 +772,7 @@ export default function Cortex(){
   const [forks, setForks] = useState([]);
   const [turnoAtivo, setTurnoAtivo] = useState("veredicto");
 
-  const { saveSession, loadSession, isSyncing, error: syncError } = useSessionPersistence({
+  const { saveSession, loadSession } = useSessionPersistence({
     supabaseClient,
     userId,
     conversationId: currentConvId

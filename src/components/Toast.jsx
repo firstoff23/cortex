@@ -16,7 +16,6 @@ export const ToastContext = createContext(null);
 
 export function useToast() {
   const context = useContext(ToastContext);
-  if (context) return context;
 
   // Fallback se não for usado dentro do provider
   const [toasts, setToasts] = useState([]);
@@ -39,7 +38,8 @@ export function useToast() {
   const notifyWolfError = useCallback((wolfName, message) => toast(`[${wolfName}] ${message}`, "erro"), [toast]);
   const notifyWolfSuccess = useCallback((wolfName, message) => toast(`[${wolfName}] ${message}`, "wolf"), [toast]);
 
-  return { toasts, toast, removerToast, notifyWolfError, notifyWolfSuccess };
+  const fallback = { toasts, toast, removerToast, notifyWolfError, notifyWolfSuccess };
+  return context ?? fallback;
 }
 
 export function ToastProvider({ children }) {

@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { supabaseClient } from "../api/memory/_db.js";
-
 // EstadoVazio.jsx — ecrã inicial para sessões sem mensagens.
 export default function EstadoVazio({ titulo, subtitulo, sugestoes = [], onSugestao, userId, ragTopics = [] }) {
   const [sugestoesDinamicas, setSugestoesDinamicas] = useState(sugestoes);
